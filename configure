@@ -1,0 +1,44 @@
+#!/bin/bash
+
+set -e
+
+which dialog > /dev/null
+
+touch "./Makefile.inc"
+
+LIBDIR=$(dialog --no-cancel --clear --no-collapse --title "Select library path (<SPACE> to auto-complete)" \
+    --backtitle "Please select the path to the microblaze BSP libraries (libc.a, libxil.a, etc.):" \
+    --stdout --dselect "/" 14 60)
+
+test -d $LIBDIR
+
+echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"$LIBDIR\"\n" > Makefile.inc
+
+
+INCDIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to include/ headers (<SPACE> to auto-complete)" \
+    --backtitle "Please select the path to include the microblaze BSP library header files (xparameters.h, xil_hal.h, xio.h, etc.):" \
+    --stdout --dselect "/" 14 60)
+
+test -d $INCDIR
+
+echo -e "#path to microblaze bsp library hearders:\nINCDIR=\"$INCDIR\"\n" >> Makefile.inc
+
+
+BUILD_ELF_DIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to output Elf (<SPACE> to auto-complete)" \
+    --backtitle "Please select the path in which to output the Elf file (This is the dir which Vivado searches for Elf):" \
+    --stdout --dselect "/" 14 60)
+
+test -d $BUILD_ELF_DIR
+
+echo -e "#path which Vivado searches for Elf file:\nBUILD_ELF_DIR=\"$BUILD_ELF_DIR\"\n" >> Makefile.inc
+
+
+CCPATH=$(dialog --no-cancel --clear --no-collapse --title "Select path to toolchain (<SPACE> to auto-complete)" \
+    --backtitle "Please select the path in which the microblaze gcc tools are installed:" \
+    --stdout --dselect "/opt/Xilinx/SDK/2016.2/gnu/microblaze/lin/bin/" 14 60)
+
+test -d $CCPATH
+
+echo -e "#path to cross-compiler installation directory\nCCPATH=\"$CCPATH\"" >> Makefile.inc
+
+clear
