@@ -37,6 +37,8 @@
 #endif
 
 #define DEBUG_PRINT
+//uncomment if you want to see more debug output
+//#define TRACE_PRINT
 
 //#define DO_40GBE_LOOPBACK_TEST
 
@@ -118,8 +120,8 @@ volatile u16 uQSFPBootloaderVersionMinor;
 volatile u32 uPreviousAsyncSdramRead;
 volatile u16 uPreviousSequenceNumber;
 
-#define EMBEDDED_SOFTWARE_VERSION_MAJOR		0x4002
-#define EMBEDDED_SOFTWARE_VERSION_MINOR		0x0000
+#define EMBEDDED_SOFTWARE_VERSION_MAJOR		0x8002
+#define EMBEDDED_SOFTWARE_VERSION_MINOR		0x0001
 
 // WISHBONE SLAVE ADDRESSES
 #define BOARD_REGISTER_ADDR			0x00000000
@@ -283,14 +285,15 @@ volatile u16 uPreviousSequenceNumber;
 
 #define DHCP_PARAMETER_ROUTER			3
 
-#define DHCP_ROUTER_OPTION				3
-
-#define DHCP_SERVER_OPTION				54
-
+//dhcp option macros
+#define DHCP_ROUTER_OPTION				  3
+#define DHCP_HOST_NAME_OPTION			  12
+#define DHCP_SERVER_OPTION				  54
 #define DHCP_REQUESTED_IP_OPTION		50
+#define DHCP_VENDOR_CLASS_ID_OPTION 60
 
-#define DHCP_END_OPTION			255
-#define DHCP_PAD_OPTION			0
+#define DHCP_END_OPTION			        255
+#define DHCP_PAD_OPTION			        0
 
 #define DHCP_STATE_IDLE		0
 #define DHCP_STATE_DISCOVER	1

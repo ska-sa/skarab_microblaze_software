@@ -51,14 +51,16 @@ LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax -Wl,--gc
 
 EXISTS := $(shell test -f Makefile.inc || echo 'NO')
 
-all: check build
+all: check .build
 
 check: .FORCE
 ifeq ("$(EXISTS)","NO")
 	$(error "First run ./configure to set up environment")
+else
+	@cat Makefile.inc
 endif
 
-build: $(ELF)
+.build: $(ELF)
 
 $(ELF): $(addprefix $(OBJDIR), $(OBJ))
 	@echo 'Building target: $@'
@@ -67,7 +69,7 @@ $(ELF): $(addprefix $(OBJDIR), $(OBJ))
 	@echo 'Finished building: $@'
 	@echo ' '
 
-$(OBJDIR)%.o: $(SRCDIR)%.c
+$(OBJDIR)%.o: $(SRCDIR)%.c .FORCE
 	@echo 'Compiling file: $<'
 	@echo 'Invoking: MicroBlaze gcc compiler'
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -fmessage-length=0  -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"

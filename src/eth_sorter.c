@@ -374,7 +374,7 @@ int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPoi
 	uChecksum += IPHeader->uDestinationIPHigh + IPHeader->uDestinationIPLow;
 
 	uUdpLength = UDPHeader->uTotalLength;
-	uChecksum = CalculateIPChecksum(uChecksum, uUdpLength / 2, (u16 *) pUdpHeaderPointer);
+	uChecksum = CalculateIPChecksum(uChecksum, ((uUdpLength + 1) / 2), (u16 *) pUdpHeaderPointer);
 
 	if (uChecksum != 0xFFFFu)
 	{
@@ -2124,7 +2124,7 @@ void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpt
 
 	// Bytes are swapped so this is why the order is swapped
 
-	// Option 53, option 55, terminate
+	// Option 53, option 55, option 12, terminate
 	*uDHCPOptions++ = 1; // Length is 1
 	*uDHCPOptions++ = DHCP_MESSAGE_OPTION;
 
@@ -2134,15 +2134,44 @@ void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpt
 	*uDHCPOptions++ = DHCP_PARAMETER_ROUTER;
 	*uDHCPOptions++ = 1; // Only requesting 1 parameter
 
+  /* Add host name to DHCP packet - Option 12 - rvw-03-2017 */
+
+	*uDHCPOptions++ = 15;  //hostname option length = 'skarab' (6) + serial# (6) + dash (1) + interface id (2) => e.g. skarab020202-01
+	*uDHCPOptions++ = DHCP_HOST_NAME_OPTION;
+
+  *uDHCPOptions++ = 'k';
+  *uDHCPOptions++ = 's';
+
+  *uDHCPOptions++ = 'r';
+  *uDHCPOptions++ = 'a';
+
+  *uDHCPOptions++ = 'b';
+  *uDHCPOptions++ = 'a';
+
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-mid */
+
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) / 10) + 48;  /* tens digit of lower octet of mac-mid */
+
+  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of upper octet of mac-low */
+  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-low */
+
+  *uDHCPOptions++ = (uId / 10) + 48;  /* tens digit of interface id*/
+  *uDHCPOptions++ = '-';
+
+  *uDHCPOptions++ = DHCP_PAD_OPTION;
+  *uDHCPOptions++ = (uId % 10) + 48;  /* unit digit of interface id*/
+
 	// End the options list
 	*uDHCPOptions++ = DHCP_PAD_OPTION;
 	*uDHCPOptions++ = DHCP_END_OPTION;
 
 	// Pad to nearest 64 bit boundary
-	for (uIndex = 0; uIndex < 6; uIndex++)
+	for (uIndex = 0; uIndex < 4; uIndex++)
 		*uDHCPOptions++ = DHCP_PAD_OPTION;
 
-	* uDHCPOptionsLength = 14;
+	*uDHCPOptionsLength = 30;
 }
 
 //=================================================================================
@@ -2169,7 +2198,7 @@ void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpti
 
 	// Bytes are swapped so this is why the order is swapped
 
-	// Option 53, 50, 54, terminate
+	// Option 53, 50, 54, 12, terminate
 	*uDHCPOptions++ = 1; // Length is 1
 	*uDHCPOptions++ = DHCP_MESSAGE_OPTION;
 
@@ -2191,14 +2220,47 @@ void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpti
 	*uDHCPOptions++ = (uServerIPAddress >> 8) & 0xFF;
 	*uDHCPOptions++ = (uServerIPAddress >> 16) & 0xFF;
 
-	*uDHCPOptions++ = DHCP_END_OPTION;
+	*uDHCPOptions++ = DHCP_PAD_OPTION;
 	*uDHCPOptions++ = uServerIPAddress & 0xFF;
 
+  /* Add host name to DHCP packet - Option 12 - rvw-03-2017 */
+
+	*uDHCPOptions++ = 15;  //hostname option length = 'skarab' (6) + serial# (6) + dash (1) + interface id (2) => e.g. skarab020202-01
+	*uDHCPOptions++ = DHCP_HOST_NAME_OPTION;
+
+  *uDHCPOptions++ = 'k';
+  *uDHCPOptions++ = 's';
+
+  *uDHCPOptions++ = 'r';
+  *uDHCPOptions++ = 'a';
+
+  *uDHCPOptions++ = 'b';
+  *uDHCPOptions++ = 'a';
+
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-mid */
+
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
+  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) / 10) + 48;  /* tens digit of lower octet of mac-mid */
+
+  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of upper octet of mac-low */
+  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-low */
+
+  *uDHCPOptions++ = (uId / 10) + 48;  /* tens digit of interface id*/
+  *uDHCPOptions++ = '-';
+
+  *uDHCPOptions++ = DHCP_PAD_OPTION;
+  *uDHCPOptions++ = (uId % 10) + 48;  /* unit digit of interface id*/
+
+	// End the options list
+  *uDHCPOptions++ = DHCP_PAD_OPTION;
+	*uDHCPOptions++ = DHCP_END_OPTION;
+
 	// Pad to nearest 64 bit boundary
-	for (uIndex = 0; uIndex < 6; uIndex++)
+	for (uIndex = 0; uIndex < 2; uIndex++)
 		*uDHCPOptions++ = DHCP_PAD_OPTION;
 
-	* uDHCPOptionsLength = 22;
+	* uDHCPOptionsLength = 38;
 }
 
 //=================================================================================
@@ -2399,31 +2461,112 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 
 	u8 * uDHCPOptions = pReceivedDHCPPacket + sizeof(sDHCPHeaderT);
 	u8 uOptionLength;
+	u8 uDHCPOptionNow;
 	u8 uDHCPMessageOption = DHCP_MESSAGE_INFORM;
 	u32 uDHCPRouterOption = 0xFFFFFFFF;
 	u32 uDHCPServerOption = 0xFFFFFFFF;
 	u32 uDHCPRequestedIPAddress;
 	u32 uDHCPOptionLength;
-	u8 uDHCPOptionByteSwap[64]; // COULD CAUSE PROBLEMS IF DHCP SERVER CREATES LARGE OPTIONS!!!
 
-	u8 uIndex;
+#define SIZE 312    //required minimum number of octets a DHCP client must be prepared to receive - RFC2131 (par. 2,pg. 10)
+  u8 uDHCPOptionByteSwap[SIZE];
+	//u8 uDHCPOptionByteSwap[64]; // COULD CAUSE PROBLEMS IF DHCP SERVER CREATES LARGE OPTIONS!!!
+
+	u16 uIndex;
 	u8 uFoundTerminate = 0x0;
 
 	// Need to swap the bytes as process received DHCP packet
 	uIndex = 0;
 
+#ifdef TRACE_PRINT
+	xil_printf("DHCP[%02x]: byte swap buffer: \r\n", uId);
+#endif
+
 	do
 	{
 		uDHCPOptionByteSwap[uIndex + 1] = *uDHCPOptions++;
 		uDHCPOptionByteSwap[uIndex] = *uDHCPOptions++;
+#ifdef TRACE_PRINT
+		xil_printf("%s", ((uIndex != 0) & (uIndex % 16 == 0)) ? "\r\n" : "");
+		xil_printf("0x%02x 0x%02x ", uDHCPOptionByteSwap[uIndex], uDHCPOptionByteSwap[uIndex + 1]);
+#endif
 		uIndex = uIndex + 2;
-	}while(uIndex < 64);
+	}while(uIndex < SIZE);
+
+#ifdef TRACE_PRINT
+	xil_printf("\r\n");
+#endif
 
 	uDHCPRequestedIPAddress = (DHCPHeader->uYourIPAddressHigh << 16) | DHCPHeader->uYourIPAddressLow;
 
 	// Need to process the options to get required information
 	uIndex = 0;
 
+  while (1)   /* this is not a real endless loop, it will end once dhcp option processing done */
+  {
+    if (uIndex >= SIZE){
+#ifdef TRACE_PRINT
+      xil_printf("DHCP[%02x] index %u exceeds buffer size %u\r\n", uId, uIndex, SIZE);
+#endif
+      return XST_FAILURE;             /* reached end of buffer without finding dhcp end option */
+    }
+
+    uDHCPOptionNow = uDHCPOptionByteSwap[uIndex];
+    if (uDHCPOptionNow == DHCP_END_OPTION){   /* found the end option, leave the option processing loop */
+#ifdef TRACE_PRINT
+      xil_printf("DHCP[%02x] end option found at %u\r\n", uId, uIndex);
+#endif
+      break;
+    }
+
+    if ((uIndex + 1) >= SIZE){      /* check that we're not about to read past the edge of our buffer */
+#ifdef TRACE_PRINT
+      xil_printf("DHCP[%02x] index %u exceeds buffer size %u\r\n", uId, uIndex + 1, SIZE);
+#endif
+      return XST_FAILURE;
+    }
+
+    uOptionLength = uDHCPOptionByteSwap[uIndex + 1];
+
+    if ((uIndex + uOptionLength) >= SIZE){      /* check that we're not about to read past the edge of our buffer */
+#ifdef TRACE_PRINT
+      xil_printf("DHCP[%02x] index %u exceeds buffer size %u\r\n", uId, uIndex + uOptionLength, SIZE);
+#endif
+      return XST_FAILURE;
+    }
+
+#ifdef TRACE_PRINT
+    xil_printf("DHCP[%02x] option %u with length %u at index %u\r\n", uId, uDHCPOptionNow, uOptionLength, uIndex);
+#endif
+
+    /* parse the dhcp options */
+    switch(uDHCPOptionNow)
+    {
+      case DHCP_MESSAGE_OPTION:
+        uDHCPMessageOption = uDHCPOptionByteSwap[uIndex + 2];
+        uIndex = uIndex + uOptionLength + 2;
+        break;
+
+      case DHCP_ROUTER_OPTION:
+        uDHCPRouterOption = (uDHCPOptionByteSwap[uIndex + 2] << 24) | (uDHCPOptionByteSwap[uIndex + 3] << 16) | (uDHCPOptionByteSwap[uIndex + 4] << 8) | (uDHCPOptionByteSwap[uIndex + 5]);
+        uIndex = uIndex + uOptionLength + 2;
+        break;
+
+      case DHCP_SERVER_OPTION:
+        uDHCPServerOption = (uDHCPOptionByteSwap[uIndex + 2] << 24) | (uDHCPOptionByteSwap[uIndex + 3] << 16) | (uDHCPOptionByteSwap[uIndex + 4] << 8) | (uDHCPOptionByteSwap[uIndex + 5]);
+        uIndex = uIndex + uOptionLength + 2;
+        break;
+
+      default:        /* skip past all other options not listed above */
+#ifdef TRACE_PRINT
+        xil_printf("DHCP[%02x] ignoring option %u\r\n", uId, uDHCPOptionNow);
+#endif
+        uIndex = uIndex + uOptionLength + 2;
+        break;
+    }
+  }
+
+#if 0
 	while ((uFoundTerminate == 0x0)&&(uIndex < 64))
 	{
 		if (uDHCPOptionByteSwap[uIndex] == DHCP_MESSAGE_OPTION)
@@ -2460,6 +2603,9 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	if (uIndex == 64)
 	// Read end of the options and didn't get a terminate
 		return XST_FAILURE;
+#endif
+
+#undef SIZE
 
 	if (uDHCPMessageOption == DHCP_MESSAGE_OFFER)
 	{
@@ -2473,7 +2619,10 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	else if (uDHCPMessageOption == DHCP_MESSAGE_ACK)
 	{
 #ifdef DEBUG_PRINT
-		xil_printf("ID: %x Setting IP address to: %x\r\n", uId, uDHCPRequestedIPAddress);
+		xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", uId, ((uDHCPRequestedIPAddress >> 24) & 0xFF), \ 
+                                                                          ((uDHCPRequestedIPAddress >> 16) & 0xFF), \
+                                                                          ((uDHCPRequestedIPAddress >> 8) & 0xFF),  \
+                                                                          (uDHCPRequestedIPAddress & 0xFF));
 #endif
 
 		uDHCPState[uId] = DHCP_STATE_COMPLETE;
