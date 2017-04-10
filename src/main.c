@@ -1018,7 +1018,7 @@ void InitialiseEthernetInterfaceParameters()
 
 		xil_printf("Setting MAC for IF %x TO %x %x %x\r\n", uId, uFabricMacHigh, uFabricMacMid, uFabricMacLow);
 		SetFabricSourceMACAddress(uId, uEthernetFabricMacHigh[uId], ((uEthernetFabricMacMid[uId] << 16) | (uEthernetFabricMacLow[uId])));
-		SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
+		//SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
 
 		uDHCPTransactionID[uId] = uId;
 		uDHCPState[uId] = DHCP_STATE_IDLE;
