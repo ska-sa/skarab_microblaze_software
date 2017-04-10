@@ -210,7 +210,7 @@ volatile u16 uPreviousSequenceNumber;
 #define NO_REBOOT				0x2
 
 // COMMAND TYPES
-#define HIGHEST_DEFINED_COMMAND	    0x0045//0x0033
+#define HIGHEST_DEFINED_COMMAND	    0x0049//0x0033
 
 #define WRITE_REG					0x0001
 #define READ_REG					0x0003
