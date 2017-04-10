@@ -490,6 +490,8 @@ int CommandSorter(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u3
 			return(GetSensorDataHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SET_FAN_SPEED)
 			return(SetFanSpeedHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == BIG_READ_WISHBONE)
+			return(BigReadWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else
 			return XST_FAILURE;
 	}

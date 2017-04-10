@@ -25,10 +25,11 @@
 // increment opcode numbers by 2 (to account for response code which = request code + 1)
 // NB: also change the HIGHEST_DEFINED_COMMAND constant in constant_defs.h
 
-#define GET_SENSOR_DATA				0x0043//0x0031
-#define SET_FAN_SPEED				0x0045//0x0033
-
-// #define NEW_OPCODE				0x0035
+#define GET_SENSOR_DATA				0x0043
+#define SET_FAN_SPEED				0x0045
+#define BIG_READ_WISHBONE			0x0047
+#define BIG_WRITE_WISHBONE			0x0049
+// #define NEW_OPCODE				0x0051
 
 // other constants
 
@@ -151,5 +152,37 @@ typedef struct sSetFanSpeedResp{
 	u16				uNewFanSpeedRPM;
 	u16				uPadding[7];
 } sSetFanSpeedRespT;
+
+typedef struct sBigWriteWishboneReq {
+	sCommandHeaderT Header;
+    u16				uAddressHigh;
+    u16				uAddressLow;
+    u16				uWriteDataHigh;
+    u16				uWriteDataLow;
+} sBigWriteWishboneReqT;
+
+typedef struct sBigWriteWishboneResp {
+	sCommandHeaderT Header;
+    u16				uAddressHigh;
+    u16				uAddressLow;
+    u16				uWriteDataHigh;
+    u16				uWriteDataLow;
+    u16				uPadding[5];
+} sBigWriteWishboneRespT;
+
+typedef struct sBigReadWishboneReq {
+	sCommandHeaderT Header;
+    u16				uStartAddressHigh;
+    u16				uStartAddressLow;
+    u16				uNumberOfReads;
+} sBigReadWishboneReqT;
+
+typedef struct sBigReadWishboneResp {
+	sCommandHeaderT	Header;
+    u16				uStartAddressHigh;
+    u16				uStartAddressLow;
+    u16				uNumberOfReads;
+    u16				uReadData[994];
+} sBigReadWishboneRespT;
 
 #endif /* CUSTOM_CONSTANTS_H_ */
