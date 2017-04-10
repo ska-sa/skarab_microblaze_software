@@ -484,6 +484,8 @@ int CommandSorter(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u3
 			return(DebugLoopbackTestCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == QSFP_RESET_AND_PROG)
 			return(QSFPResetAndProgramCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == HMC_READ_I2C)
+			return(HMCReadI2CBytesCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == GET_SENSOR_DATA)
 			return(GetSensorDataHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SET_FAN_SPEED)
@@ -3013,3 +3015,57 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
 	return XST_SUCCESS;
 }
 
+//=================================================================================
+//	HMCReadI2CBytesCommandHandler
+//--------------------------------------------------------------------------------
+//	This method executes the HMC_READ_I2C command.
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	pCommand				IN	Pointer to command header
+//	uCommandLength			IN	Length of command
+//	uResponsePacketPtr		IN	Pointer to where response packet must be constructed
+//	uResponseLength			OUT	Length of payload of response packet
+//
+//	Return
+//	------
+//	XST_SUCCESS if successful
+//=================================================================================
+int HMCReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+	sHMCReadI2CBytesReqT *Command = (sHMCReadI2CBytesReqT *) pCommand;
+	sHMCReadI2CBytesRespT *Response = (sHMCReadI2CBytesRespT *) uResponsePacketPtr;
+	int iStatus;
+	u8 uPaddingIndex;
+	u8 uByteIndex;
+
+	if (uCommandLength < sizeof(sHMCReadI2CBytesReqT))
+		return XST_FAILURE;
+
+#ifdef DEBUG_PRINT
+	//xil_printf("ID: %x SLV: %x ADDRS: %x %x %x %x\r\n", Command->uId, Command->uSlaveAddress, Command->uReadAddress[0], Command->uReadAddress[1], Command->uReadAddress[2], Command->uReadAddress[3]);
+#endif
+
+	// Execute the command
+	iStatus = HMCReadI2CBytes(Command->uId, Command->uSlaveAddress, Command->uReadAddress, & Response->uReadBytes[0]);
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+	Response->uId = Command->uId;
+	Response->uSlaveAddress = Command->uSlaveAddress;
+
+	if (iStatus == XST_SUCCESS)
+		Response->uReadSuccess = 1;
+	else
+		Response->uReadSuccess = 0;
+
+	for (uByteIndex = 0; uByteIndex < 4; uByteIndex++)
+		Response->uReadAddress[uByteIndex] = Command->uReadAddress[uByteIndex];
+
+	for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++)
+		Response->uPadding[uPaddingIndex] = 0;
+
+	*uResponseLength = sizeof(sHMCReadI2CBytesRespT);
+
+	return XST_SUCCESS;
+}

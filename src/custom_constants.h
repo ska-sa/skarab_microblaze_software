@@ -25,8 +25,8 @@
 // increment opcode numbers by 2 (to account for response code which = request code + 1)
 // NB: also change the HIGHEST_DEFINED_COMMAND constant in constant_defs.h
 
-#define GET_SENSOR_DATA				0x0031
-#define SET_FAN_SPEED				0x0033
+#define GET_SENSOR_DATA				0x0043//0x0031
+#define SET_FAN_SPEED				0x0045//0x0033
 
 // #define NEW_OPCODE				0x0035
 

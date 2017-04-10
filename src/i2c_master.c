@@ -458,6 +458,167 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
 }
 
 //=================================================================================
+//	HMCReadI2CBytes
+//--------------------------------------------------------------------------------
+//	This method reads a burst of four bytes from HMC I2C. The HMC requires a repeated
+//	start when doing a read.
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	uId				IN	ID of I2C master want to read from
+//	uSlaveAddress	IN	I2C slave address of device want to access
+//	uReadAddress	IN	Register address want to read
+//	uReadBytes		OUT	Buffer to store bytes read
+//
+//	Return
+//	------
+//	XST_SUCCESS if successful
+//=================================================================================
+int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadBytes)
+{
+	u32 uReg;
+	u32 uAddressOffset = GetI2CAddressOffset(uId);
+	u32 uTimeout = 0;
+	u16 uByteCount;
+
+	// USB PHY only has control over MB I2C
+	if (uId == MB_I2C_BUS_ID)
+	{
+		// Check if the I2C bus is currently being used by USB PHY
+		uReg = ReadBoardRegister(C_RD_USB_STAT_ADDR);
+
+		if ((uReg & USB_I2C_CONTROL) != 0)
+		{
+			// USB PHY has control over I2C so return XST_FAILURE
+			xil_printf("HMCReadI2CBytes: USB PHY has control of I2C\r\n");
+			return XST_FAILURE;
+		}
+	}
+
+	// Write slave address
+	uReg = uSlaveAddress << 1;
+	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_TXR * 4), uReg);
+
+	// Generate write start
+	uReg = OC_I2C_WR | OC_I2C_STA;
+	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_CR * 4), uReg);
+
+	// Wait for transaction to complete
+	do
+	{
+		uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_SR * 4));
+		Delay(1);
+		uTimeout++;
+	}while(((uReg & OC_I2C_TIP) != 0x0)&&(uTimeout < I2C_TIMEOUT));
+
+	if (uTimeout == I2C_TIMEOUT)
+	{
+		xil_printf("HMCReadI2CBytes: Timeout waiting for first address write to complete\r\n");
+		return XST_FAILURE;
+	}
+
+	// Check the received ACK, should be '0'
+	if ((uReg & OC_I2C_RXACK) != 0x0)
+	{
+		xil_printf("HMCReadI2CBytes: First Address write not ACKed\r\n");
+		return XST_FAILURE;
+	}
+
+	// Write address bytes
+	for (uByteCount = 0; uByteCount < 4; uByteCount++)
+	{
+		uReg = uReadAddress[uByteCount];
+		Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_TXR * 4), uReg);
+
+		uReg = OC_I2C_WR;
+		Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_CR * 4), uReg);
+
+		// Wait for transaction to complete
+		uTimeout = 0x0;
+		do
+		{
+			uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_SR * 4));
+			Delay(1);
+			uTimeout++;
+		}while(((uReg & OC_I2C_TIP) != 0x0)&&(uTimeout < I2C_TIMEOUT));
+
+		if (uTimeout == I2C_TIMEOUT)
+		{
+			xil_printf("HMCReadI2CBytes: Timeout waiting for address write to complete\r\n");
+			return XST_FAILURE;
+		}
+
+		// Check the received ACK, should be '0'
+		if ((uReg & OC_I2C_RXACK) != 0x0)
+		{
+			xil_printf("HMCReadI2CBytes: Address write not ACKed\r\n");
+			return XST_FAILURE;
+		}
+	}
+
+	// Write slave address, set read bit
+	uReg = (uSlaveAddress << 1) | 0x1;
+	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_TXR * 4), uReg);
+
+	// Generate write start (repeated start because was no stop)
+	uReg = OC_I2C_WR | OC_I2C_STA;
+	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_CR * 4), uReg);
+
+	// Wait for transaction to complete
+	do
+	{
+		uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_SR * 4));
+		Delay(1);
+		uTimeout++;
+	}while(((uReg & OC_I2C_TIP) != 0x0)&&(uTimeout < I2C_TIMEOUT));
+
+	if (uTimeout == I2C_TIMEOUT)
+	{
+		xil_printf("HMCReadI2CBytes: Timeout waiting for second address write to complete\r\n");
+		return XST_FAILURE;
+	}
+
+	// Check the received ACK, should be '0'
+	if ((uReg & OC_I2C_RXACK) != 0x0)
+	{
+		xil_printf("HMCReadI2CBytes: Second address write not ACKed\r\n");
+		return XST_FAILURE;
+	}
+
+	for (uByteCount = 0; uByteCount < 4; uByteCount++)
+	{
+		if ((uByteCount + 1) == 4)
+			// For last byte, must set stop bit and NACK
+			uReg = OC_I2C_RD | OC_I2C_STO | OC_I2C_ACK;
+		else
+			uReg = OC_I2C_RD;
+
+		Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_CR * 4), uReg);
+
+
+		// Wait for transaction to complete
+		do
+		{
+			uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_SR * 4));
+			Delay(1);
+			uTimeout++;
+		}while(((uReg & OC_I2C_TIP) != 0x0)&&(uTimeout < I2C_TIMEOUT));
+
+		if (uTimeout == I2C_TIMEOUT)
+		{
+			xil_printf("HMCReadI2CBytes: Timeout waiting for read data byte\r\n");
+			return XST_FAILURE;
+		}
+
+		// Get read bytes
+		uReadBytes[uByteCount] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (OC_I2C_RXR * 4));
+	}
+
+	return XST_SUCCESS;
+
+}
+
+//=================================================================================
 //	I2CPCA9548SelectChannel
 //--------------------------------------------------------------------------------
 //	This method selects a specific channel of PCA9548.

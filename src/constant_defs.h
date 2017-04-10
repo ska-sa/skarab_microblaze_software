@@ -210,7 +210,7 @@ volatile u16 uPreviousSequenceNumber;
 #define NO_REBOOT				0x2
 
 // COMMAND TYPES
-#define HIGHEST_DEFINED_COMMAND	    0x0033
+#define HIGHEST_DEFINED_COMMAND	    0x0045//0x0033
 
 #define WRITE_REG					0x0001
 #define READ_REG					0x0003
@@ -236,6 +236,13 @@ volatile u16 uPreviousSequenceNumber;
 #define CONFIGURE_MULTICAST			0x002B
 #define DEBUG_LOOPBACK_TEST			0x002D
 #define QSFP_RESET_AND_PROG			0x002F
+#define HMC_READ_I2C				0x0031
+//#define SPARE1                      0x0033
+//#define SPARE2                      0x0035
+//#define SPARE3                      0x0037
+//#define SPARE4                      0x0039
+//#define SPARE5                      0x0041
+
 
 // ETHERNET TYPE CODES
 #define ETHERNET_TYPE_IPV4   	0x800
@@ -920,6 +927,23 @@ typedef struct sQSFPResetAndProgramResp {
     u16				uProgram;
 	u16				uPadding[7];
 } sQSFPResetAndProgramRespT;
+
+typedef struct sHMCReadI2CBytesReq {
+	sCommandHeaderT Header;
+	u16				uId;
+	u16				uSlaveAddress;
+	u16				uReadAddress[4];
+} sHMCReadI2CBytesReqT;
+
+typedef struct sHMCReadI2CBytesResp {
+	sCommandHeaderT Header;
+	u16				uId;
+	u16				uSlaveAddress;
+	u16				uReadAddress[4];
+	u16				uReadBytes[4];
+    u16				uReadSuccess;
+	u16				uPadding[2];
+} sHMCReadI2CBytesRespT;
 
 // I2C BUS DEFINES
 #define	MB_I2C_BUS_ID				0x0
