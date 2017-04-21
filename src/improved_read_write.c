@@ -35,10 +35,10 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
 	sBigReadWishboneRespT *Response = (sBigReadWishboneRespT *) uResponsePacketPtr;
 	u32 uAddress;
 	u32 uReadData;
-	u8 uReadIndex;
-	u8 uDataIndex = 0;
-	u8 uNullWords;
-	u8 uNullWordsIndex;
+	u16 uReadIndex;
+	u16 uDataIndex = 0;
+	u16 uNullWords;
+	u16 uNullWordsIndex;
 
 	if (uCommandLength < sizeof(sBigReadWishboneReqT)){
 		return XST_FAILURE;
