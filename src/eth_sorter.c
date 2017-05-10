@@ -492,11 +492,17 @@ int CommandSorter(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u3
 			return(SetFanSpeedHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == BIG_READ_WISHBONE)
 			return(BigReadWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
-		else
-			return XST_FAILURE;
+		else{
+			xil_printf("Invalid Opcode Detected!\n\r");
+			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+			//return XST_FAILURE;
+		}
+			
 	}
 	else
-		return XST_FAILURE;
+		xil_printf("Invalid Opcode Detected: Out of Range!\n\r");
+		return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		//return XST_FAILURE;
 
 	return XST_SUCCESS;
 
