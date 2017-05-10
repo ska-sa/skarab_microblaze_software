@@ -18,7 +18,8 @@ SRCDIR := src/
 HDR :=
 INC := -I$(INCDIR)
 
-ELF := EMB123701U1R1.elf
+VERSION=$(shell git describe --dirty=-uncommitted-changes --always)
+ELF := EMB123701U1R1-g$(VERSION).elf
 
 # the cross-compiler details
 CROSS_COMPILE := mb-
