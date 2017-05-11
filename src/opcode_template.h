@@ -19,6 +19,7 @@
 #include "eth_mac.h"
 #include "eth_sorter.h"
 #include "custom_constants.h"
+#include "invalid_nack.h"
 
 #ifndef OPCODE_TEMPLATE_H_
 #define OPCODE_TEMPLATE_H_

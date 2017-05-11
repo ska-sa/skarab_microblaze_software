@@ -35,6 +35,7 @@
 #include "eth_mac.h"
 #include "sensors.h"
 #include "improved_read_write.h"
+#include "invalid_nack.h"
 
 u32 CalculateIPChecksum(u32 uChecksum, u32 uLength, u16 *pHeaderPtr);
 int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHeaderPointer);

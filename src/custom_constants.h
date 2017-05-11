@@ -31,6 +31,9 @@
 #define BIG_WRITE_WISHBONE			0x0049
 // #define NEW_OPCODE				0x0051
 
+// nack return opcode --> used to return when SKARAB receives an unknown opcode
+#define NACK_OPCODE_RESP			0xFFFF
+
 // other constants
 
 // i2c constants
@@ -184,5 +187,12 @@ typedef struct sBigReadWishboneResp {
     u16				uNumberOfReads;
     u16				uReadData[994];
 } sBigReadWishboneRespT;
+
+
+// packet structure for NACK response
+typedef struct sInvalidOpcodeResp {
+	sCommandHeaderT Header;
+	u16				uPadding[9];
+} sInvalidOpcodeRespT;
 
 #endif /* CUSTOM_CONSTANTS_H_ */
