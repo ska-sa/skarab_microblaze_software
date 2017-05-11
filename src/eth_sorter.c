@@ -2127,6 +2127,7 @@ void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpt
 {
 	u8 * uDHCPOptions = pTransmitBuffer +  sizeof(sEthernetHeaderT) + sizeof(sIPV4HeaderT) + sizeof(sUDPHeaderT) + sizeof(sDHCPHeaderT);
 	u8 uIndex;
+  u8 uTempDigit;
 
 	// Create a transaction ID that is unique for each interface
 	// May need to include serial number to make globally unique
@@ -2158,14 +2159,23 @@ void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpt
   *uDHCPOptions++ = 'b';
   *uDHCPOptions++ = 'a';
 
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-mid */
+  uTempDigit = ((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) / 10) + 48;  /* tens digit of lower octet of mac-mid */
+  uTempDigit = ((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
-  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of upper octet of mac-low */
-  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-low */
+  uTempDigit = ((uEthernetFabricMacMid[uId]) & 0xff) % 0x10;  /* lower digit of lower octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacMid[uId]) & 0xff) / 0x10;  /* upper digit of lower octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-low */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
   *uDHCPOptions++ = (uId / 10) + 48;  /* tens digit of interface id*/
   *uDHCPOptions++ = '-';
@@ -2205,6 +2215,7 @@ void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpti
 {
 	u8 * uDHCPOptions = pTransmitBuffer +  sizeof(sEthernetHeaderT) + sizeof(sIPV4HeaderT) + sizeof(sUDPHeaderT) + sizeof(sDHCPHeaderT);
 	u8 uIndex;
+  u8 uTempDigit;
 
 	// Bytes are swapped so this is why the order is swapped
 
@@ -2247,14 +2258,23 @@ void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOpti
   *uDHCPOptions++ = 'b';
   *uDHCPOptions++ = 'a';
 
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-mid */
+  uTempDigit = ((uEthernetFabricMacMid[uId] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) % 10) + 48;  /* unit digit of lower octet of mac-mid */
-  *uDHCPOptions++ = (((uEthernetFabricMacMid[uId]) & 0xff) / 10) + 48;  /* tens digit of lower octet of mac-mid */
+  uTempDigit = ((uEthernetFabricMacMid[uId] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
-  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 10) + 48;  /* unit digit of upper octet of mac-low */
-  *uDHCPOptions++ = (((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 10) + 48;  /* tens digit of upper octet of mac-low */
+  uTempDigit = ((uEthernetFabricMacMid[uId]) & 0xff) % 0x10;  /* lower digit of lower octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacMid[uId]) & 0xff) / 0x10;  /* upper digit of lower octet of mac-mid */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacLow[uId] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+  uTempDigit = ((uEthernetFabricMacLow[uId] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-low */
+  *uDHCPOptions++ = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
   *uDHCPOptions++ = (uId / 10) + 48;  /* tens digit of interface id*/
   *uDHCPOptions++ = '-';
