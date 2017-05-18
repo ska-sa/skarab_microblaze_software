@@ -158,19 +158,18 @@ typedef struct sSetFanSpeedResp{
 
 typedef struct sBigWriteWishboneReq {
 	sCommandHeaderT Header;
-    u16				uAddressHigh;
-    u16				uAddressLow;
-    u16				uWriteDataHigh;
-    u16				uWriteDataLow;
+    u16				uStartAddressHigh;
+    u16				uStartAddressLow;
+    u16				uWriteData[994];
+    u16				uNumberOfWrites;
 } sBigWriteWishboneReqT;
 
 typedef struct sBigWriteWishboneResp {
 	sCommandHeaderT Header;
-    u16				uAddressHigh;
-    u16				uAddressLow;
-    u16				uWriteDataHigh;
-    u16				uWriteDataLow;
-    u16				uPadding[5];
+    u16				uStartAddressHigh;
+    u16				uStartAddressLow;
+    u16				uNumberOfWritesDone;
+    u16				uPadding[6];
 } sBigWriteWishboneRespT;
 
 typedef struct sBigReadWishboneReq {
@@ -187,7 +186,6 @@ typedef struct sBigReadWishboneResp {
     u16				uNumberOfReads;
     u16				uReadData[994];
 } sBigReadWishboneRespT;
-
 
 // packet structure for NACK response
 typedef struct sInvalidOpcodeResp {
