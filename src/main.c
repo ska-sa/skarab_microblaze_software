@@ -38,6 +38,14 @@
 #include "sensors.h"
 #include "improved_read_write.h"
 #include "invalid_nack.h"
+#include "dhcp.h"
+
+/* local function prototypes */
+static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
+static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
+
+/* temp global definition */
+static volatile u8 uFlagRunTask_DHCP = 0;
 
 //=================================================================================
 //	TimerHandler
@@ -68,6 +76,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
 
+  /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+  uFlagRunTask_DHCP = 1;
+
 	// DHCP every 10 seconds (timer every 100 ms)
 	if (uDHCPTimerCounter == 0x64)
 	{
@@ -75,8 +86,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 		for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
 		{
-			uDHCPRetryTimer[uIndex] = DHCP_RETRY_ENABLED;
-			uEthernetNeedsReset[uIndex] = NEEDS_RESET;
+      /* TODO verify if we can remove these */
+			//uDHCPRetryTimer[uIndex] = DHCP_RETRY_ENABLED;
+			//uEthernetNeedsReset[uIndex] = NEEDS_RESET;
 
 			// Send out ARP requests every 60 seconds
 			if (uIGMPTimerCounter == 0x5)
@@ -379,7 +391,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 #ifdef DEBUG_PRINT
 							xil_printf("DHCP packet received!\r\n");
 #endif
-							iStatus = DHCPHandler(uId, pL5Ptr, uL5PktLen, (u8 *) uTransmitBuffer, uResponsePacketLengthBytes);
+							// iStatus = DHCPHandler(uId, pL5Ptr, uL5PktLen, (u8 *) uTransmitBuffer, uResponsePacketLengthBytes);
 
 							return iStatus;
 						}
@@ -1276,6 +1288,10 @@ int main()
 	   u8 uConfig1GBE = 0x1;
 #endif
 
+     struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
+     u8 arrEthId[NUM_ETHERNET_INTERFACES];
+     u8 uTempMac[6];
+
 	   Xil_ICacheEnable();
 	   Xil_DCacheEnable();
 
@@ -1362,6 +1378,58 @@ int main()
 
 	   ReadAndPrintFPGADNA();
 
+     /* DHCP State initializations for each interface */
+     /* TODO: perhaps create an inline function for the following to neaten up code */
+     /* the first 5 octets of the mac address /should/ never change across interfaces */
+     uTempMac[0] = (uEthernetFabricMacHigh[0] >> 8) & 0xff;
+     uTempMac[1] = (uEthernetFabricMacHigh[0]     ) & 0xff;
+     uTempMac[2] = (uEthernetFabricMacMid[0]  >> 8) & 0xff;
+     uTempMac[3] = (uEthernetFabricMacMid[0]      ) & 0xff;
+     uTempMac[4] = (uEthernetFabricMacLow[0]  >> 8) & 0xff;
+
+     u8 uTempHostNameString[16] = "skarab";   /* 15 chars plus '/0'. To be appended just now with partial mac & i/f. */
+     u8 uTempDigit;
+
+     /* stringify mac and append to hostname ("skarab" - see initialization above ) */
+
+     uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-mid */
+     uTempHostNameString[6] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+     uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-mid */
+     uTempHostNameString[7] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+     uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) / 0x10;  /* upper digit of lower octet of mac-mid */
+     uTempHostNameString[8] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+     uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) % 0x10;  /* lower digit of lower octet of mac-mid */
+     uTempHostNameString[9] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+     uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-low */
+     uTempHostNameString[10] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+     uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
+     uTempHostNameString[11] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
+
+
+     uTempHostNameString[12] = '-';
+
+     for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+       arrEthId[uEthernetId] = uEthernetId;
+       
+       /* 6th octet of mac should equal id anyway */
+       uTempMac[5] = uEthernetFabricMacLow[uEthernetId] & 0xff;
+       /* fill in interface number in host name and terminate string */
+       uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
+       uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
+       uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
+
+       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) uReceiveBuffer, (256 * 4), uTransmitBuffer, (256 * 4), uTempMac);
+       eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
+       eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
+       vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
+       uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE);
+     }
+
 	   while(1)
 	   {
 		   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)
@@ -1369,6 +1437,18 @@ int main()
 
 			if (uUpdateArpRequests == ARP_REQUEST_UPDATE)
 			   ArpRequestHandler();
+
+      /* simple interrupt driven multi-tasking scheduler */
+
+      /* is it time... */
+      /* ... to run the dhcp task */
+      if (uFlagRunTask_DHCP){
+        uFlagRunTask_DHCP = 0;     /* reset task flag */
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
+        }
+      }
+
 
 		   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
 		   {
@@ -1382,6 +1462,9 @@ int main()
 					   // Read packet into receive buffer
 					   //xil_printf("Rd pkt.\r\n");
 					   iStatus  = ReadHostPacket(uEthernetId, & uReceiveBuffer[0], uNumWords);
+             /* TODO remove the following inline data declarations */
+             u16 *buffer = (u16*) uReceiveBuffer;
+             u8 *pbuffer;
 
 					   if (iStatus == XST_SUCCESS)
 					   {
@@ -1394,9 +1477,24 @@ int main()
 						   // Send the response packet now
 						   uResponsePacketLength = (uResponsePacketLength >> 2);
 						   iStatus = TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
-
 					   }
 
+             /* DHCP new */
+             /* TODO remove the following inline data declarations */
+             int size = uNumWords << 1;     /* 16bit words */
+             int i;
+
+             for (i = 0; i < size; i++){
+               buffer[i] = Xil_EndianSwap16(buffer[i]);
+             }
+
+             /* validate and set flag */
+             if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
+               uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
+               uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
+               //xil_printf("run dhcp task\n\r");
+             }
+             /* DHCP new */            
 					}
 
 #ifdef DO_40GBE_LOOPBACK_TEST
@@ -1459,6 +1557,7 @@ int main()
 					}
 #endif
 
+#if 0 /* DHCP old*/
 					if (((uDHCPState[uEthernetId] == DHCP_STATE_DISCOVER)||(uDHCPState[uEthernetId] == DHCP_STATE_REQUEST))&&(uDHCPRetryTimer[uEthernetId] == DHCP_RETRY_ENABLED))
 					{
 						uDHCPState[uEthernetId] = DHCP_STATE_DISCOVER;
@@ -1468,6 +1567,7 @@ int main()
   					    iStatus =  TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
 						uDHCPRetryTimer[uEthernetId] = DHCP_RETRY_DISABLED;
 					}
+#endif  /* DHCP old */
 
 					if (uIGMPSendMessage[uEthernetId] == IGMP_SEND_MESSAGE)
 					{
@@ -1535,4 +1635,66 @@ int main()
 	Xil_DCacheDisable();
 	Xil_ICacheDisable();
 	return 0;
+}
+
+
+static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
+  u8 uEthernetId;
+  u8 r;
+  u32 size;
+  u16 *buffer;
+  u32 uIndex;
+
+  size = (u32) pDHCPObjectPtr->uDHCPMsgSize;    /* bytes */
+  buffer = (u16 *) pDHCPObjectPtr->pUserTxBufferPtr;
+
+  size = size >> 1;     /* 16bit words */
+
+  for (uIndex = 0; uIndex < size; uIndex++){
+    buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+  }
+
+  uEthernetId = * ((u8 *) pUserData);
+  size = size >> 1;   /*  32-bit words */
+  r = TransmitHostPacket(uEthernetId, (u32 *) buffer, size);
+
+  return 0;
+}
+
+
+int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
+  u32 ip;
+  u8 id;
+
+  id = * ((u8 *) pUserData);
+  ip = pDHCPObjectPtr->arrDHCPAddrYIPCached[0] << 24 |
+        pDHCPObjectPtr->arrDHCPAddrYIPCached[1] << 16 |
+        pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 |
+        pDHCPObjectPtr->arrDHCPAddrYIPCached[3];
+
+  xil_printf("setting ip of interface %d to %x\n\r", id, ip);
+
+  xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", id, ((ip >> 24) & 0xFF), \ 
+      ((ip >> 16) & 0xFF), \
+      ((ip >> 8) & 0xFF),  \
+      (ip & 0xFF));
+
+  uEthernetFabricIPAddress[id] = ip;
+  uEthernetSubnet[id] = (ip & 0xFFFFFF00);
+  uEthernetGatewayIPAddress[id] = pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24 |
+    pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16 |
+    pDHCPObjectPtr->arrDHCPAddrRoute[2] << 8 |
+    pDHCPObjectPtr->arrDHCPAddrRoute[3];
+
+  ProgramARPCacheEntry(id, (ip & 0xFF), uEthernetFabricMacHigh[id], ((uEthernetFabricMacMid[id] << 16) | uEthernetFabricMacLow[id]));
+
+	SetFabricSourceIPAddress(id, ip);
+
+  SetFabricGatewayARPCacheAddress(id, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
+
+  uEnableArpRequests[id] = ARP_REQUESTS_ENABLE;
+
+  EnableFabricInterface(id, 1);
+
+  return 0;
 }

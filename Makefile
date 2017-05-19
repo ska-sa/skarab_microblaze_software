@@ -7,18 +7,20 @@
 
 -include Makefile.inc
 
+#version info
+VERSION=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+
 #Additional build flags
 
 LDFLAGS +=
 CPPFLAGS +=
-CFLAGS +=
+CFLAGS += -DGITVERSION=\"$(VERSION)\" -DGITVERSION_SIZE=$(shell echo -n $(VERSION) | wc -c)
 
 SRCDIR := src/
 
 HDR :=
 INC := -I$(INCDIR)
 
-VERSION=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
 ELF := EMB123701U1R1-$(VERSION).elf
 
 # the cross-compiler details
@@ -41,7 +43,10 @@ OBJ := $(SRC:.c=.o)
 #microblaze cpu specific
 MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul
 #common flags
-CFLAGS += -Wall -O2 -Wl,--no-relax 
+CFLAGS += -Wall -Wl,--no-relax 
+#optimization flags
+#CFLAGS += -Os
+CFLAGS += -O2
 #extra
 CFLAGS += $(MBFLAGS) -ffunction-sections -fdata-sections -MMD -MP $(INC)
 
