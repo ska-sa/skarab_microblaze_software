@@ -682,6 +682,8 @@ static typeDHCPState bound_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
     /* time to renew our lease */
     if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_UNICAST | 1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
       pDHCPObjectPtr->uDHCPErrors++;
+    } else {
+      pDHCPObjectPtr->uDHCPTx++;
     }
     return RENEW;
   }
@@ -728,6 +730,8 @@ static typeDHCPState renew_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
     /*  time to rebind */
     if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
       pDHCPObjectPtr->uDHCPErrors++;
+    } else {
+      pDHCPObjectPtr->uDHCPTx++;
     }
     return REBIND;
   }

@@ -1827,7 +1827,7 @@ int GetEmbeddedSoftwareVersionCommandHandler(u8 * pCommand, u32 uCommandLength, 
 	if (uCommandLength < sizeof(sGetEmbeddedSoftwareVersionReqT))
 		return XST_FAILURE;
 
-	for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
+	for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++)
 		Response->uPadding[uPaddingIndex] = 0;
 
 	Response->Header.uCommandType = Command->Header.uCommandType + 1;
@@ -1835,6 +1835,7 @@ int GetEmbeddedSoftwareVersionCommandHandler(u8 * pCommand, u32 uCommandLength, 
 
 	Response->uVersionMajor = EMBEDDED_SOFTWARE_VERSION_MAJOR;
 	Response->uVersionMinor = EMBEDDED_SOFTWARE_VERSION_MINOR;
+	Response->uVersionPatch = EMBEDDED_SOFTWARE_VERSION_PATCH;
 	Response->uQSFPBootloaderVersionMajor = uQSFPBootloaderVersionMajor;
 	Response->uQSFPBootloaderVersionMinor = uQSFPBootloaderVersionMinor;
 

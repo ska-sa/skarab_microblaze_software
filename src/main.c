@@ -46,6 +46,7 @@ static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserDa
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
+static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 
 //=================================================================================
 //	TimerHandler
@@ -491,7 +492,9 @@ void UpdateEthernetLinkUpStatus(u8 uId)
 			// Put DHCP into DISCOVER STATE
 #ifndef DO_1GBE_LOOPBACK_TEST
 			uDHCPState[uId] = DHCP_STATE_DISCOVER;
-			uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
+			//uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
+      vDHCPStateMachineReset(&DHCPContextState[uId]);
+      uDHCPSetStateMachineEnable(&DHCPContextState[uId], SM_TRUE);
 #endif
 		}
 
@@ -500,7 +503,9 @@ void UpdateEthernetLinkUpStatus(u8 uId)
 			// Put DHCP into DISCOVER STATE
 #ifndef DO_40GBE_LOOPBACK_TEST
 			uDHCPState[uId] = DHCP_STATE_DISCOVER;
-			uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
+			//uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
+      vDHCPStateMachineReset(&DHCPContextState[uId]);
+      uDHCPSetStateMachineEnable(&DHCPContextState[uId], SM_TRUE);
 #endif
 
 			/*if ((uEthernetNeedsReset[uId] == NEEDS_RESET)||(uEthernetNeedsReset[uId] == LINK_DOWN_RESET_DONE))
@@ -1036,7 +1041,7 @@ void InitialiseEthernetInterfaceParameters()
 
 		uDHCPTransactionID[uId] = uId;
 		uDHCPState[uId] = DHCP_STATE_IDLE;
-		uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
+		//uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
 
 		uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
 		uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
@@ -1288,9 +1293,12 @@ int main()
 	   u8 uConfig1GBE = 0x1;
 #endif
 
-     struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
+     //struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
      u8 arrEthId[NUM_ETHERNET_INTERFACES];
      u8 uTempMac[6];
+#ifdef DEBUG_PRINT
+     u16 uCountDumpStats_DHCP=0;
+#endif
 
 	   Xil_ICacheEnable();
 	   Xil_DCacheEnable();
@@ -1447,6 +1455,20 @@ int main()
         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
           uDHCPStateMachine(&DHCPContextState[uEthernetId]);
         }
+
+#ifdef DEBUG_PRINT
+        uCountDumpStats_DHCP++;
+        if (uCountDumpStats_DHCP == 3000){
+          uCountDumpStats_DHCP=0;
+          /* dump dhcp stats to terminal once in a while */
+          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+            xil_printf("DHCP[%d] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,\
+                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,\
+                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
+          }
+        }
+#endif
+
       }
 
 
@@ -1672,7 +1694,7 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
         pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 |
         pDHCPObjectPtr->arrDHCPAddrYIPCached[3];
 
-  xil_printf("setting ip of interface %d to %x\n\r", id, ip);
+  //xil_printf("setting ip of interface %d to %x\n\r", id, ip);
 
   xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", id, ((ip >> 24) & 0xFF), \ 
       ((ip >> 16) & 0xFF), \
@@ -1693,6 +1715,9 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   SetFabricGatewayARPCacheAddress(id, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
   uEnableArpRequests[id] = ARP_REQUESTS_ENABLE;
+
+  /* legacy dhcp states */
+  uDHCPState[id] = DHCP_STATE_COMPLETE;
 
   EnableFabricInterface(id, 1);
 
