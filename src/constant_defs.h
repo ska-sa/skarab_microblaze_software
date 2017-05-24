@@ -120,8 +120,10 @@ volatile u16 uQSFPBootloaderVersionMinor;
 volatile u32 uPreviousAsyncSdramRead;
 volatile u16 uPreviousSequenceNumber;
 
-#define EMBEDDED_SOFTWARE_VERSION_MAJOR		0x0003
-#define EMBEDDED_SOFTWARE_VERSION_MINOR		0x0000
+/* <major>.<minor>.<patch> */
+#define EMBEDDED_SOFTWARE_VERSION_MAJOR		3
+#define EMBEDDED_SOFTWARE_VERSION_MINOR		1
+#define EMBEDDED_SOFTWARE_VERSION_PATCH		1
 
 // WISHBONE SLAVE ADDRESSES
 #define BOARD_REGISTER_ADDR			0x00000000
@@ -502,9 +504,10 @@ typedef struct sGetEmbeddedSoftwareVersionResp {
 	sCommandHeaderT Header;
 	u16				uVersionMajor;
 	u16				uVersionMinor;
+	u16				uVersionPatch;
 	u16 			uQSFPBootloaderVersionMajor;
 	u16				uQSFPBootloaderVersionMinor;
-	u16				uPadding[5];
+	u16				uPadding[4];
 } sGetEmbeddedSoftwareVersionRespT;
 
 typedef struct sWriteRegReq {
