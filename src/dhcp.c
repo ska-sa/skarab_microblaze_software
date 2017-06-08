@@ -468,14 +468,17 @@ u8 uDHCPStateMachine(struct sDHCPObject *pDHCPObjectPtr){
     /* after <t> seconds, if still not bound, reset state machine */
     if (pDHCPObjectPtr->uDHCPTimeout >= DHCP_SM_INTERVAL){
       pDHCPObjectPtr->tDHCPCurrentState = INIT;
+      /* check if we must stop trying eventually...else keep trying */
+      if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_AUTO_REDISCOVER) == statusCLR){
       /* if we've retried <n> times, quit trying */
-      if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
-        pDHCPObjectPtr->uDHCPRetries = 0;
-        /* stop state machine */
-        vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
-        /* dhcp failed, increase error counter */
-        pDHCPObjectPtr->uDHCPErrors++;
-        return DHCP_RETURN_FAIL;
+        if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
+          pDHCPObjectPtr->uDHCPRetries = 0;
+          /* stop state machine */
+          vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
+          /* dhcp failed, increase error counter */
+          pDHCPObjectPtr->uDHCPErrors++;
+          return DHCP_RETURN_FAIL;
+        }
       }
     }
   }
@@ -512,7 +515,8 @@ static typeDHCPState init_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   pDHCPObjectPtr->uDHCPTimeout = 0;
 
   //FIXME pDHCPObjectPtr->uDHCPRandomWait = (u32) (uDHCPRandomNumber(0) % 40 + 10);
-  pDHCPObjectPtr->uDHCPRandomWait = 0;
+  //pDHCPObjectPtr->uDHCPRandomWait = 0;
+  pDHCPObjectPtr->uDHCPRandomWait = DHCP_SM_WAIT; /* wait a prerequisite amount of time before dhcp'ing */
 
   return RANDOMIZE;
 }
@@ -861,9 +865,10 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
   pBuffer[ETH_FRAME_TYPE_OFFSET] = 0x08;
 
   /*****  ip frame struff  *****/
+  pBuffer[IP_FRAME_BASE + IP_FLAG_FRAG_OFFSET] = 0x40;    /* ip flags = don't fragment */
   pBuffer[IP_FRAME_BASE + IP_V_HIL_OFFSET] = 0x45;
 
-  pBuffer[IP_FRAME_BASE + IP_TTL_OFFSET] = 0x40;
+  pBuffer[IP_FRAME_BASE + IP_TTL_OFFSET] = 0x80;
   pBuffer[IP_FRAME_BASE + IP_PROT_OFFSET] = 0x11;
 
   /* if unicast, fill in relevant addresses else broadcast */
@@ -873,6 +878,7 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
     memcpy(pBuffer + IP_FRAME_BASE + IP_SRC_OFFSET, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
   } else {
     memset(pBuffer + IP_FRAME_BASE + IP_DST_OFFSET, 0xff, 4);     /* broadcast */
+    pBuffer[BOOTP_FRAME_BASE + BOOTP_FLAGS_OFFSET] = 0x80;        /* set the broadcast bit flag in the bootp/dhcp payload */
   }
   
   /*****  udp frame struff  *****/
