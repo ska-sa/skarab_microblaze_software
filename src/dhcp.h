@@ -146,8 +146,11 @@
        knows what to do with the user provided buffer*/
 
 #define DHCP_SM_RETRIES   5
-#define DHCP_SM_INTERVAL  50   /* interval time = call_rate * DHCP_SM_INTERVAL */
-#define POLL_INTERVAL 100        /* polling interval, in msecs. ie interval at which state machine is invoked */
+#define DHCP_SM_INTERVAL  100   /* interval time (ms) = POLL_INTERVAL * DHCP_SM_INTERVAL */
+                                /* Retry rate -> The state machine will reset if this interval expires before a lease is obtained. */
+#define POLL_INTERVAL 100       /* polling interval, in msecs. ie interval at which state machine is invoked - user defined */
+#define DHCP_SM_WAIT  50        /* wait a prerequisite amount of time before starting dhcp. */
+                                /* -> times by POLL_INTERVAL to get milli-seconds value */
 
 /* 14 [eth] + 20 [ip] + 8 [udp] + 236 [bootp] + 312 [min dhcp option length - rfc 2131, pg. 10] */
 #define DHCP_MIN_BUFFER_SIZE  590  /*FIXME*/
