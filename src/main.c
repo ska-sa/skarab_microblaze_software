@@ -369,7 +369,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 					// Command protocol
 					if (uUdpDstPort == ETHERNET_CONTROL_PORT_ADDRESS)
 					{
-						iStatus = CommandSorter(pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength);
+						iStatus = CommandSorter(uId, pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength);
 
 						if (iStatus == XST_SUCCESS)
 						{
@@ -404,7 +404,10 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 
 				}
 				else
+        {
+          xil_printf("check UDP header failed: src mac %.4x.%.4x.%.4x\r\n", EthHdr->uSourceMacHigh, EthHdr->uSourceMacMid, EthHdr->uSourceMacLow);
 					return XST_FAILURE;
+        }
 			}
 			else
 				return XST_FAILURE;
