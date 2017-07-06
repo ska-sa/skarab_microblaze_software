@@ -26,7 +26,7 @@
 //
 //	Parameter	Dir		Description
 //	---------	---		-----------
-//	uId					IN	Selected Ethernet interface
+//	uId			IN	Selected Ethernet interface
 //	pTransmitBuffer		OUT	Location to create packet
 //	uResponseLength		OUT	Length of packet created
 //
@@ -106,15 +106,15 @@ void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 }
 
 //=================================================================================
-//  uLLDPBuildPacket
+//  uMY_IP_Address
 //---------------------------------------------------------------------------------
-// This method builds the LLDP Packet into the user supplied buffer
+// This method converts a u32 IP address to a string in dot notation
 //
 //	Parameter	Dir		Description
 //	---------	---		-----------
-//	uId					IN	Selected Ethernet interface
-//	pTransmitBuffer		OUT	Location to create packet
-//	uResponseLength		OUT	Length of packet created
+//	uIP		IN	u32 IP address in hex
+//	IP_Addr		OUT	Location to store 4 decimal u8 representation of the IP address
+//	IP_Buffer	OUT	Location to store the string representation of IP in dot notation
 //
 //	Return
 //	------
@@ -164,6 +164,24 @@ void  uMY_IP_Address(u32 uIP, u8 IP_Addr[], char IP_Buffer[]){
 
 }
 
+
+//=================================================================================
+//  uToStringHex
+//---------------------------------------------------------------------------------
+// This method makes a u32 hex IP address a hex string without any changes 
+//
+//      Parameter       Dir             Description
+//      ---------       ---             -----------
+//      str             OUT      Location to store a u32 hex IP address as a hex string
+//      uNum            IN       u32 IP address in hex
+//
+//      Return
+//      ------
+//      None
+//==================================================================================
+
+
+
 void uToStringHex(char str[], uint32_t uNum)
 
 {
@@ -181,13 +199,30 @@ void uToStringHex(char str[], uint32_t uNum)
 
 }
 
+
+//=================================================================================
+//  uIP_TO_String
+//---------------------------------------------------------------------------------
+// This method takes 4 decimal u8(for IP address) and makes an IP addess as string in dot notation
+//
+//      Parameter       Dir             Description
+//      ---------       ---             -----------
+//      IP_Buffer       OUT      Location to store string IP address as a string in dot notation
+//      uNum            IN       u8 decimal pieces of IP address
+//
+//      Return
+//      ------
+//      None
+//==================================================================================
+
+
+
 void uIP_TO_String(char IP_Buffer[], u8 IP_Addr[]){
 	unsigned char lookup[10] = "0123456789";
-	//uint8_t a[4] = {192, 168, 14, 5};
 	unsigned int i, b, c, k;
 	int leading;
-	//char ip[16];
 	int len = 0;
+
 	for(k = 0; k < sizeof(IP_Addr); k++){
 		leading = 0;
 		b = IP_Addr[k];
@@ -209,6 +244,24 @@ void uIP_TO_String(char IP_Buffer[], u8 IP_Addr[]){
 
 	}
 }
+
+
+//=================================================================================
+//  uPower
+//---------------------------------------------------------------------------------
+// This method returns x raised to the power of y
+//
+//      Parameter       Dir             Description
+//      ---------       ---             -----------
+//      base            IN      	base
+//      uNum            IN      	exponent
+//
+//      Return
+//      ------
+//      base raised to the exponent
+//==================================================================================
+
+
 
 int uPower(int base, unsigned int exp)
 {
