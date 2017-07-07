@@ -87,12 +87,11 @@ enum LLDP_PORT_ID_SUBTYPE {
 	LLDP_PORT_ID_NETWORK_ADDRESS = 4
 };
 
-
 void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength);
 void  uMY_IP_Address(u32 ip, u8 ip_addr[], char IP_Buffer[]);
 void uIP_TO_String(char IP_Buffer[], u8 ip_addr[]);
 void uToStringHex(char str[], uint32_t num);
-int uPower(int x, unsigned int y);
+int _uPower(int x, unsigned int y);
 
 
 

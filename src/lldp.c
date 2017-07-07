@@ -12,7 +12,7 @@
 
 
 /* local includes */
-#include "LLDP.h"
+#include "lldp.h"
 #include "constant_defs.h"
 
 
@@ -149,7 +149,7 @@ void  uMY_IP_Address(u32 uIP, u8 IP_Addr[], char IP_Buffer[]){
 		{
 			val = hex[i] - 65 + 10;
 		}
-		decimal += val * uPower(16, len);
+		decimal += val * _uPower(16, len);
 		len--;
 	}
 
@@ -263,7 +263,7 @@ void uIP_TO_String(char IP_Buffer[], u8 IP_Addr[]){
 
 
 
-int uPower(int base, unsigned int exp)
+int _uPower(int base, unsigned int exp)
 {
 	if( exp == 0)
 		return 1;

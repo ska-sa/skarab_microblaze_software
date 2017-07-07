@@ -39,13 +39,16 @@
 #include "improved_read_write.h"
 #include "invalid_nack.h"
 #include "dhcp.h"
+#include "lldp.h"
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
+void vSendLLDPPacket(u8 uEthernetId, u8 *pTransmitBuffer, u32 *uResponseLength);
 static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
+static volatile u8 uFlagRunTask_LLDP = 0;
 static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 
 //=================================================================================
@@ -76,6 +79,22 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
+  
+ /* set the lldp task flag every 100ms */
+  uFlagRunTask_LLDP = 1;
+	//LLDP every 10 seconds (timer every 100 ms)
+	if(uLLDPTimerCounter == 0x64)
+	{
+		uLLDPTimerCounter = 0x0;
+
+		for(uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
+		{
+			uLLDPRetryTimer[uIndex] = LLDP_RETRY_ENABLED;
+		}
+	}
+	else
+		uLLDPTimerCounter++;
+
 
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   uFlagRunTask_DHCP = 1;
@@ -1456,6 +1475,7 @@ int main()
           uDHCPStateMachine(&DHCPContextState[uEthernetId]);
         }
 
+
 #ifdef DEBUG_PRINT
         uCountDumpStats_DHCP++;
         if (uCountDumpStats_DHCP == 3000){
@@ -1470,6 +1490,15 @@ int main()
 #endif
 
       }
+      /*  run the lldp task*/
+      if (uFlagRunTask_LLDP){
+         uFlagRunTask_LLDP = 0;     /* reset task flag */
+         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+           vSendLLDPPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
+         }
+	
+      }
+
 
 
 		   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
@@ -1681,6 +1710,30 @@ static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   r = TransmitHostPacket(uEthernetId, (u32 *) buffer, size);
 
   return 0;
+}
+
+
+void vSendLLDPPacket(u8 uEthernetId, u8 *pTransmitBuffer, u32 *uResponseLength){
+  u8 r;
+  u32 size;
+  u16 *buffer;
+  u32 uIndex;
+  
+  uLLDPBuildPacket(uEthernetId, pTransmitBuffer, uResponseLength);
+  size = uResponseLength; // bytes/
+  buffer = (u16*) pTransmitBuffer;
+
+  size = size >> 1; /// 16bit words/
+  xil_printf("size = %d\n\r", size);
+  
+  for(uIndex = 0; uIndex < size; uIndex++){
+    buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+  }
+
+  size = size >> 1;  /// 32-bit words /
+  xil_printf("size = %d\n\r", size);
+  r = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
+  xil_printf("status = %d\n\r");
 }
 
 
