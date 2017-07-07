@@ -390,7 +390,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 						if (iStatus == XST_SUCCESS)
 						{
 #ifdef DEBUG_PRINT
-							xil_printf("DHCP packet received!\r\n");
+							xil_printf("DHCP [%02x] packet received!\r\n", uId);
 #endif
 							// iStatus = DHCPHandler(uId, pL5Ptr, uL5PktLen, (u8 *) uTransmitBuffer, uResponsePacketLengthBytes);
 
@@ -1685,7 +1685,7 @@ static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
 
 
 int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
-  u32 ip;
+  u32 ip, netmask;
   u8 id;
 
   id = * ((u8 *) pUserData);
@@ -1694,6 +1694,11 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
         pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 |
         pDHCPObjectPtr->arrDHCPAddrYIPCached[3];
 
+  netmask = pDHCPObjectPtr->arrDHCPAddrSubnetMask[0] << 24 |
+            pDHCPObjectPtr->arrDHCPAddrSubnetMask[1] << 16 |
+            pDHCPObjectPtr->arrDHCPAddrSubnetMask[2] << 8 |
+            pDHCPObjectPtr->arrDHCPAddrSubnetMask[3];
+
   //xil_printf("setting ip of interface %d to %x\n\r", id, ip);
 
   xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", id, ((ip >> 24) & 0xFF), \ 
@@ -1701,8 +1706,15 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
       ((ip >> 8) & 0xFF),  \
       (ip & 0xFF));
 
+  xil_printf("DHCP [%02x] Setting netmask to: %u.%u.%u.%u\r\n", id, ((netmask >> 24) & 0xFF), \ 
+      ((netmask >> 16) & 0xFF), \
+      ((netmask >> 8) & 0xFF),  \
+      (netmask & 0xFF));
+
   uEthernetFabricIPAddress[id] = ip;
-  uEthernetSubnet[id] = (ip & 0xFFFFFF00);
+  /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
+  uEthernetSubnet[id] = (ip & netmask);
+
   uEthernetGatewayIPAddress[id] = pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24 |
     pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16 |
     pDHCPObjectPtr->arrDHCPAddrRoute[2] << 8 |
@@ -1711,6 +1723,8 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   ProgramARPCacheEntry(id, (ip & 0xFF), uEthernetFabricMacHigh[id], ((uEthernetFabricMacMid[id] << 16) | uEthernetFabricMacLow[id]));
 
 	SetFabricSourceIPAddress(id, ip);
+
+  SetFabricNetmask(id, netmask);
 
   SetFabricGatewayARPCacheAddress(id, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
