@@ -21,6 +21,10 @@
 #define u32 uint32_t
 #endif
 
+/*link custom return values */
+#define LLDP_RETURN_FAIL     XST_FAILURE
+#define LLDP_RETURN_OK       XST_SUCCESS
+#define LLDP_RETURN_INVALID  XST_FAILURE
 /*lldp packet offsets */
 #define ETH_DST_OFFSET                           0
 #define ETH_DST_LEN                              6
@@ -45,25 +49,37 @@
 #define LLDP_PORT_ID_TLV_OFFSET                  (LLDP_PORT_ID_TLV_LEN_OFFSET + LLDP_PORT_ID_TLV_LEN_LEN) //25
 #define LLDP_PORT_ID_TLV_LEN                     1
 
-#define LLDP_TTL_TLV_TYPE_OFFSET                 (LLDP_PORT_ID_TLV_OFFSET + LLDP_PORT_ID_TLV_LEN) //26 + strlen(ip_address)
+#define LLDP_TTL_TLV_TYPE_OFFSET                 (LLDP_PORT_ID_TLV_OFFSET + LLDP_PORT_ID_TLV_LEN) //26 + uIPLength
 #define LLDP_TTL_TLV_TYPE_LEN                    1
-#define LLDP_TTL_TLV_LEN_OFFSET                  (LLDP_TTL_TLV_TYPE_OFFSET + LLDP_TTL_TLV_TYPE_LEN) //27 + strlen(ip_address)
+#define LLDP_TTL_TLV_LEN_OFFSET                  (LLDP_TTL_TLV_TYPE_OFFSET + LLDP_TTL_TLV_TYPE_LEN) //27 + uIPLength
 #define LLDP_TTL_TLV_LEN_LEN                     1
-#define LLDP_TTL_TLV_OFFSET                      (LLDP_TTL_TLV_LEN_OFFSET + LLDP_TTL_TLV_LEN_LEN) //28 + strlen(ip_address)
+#define LLDP_TTL_TLV_OFFSET                      (LLDP_TTL_TLV_LEN_OFFSET + LLDP_TTL_TLV_LEN_LEN) //28 + uIPLength
 #define LLDP_TTL_TLV_LEN                         2
 
-#define LLDP_PORT_DESCR_TLV_TYPE_OFFSET          (LLDP_TTL_TLV_OFFSET + LLDP_TTL_TLV_LEN) //30 + strlen(ip_address)
+#define LLDP_PORT_DESCR_TLV_TYPE_OFFSET          (LLDP_TTL_TLV_OFFSET + LLDP_TTL_TLV_LEN) //30 + uIPLength
 #define LLDP_PORT_DESCR_TLV_TYPE_LEN             1
-#define LLDP_PORT_DESCR_TLV_LEN_OFFSET           (LLDP_PORT_DESCR_TLV_TYPE_OFFSET + LLDP_PORT_DESCR_TLV_TYPE_LEN) //31 + strlen(ip_address)
+#define LLDP_PORT_DESCR_TLV_LEN_OFFSET           (LLDP_PORT_DESCR_TLV_TYPE_OFFSET + LLDP_PORT_DESCR_TLV_TYPE_LEN) //31 + uIPLength
 #define LLDP_PORT_DESCR_TLV_LEN_LEN              1
-#define LLDP_PORT_DESCR_TLV_OFFSET               (LLDP_PORT_DESCR_TLV_LEN_OFFSET + LLDP_PORT_DESCR_TLV_LEN_LEN) //32 + strlen(ip_address)
+#define LLDP_PORT_DESCR_TLV_OFFSET               (LLDP_PORT_DESCR_TLV_LEN_OFFSET + LLDP_PORT_DESCR_TLV_LEN_LEN) //32 + uIPLength
 #define LLDP_PORT_DESCR_TLV_LEN                  12
 
-#define LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET       (LLDP_PORT_DESCR_TLV_OFFSET + LLDP_PORT_DESCR_TLV_LEN) // 44 + strlen(ip_address)
+#define LLDP_SYSTEM_DESCR_TLV_TYPE_OFFSET        (LLDP_PORT_DESCR_TLV_OFFSET + LLDP_PORT_DESCR_TLV_LEN) //44 + uIPLength
+#define LLDP_SYSTEM_DESCR_TLV_TYPE_LEN           1
+#define LLDP_SYSTEM_DESCR_TLV_LEN_OFFSET         (LLDP_SYSTEM_DESCR_TLV_TYPE_OFFSET + LLDP_SYSTEM_DESCR_TLV_TYPE_LEN) //45 + uIPLength
+#define LLDP_SYSTEM_DESCR_TLV_LEN_LEN            1
+#define LLDP_SYSTEM_DESCR_TLV_OFFSET             (LLDP_SYSTEM_DESCR_TLV_LEN_OFFSET + LLDP_SYSTEM_DESCR_TLV_LEN_LEN) //46 + uIPLength
+#define LLDP_SYSTEM_DESCR_TLV_LEN                3  // Can either be TLF or BSP
+
+#define LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET       (LLDP_SYSTEM_DESCR_TLV_OFFSET + LLDP_SYSTEM_DESCR_TLV_LEN) // 49 + uIPLength
 #define LLDP_END_OF_LLDPDU_TLV_TYPE_LEN          1
-#define LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET        (LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET + LLDP_END_OF_LLDPDU_TLV_TYPE_LEN) //45 + strlen(ip_address)
+#define LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET        (LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET + LLDP_END_OF_LLDPDU_TLV_TYPE_LEN) //50 + uIPLength
 #define LLDP_END_OF_LLDPDU_TLV_LEN_LEN           1
-#define LLDP_END_OF_LLDPDU_TLV_OFFSET            (LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + LLDP_END_OF_LLDPDU_TLV_LEN_LEN) //46 + + strlen(ip_address)
+#define LLDP_END_OF_LLDPDU_TLV_OFFSET            (LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + LLDP_END_OF_LLDPDU_TLV_LEN_LEN) //51 + uIPLength
+
+
+#define LLDP_MAX_BUFFER_SIZE    1024
+volatile u8 uIPAddr[4];  // for IP address before dot notation 
+volatile char pIPBuffer[16]; // for IP address string in dot notation 
 
 enum LLDP_TLV_TYPE {
 
@@ -76,6 +92,7 @@ enum LLDP_TLV_TYPE {
 
 	/* start of optional TLV */
 	LLDP_PORT_DESC_TLV = 8,
+	LLDP_SYSTEM_DESCR_TLV = 12,
 
 };
 
@@ -87,11 +104,8 @@ enum LLDP_PORT_ID_SUBTYPE {
 	LLDP_PORT_ID_NETWORK_ADDRESS = 4
 };
 
-void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength);
-void  uMY_IP_Address(u32 ip, u8 ip_addr[], char IP_Buffer[]);
-void uIP_TO_String(char IP_Buffer[], u8 ip_addr[]);
-void uToStringHex(char str[], uint32_t num);
-int _uPower(int x, unsigned int y);
+int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength);
+int uIPToString(char* pIPBuffer, u8* pIPAddr);
 
 
 

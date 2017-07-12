@@ -1,5 +1,5 @@
-/**------------------------------------------------------------------------------
-*  FILE NAME            : main.c
+/**-----------------------------------------------------------------------------
+*FILE NAME            : main.c
 * ------------------------------------------------------------------------------
 *  COMPANY              : PERALEX ELECTRONIC (PTY) LTD
 * ------------------------------------------------------------------------------
@@ -39,11 +39,9 @@
 #include "improved_read_write.h"
 #include "invalid_nack.h"
 #include "dhcp.h"
-#include "lldp.h"
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
-void vSendLLDPPacket(u8 uEthernetId, u8 *pTransmitBuffer, u32 *uResponseLength);
 static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
 
 /* temp global definition */
@@ -79,21 +77,21 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
-  
- /* set the lldp task flag every 100ms */
-  uFlagRunTask_LLDP = 1;
-	//LLDP every 10 seconds (timer every 100 ms)
+
+
+  /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+  //uFlagRunTask_LLDP = 1;
+
+	// LLDP every 10 seconds (timer every 100 ms)
 	if(uLLDPTimerCounter == 0x64)
 	{
 		uLLDPTimerCounter = 0x0;
+		uFlagRunTask_LLDP = 1;
 
-		for(uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-		{
-			uLLDPRetryTimer[uIndex] = LLDP_RETRY_ENABLED;
-		}
 	}
 	else
 		uLLDPTimerCounter++;
+
 
 
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
@@ -1475,7 +1473,6 @@ int main()
           uDHCPStateMachine(&DHCPContextState[uEthernetId]);
         }
 
-
 #ifdef DEBUG_PRINT
         uCountDumpStats_DHCP++;
         if (uCountDumpStats_DHCP == 3000){
@@ -1490,14 +1487,24 @@ int main()
 #endif
 
       }
-      /*  run the lldp task*/
-      if (uFlagRunTask_LLDP){
-         uFlagRunTask_LLDP = 0;     /* reset task flag */
-         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-           vSendLLDPPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-         }
-	
-      }
+
+      /* if(uFlagRunTask_LLDP){
+	  uFlagRunTask_LLDP = 0;
+	  for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+             uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
+             u32 size = uResponsePacketLength >> 1;  //16 bit words 
+             u16 * buffer = (u16*)uTransmitBuffer;
+
+             for(u32 uIndex = 0; uIndex < size; uIndex++){
+                buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+             }
+
+             size = size >> 1; // 32 bit words
+             xil_printf("size = %d\n\r", size);
+             iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
+             xil_printf("status = %d\n\r", iStatus);
+          }
+        }*/
 
 
 
@@ -1606,8 +1613,27 @@ int main()
 #endif
 						EnableFabricInterface(uEthernetId, 0x1);
 					}
-#endif
-
+#endif 
+				     /* is it time to run the lldp task?
+				        if so, do so*/
+                                      if(uFlagRunTask_LLDP){
+					for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+					  iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
+					  xil_printf("LLDP Packet build status : %d\n\r", iStatus);
+					  if(iStatus == XST_SUCCESS){
+					    u32 size = uResponsePacketLength >> 1; /* 16 bit words */
+					    u16 * buffer = (u16*)uTransmitBuffer;
+					    xil_printf("packet size, 16 bit words : %d\n\r", size);
+					    for(u32 uIndex = 0; uIndex < size; uIndex++){
+					      buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+					    }
+					    size = size >> 1; /* 32 bit words*/
+					    iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
+					    xil_printf("LLDP Packet transmit status :%d\n\r", iStatus);
+					  }
+					}
+					  uFlagRunTask_LLDP = 0;	
+				      }
 #if 0 /* DHCP old*/
 					if (((uDHCPState[uEthernetId] == DHCP_STATE_DISCOVER)||(uDHCPState[uEthernetId] == DHCP_STATE_REQUEST))&&(uDHCPRetryTimer[uEthernetId] == DHCP_RETRY_ENABLED))
 					{
@@ -1713,30 +1739,6 @@ static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
 }
 
 
-void vSendLLDPPacket(u8 uEthernetId, u8 *pTransmitBuffer, u32 *uResponseLength){
-  u8 r;
-  u32 size;
-  u16 *buffer;
-  u32 uIndex;
-  
-  uLLDPBuildPacket(uEthernetId, pTransmitBuffer, uResponseLength);
-  size = uResponseLength; // bytes/
-  buffer = (u16*) pTransmitBuffer;
-
-  size = size >> 1; /// 16bit words/
-  xil_printf("size = %d\n\r", size);
-  
-  for(uIndex = 0; uIndex < size; uIndex++){
-    buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
-  }
-
-  size = size >> 1;  /// 32-bit words /
-  xil_printf("size = %d\n\r", size);
-  r = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
-  xil_printf("status = %d\n\r");
-}
-
-
 int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   u32 ip;
   u8 id;
@@ -1776,3 +1778,4 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
 
   return 0;
 }
+

@@ -6,15 +6,11 @@
  */
 
 /* standard C lib includes */
-#include <stdio.h>
-#include <math.h>
 #include <string.h>
-
 
 /* local includes */
 #include "lldp.h"
 #include "constant_defs.h"
-
 
 /* Local function prototypes*/
 
@@ -34,8 +30,11 @@
 //	------
 //	None
 //==================================================================================
-void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
-
+int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
+	
+	u32 uIPAddress = uEthernetFabricIPAddress[uId];
+	u16 uIPLength;
+	u32 version;
 	u8 dst_mac_addr[ETH_DST_LEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
 
 	u8 src_mac_addr[ETH_SRC_LEN];
@@ -47,7 +46,7 @@ void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 	src_mac_addr[5] = (uEthernetFabricMacLow[uId] & 0xFF);
 
 	/* zero the buffer, saves us from having to explicitly set zero valued bytes */
-	memset(pTransmitBuffer, 0, 1024);
+	memset(pTransmitBuffer, 0, LLDP_MAX_BUFFER_SIZE);
 
 	/******* Ethernet frame stuff ******/
 
@@ -63,216 +62,107 @@ void uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 
 	/* chassis ID TLV */
 	pTransmitBuffer[LLDP_CHASSIS_ID_TLV_TYPE_OFFSET] = LLDP_CHASSIS_ID_TLV;
-	pTransmitBuffer[LLDP_CHASSIS_ID_TLV_LEN_OFFSET] = LLDP_CHASSIS_ID_TLV_LEN;
+		pTransmitBuffer[LLDP_CHASSIS_ID_TLV_LEN_OFFSET] = LLDP_CHASSIS_ID_TLV_LEN;
 	pTransmitBuffer[LLDP_CHASSIS_ID_TLV_OFFSET] = LLDP_CHASSIS_ID_MAC_ADDRESS;
 	memcpy(pTransmitBuffer + LLDP_CHASSIS_ID_TLV_OFFSET + 1, src_mac_addr, 6);
-
+       
 	/* port ID TLV*/
-	u32 uIP = uEthernetFabricIPAddress[uId];
-	u8 IP_Addr[4] = {0};
-	char IP_Buffer[16];
-	uMY_IP_Address(uIP, IP_Addr, IP_Buffer);
-	pTransmitBuffer[LLDP_PORT_ID_TLV_TYPE_OFFSET] =  LLPD_PORT_ID_TLV;
-	pTransmitBuffer[LLDP_PORT_ID_TLV_LEN_OFFSET] =  LLDP_PORT_ID_TLV_LEN + strlen(IP_Buffer);
-	pTransmitBuffer[LLDP_PORT_ID_TLV_OFFSET] = LLDP_PORT_ID_NETWORK_ADDRESS;
-	memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, IP_Buffer, strlen(IP_Buffer));
-
+	uIPAddr[3] = (uIPAddress & 0x000000ff);
+        uIPAddr[2] = (uIPAddress & 0x0000ff00) >> 8;
+        uIPAddr[1] = (uIPAddress & 0x00ff0000) >> 16;
+        uIPAddr[0] = (uIPAddress & 0xff000000) >> 24;
+        uIPLength = uIPToString(pIPBuffer, uIPAddr);
+	if(uIPLength > 0){
+		pTransmitBuffer[LLDP_PORT_ID_TLV_TYPE_OFFSET] =  LLPD_PORT_ID_TLV;
+		pTransmitBuffer[LLDP_PORT_ID_TLV_LEN_OFFSET] =  LLDP_PORT_ID_TLV_LEN + uIPLength;
+		pTransmitBuffer[LLDP_PORT_ID_TLV_OFFSET] = LLDP_PORT_ID_NETWORK_ADDRESS;
+		memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, pIPBuffer, uIPLength);
+	}else{
+		return LLDP_RETURN_INVALID;
+	}
 	/* Tome to live TLV */
-	pTransmitBuffer[LLDP_TTL_TLV_TYPE_OFFSET + strlen(IP_Buffer)] = LLDP_TTL_TLV;
-	pTransmitBuffer[LLDP_TTL_TLV_LEN_OFFSET + strlen(IP_Buffer)] = LLDP_TTL_TLV_LEN;
-	pTransmitBuffer[LLDP_TTL_TLV_OFFSET + strlen(IP_Buffer)] = 0;
-	pTransmitBuffer[LLDP_TTL_TLV_OFFSET + 1 + strlen(IP_Buffer)] = 120;
+	pTransmitBuffer[LLDP_TTL_TLV_TYPE_OFFSET + uIPLength] = LLDP_TTL_TLV;
+	pTransmitBuffer[LLDP_TTL_TLV_LEN_OFFSET + uIPLength] = LLDP_TTL_TLV_LEN;
+	pTransmitBuffer[LLDP_TTL_TLV_OFFSET + uIPLength] = 0;
+	pTransmitBuffer[LLDP_TTL_TLV_OFFSET + 1 + uIPLength] = 120;
 
 	/* port description TLV */
-	pTransmitBuffer[LLDP_PORT_DESCR_TLV_TYPE_OFFSET + strlen(IP_Buffer)] = LLDP_PORT_DESC_TLV;
-	pTransmitBuffer[LLDP_PORT_DESCR_TLV_LEN_OFFSET + strlen(IP_Buffer)] = LLDP_PORT_DESCR_TLV_LEN;
+	pTransmitBuffer[LLDP_PORT_DESCR_TLV_TYPE_OFFSET + uIPLength] = LLDP_PORT_DESC_TLV;
+	pTransmitBuffer[LLDP_PORT_DESCR_TLV_LEN_OFFSET + uIPLength] = LLDP_PORT_DESCR_TLV_LEN;
 	switch(uId){
 	case 0:
-		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET + strlen(IP_Buffer), ONE_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
+		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET + uIPLength, ONE_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
 		break;
 
 	case 1:
-		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET + strlen(IP_Buffer), FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
+		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET + uIPLength, FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
 		break;
 	}
 
+	/* LLDP_SYSTEM_DESCR_TLV */
+	pTransmitBuffer[LLDP_SYSTEM_DESCR_TLV_TYPE_OFFSET + uIPLength] = LLDP_SYSTEM_DESCR_TLV;
+	pTransmitBuffer[LLDP_SYSTEM_DESCR_TLV_LEN_OFFSET + uIPLength] = LLDP_SYSTEM_DESCR_TLV_LEN;
+	version = ReadBoardRegister(C_RD_VERSION_ADDR);
+	u16 first_part = (version & 0xff000000) >> 24; // for BSP or TLF
+	if(first_part > 0){
+		memcpy(pTransmitBuffer + LLDP_SYSTEM_DESCR_TLV_OFFSET + uIPLength, "BSP", LLDP_SYSTEM_DESCR_TLV_LEN);
+	}
+	else
+		 memcpy(pTransmitBuffer + LLDP_SYSTEM_DESCR_TLV_OFFSET + uIPLength, "TLF", LLDP_SYSTEM_DESCR_TLV_LEN);
 	/* LLDP END OF LLDPDU TLV */
-	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET + strlen(IP_Buffer)] = LLDP_END_OF_LLDPDU_TLV;
-	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + strlen(IP_Buffer)] = 0;
+	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET + uIPLength] = LLDP_END_OF_LLDPDU_TLV;
+	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + uIPLength] = 0;
 
-	*uResponseLength = sizeof(pTransmitBuffer) * 16;
-
+	*uResponseLength = LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + uIPLength + 1;
+	
+	return LLDP_RETURN_OK;
 
 }
 
 //=================================================================================
-//  uMY_IP_Address
+//  uIPToString
 //---------------------------------------------------------------------------------
-// This method converts a u32 IP address to a string in dot notation
-//
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uIP		IN	u32 IP address in hex
-//	IP_Addr		OUT	Location to store 4 decimal u8 representation of the IP address
-//	IP_Buffer	OUT	Location to store the string representation of IP in dot notation
-//
-//	Return
-//	------
-//	None
-//==================================================================================
-
-void  uMY_IP_Address(u32 uIP, u8 IP_Addr[], char IP_Buffer[]){
-	char hex[17];
-	u32 decimal;
-	int i = 0, val, len;
-
-	decimal = 0;
-	uToStringHex(hex, uIP);
-
-	/* Find the length of total number of hex digit */
-	len = strlen(hex);
-	len--;
-
-	/* Iterate over each hex digit */
-	for(i = 0; hex[i] != '\0'; i++)
-	{
-		/* Find the decimal representation of hex[i]*/
-		if(hex[i] >= '0' && hex[i] <= '9')
-		{
-			val = hex[i] - 48;
-		}
-		else if(hex[i] >= 'a' && hex[i] <= 'f')
-		{
-			val = hex[i] - 97 + 10;
-		}
-		else if(hex[i] >= 'A' && hex[i] <= 'F')
-		{
-			val = hex[i] - 65 + 10;
-		}
-		decimal += val * _uPower(16, len);
-		len--;
-	}
-
-	//u8 ip_addr[4];
-	IP_Addr[3] = (decimal & 0x000000ff);
-	IP_Addr[2] = (decimal & 0x0000ff00) >> 8;
-	IP_Addr[1] = (decimal & 0x00ff0000) >> 16;
-	IP_Addr[0] = (decimal & 0xff000000) >> 24;
-
-	uIP_TO_String(IP_Buffer, IP_Addr);
-
-
-}
-
-
-//=================================================================================
-//  uToStringHex
-//---------------------------------------------------------------------------------
-// This method makes a u32 hex IP address a hex string without any changes 
+//  This method converts a u32 hex IP address to a string in dot notation
 //
 //      Parameter       Dir             Description
 //      ---------       ---             -----------
-//      str             OUT      Location to store a u32 hex IP address as a hex string
-//      uNum            IN       u32 IP address in hex
+//      pIPBuffer       OUT      Location to store string IP address as a string in dot notation
+//      pIPAddr         IN       u8 pieces of IP address
 //
 //      Return
 //      ------
-//      None
+//      len                        Length of IP address in dot notation
 //==================================================================================
 
-
-
-void uToStringHex(char str[], uint32_t uNum)
-
-{
-	unsigned char lookup[16] = "0123456789abcdef";
-	unsigned int i, b;
-	int len = 0;
-
-	for (i = 0; i < 32; i+=4)
-	{
-		b = (uNum >> (28 - i) & 0xf);
-		str[len] = lookup[b];
-		len++;
-	}
-	str[len] = '\0';
-
-}
-
-
-//=================================================================================
-//  uIP_TO_String
-//---------------------------------------------------------------------------------
-// This method takes 4 decimal u8(for IP address) and makes an IP addess as string in dot notation
-//
-//      Parameter       Dir             Description
-//      ---------       ---             -----------
-//      IP_Buffer       OUT      Location to store string IP address as a string in dot notation
-//      uNum            IN       u8 decimal pieces of IP address
-//
-//      Return
-//      ------
-//      None
-//==================================================================================
-
-
-
-void uIP_TO_String(char IP_Buffer[], u8 IP_Addr[]){
+int uIPToString(char* pIPBuffer, u8* pIPAddr){
 	unsigned char lookup[10] = "0123456789";
 	unsigned int i, b, c, k;
 	int leading;
 	int len = 0;
 
-	for(k = 0; k < sizeof(IP_Addr); k++){
+	if(pIPAddr == NULL){
+		return LLDP_RETURN_FAIL;
+	}
+	for(k = 0; k < 4; k++){
 		leading = 0;
-		b = IP_Addr[k];
+		b = pIPAddr[k];
 
 		for(i = 1000 ; i > 9 ; i = i / 10){
 			c = b / i;
 			if(c || leading){
-				IP_Buffer[len] = lookup[c];
+				pIPBuffer[len] = lookup[c];
 				leading = 1;
 				len++;
 			}
 			b = b - (i * c);
 		}
-		IP_Buffer[len++] = lookup[b];
+		pIPBuffer[len++] = lookup[b];
 		if(k != 3)
-			IP_Buffer[len++] = '.';
+			pIPBuffer[len++] = '.';
 		else
-			IP_Buffer[len++] = '\0';
+			pIPBuffer[len++] = '\0';
 
 	}
+	len--;
+	return len;
 }
-
-
-//=================================================================================
-//  uPower
-//---------------------------------------------------------------------------------
-// This method returns x raised to the power of y
-//
-//      Parameter       Dir             Description
-//      ---------       ---             -----------
-//      base            IN      	base
-//      uNum            IN      	exponent
-//
-//      Return
-//      ------
-//      base raised to the exponent
-//==================================================================================
-
-
-
-int _uPower(int base, unsigned int exp)
-{
-	if( exp == 0)
-		return 1;
-
-	int t = uPower(base, exp/2);  // power is called only once instead of twice.
-
-	if (exp%2 == 0)
-		return t*t;
-	else
-		return base*t*t;
-}
-
