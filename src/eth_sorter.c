@@ -420,6 +420,7 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
 //
 //	Parameter	Dir		Description
 //	---------	---		-----------
+//  uId       IN    ID of the interface the command was received on
 //	pCommand				IN	Pointer to command header
 //	uCommandLength			IN	Length of command
 //	uResponsePacketPtr		IN	Location to put response packet
@@ -429,7 +430,7 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int CommandSorter(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
 	int iStatus;
 	sCommandHeaderT *Command = (sCommandHeaderT *) pCommand;
@@ -451,7 +452,7 @@ int CommandSorter(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u3
 		else if (Command->uCommandType == READ_I2C)
 			return(ReadI2CCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SDRAM_RECONFIGURE)
-			return(SdramReconfigureCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+			return(SdramReconfigureCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == READ_FLASH_WORDS)
 			return(ReadFlashWordsCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == PROGRAM_FLASH_WORDS)
@@ -1011,6 +1012,7 @@ int ReadI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 //
 //	Parameter	Dir		Description
 //	---------	---		-----------
+//  uId       IN    ID of the interface the command was received on
 //	pCommand				IN	Pointer to command header
 //	uCommandLength			IN	Length of command
 //	uResponsePacketPtr		IN	Pointer to where response packet must be constructed
@@ -1020,7 +1022,7 @@ int ReadI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int SdramReconfigureCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
 
 	sSdramReconfigureReqT *Command = (sSdramReconfigureReqT *) pCommand;
@@ -1028,6 +1030,7 @@ int SdramReconfigureCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
 	u32 uReg;
 	u8 uIndex;
 	u32 uContinuityData;
+  u32 uMuxSelect = 0;
 
 	if (uCommandLength < sizeof(sSdramReconfigureReqT))
 		return XST_FAILURE;
@@ -1052,8 +1055,27 @@ int SdramReconfigureCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
 		ProgramReadConfigurationRegisterCmd(0xD807);
 	}
 
-	if (Command->uClearSdram == 1)
+	if (Command->uClearSdram == 1){
 		ClearSdram();
+
+    /* Now, set the mux bit (bit #2) in C_WR_BRD_CTL_STAT_1_ADDR (register 0x18) to select */
+    /* the appropriate interface to receive the config data on. */
+    /* Since this is a later addition to this command, this seems to be the most appropriate place to do it. */
+    /* i.e. after clearing the sdram and in preparation for the config data to be written. */
+    /* Set bit #2 to 0 for 40gbe and 1 for 1gbe. Set bit #1 to 0 for config_data (would be set to 1 for user_data) */
+    /* This is done in order for the uBlaze to detect which interface it is receiving the SDRAM configure */
+    /* command over and set the board register in the fpga to the appropriate value for mux selection */
+    /* therefore, set register 0x18 to 0x4 for uId 0 (1gbe i/f) and 0x0 for the rest (40gbe i/f's) */
+    /* note: this register will fallback to defaults in fpga on reboot or link status change. */
+
+    uMuxSelect = (uId == 0 ? 0x4 : 0x0);
+
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
+#ifdef DEBUG_PRINT
+    xil_printf("Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
+    xil_printf("Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
+#endif
+  }
 
 	if (Command->uFinishedWritingToSdram == 1)
 		FinishedWritingToSdram();

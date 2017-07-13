@@ -86,9 +86,12 @@ copy: $(ELF)
 	@echo 'Copying file: $< to $(BUILD_ELF_DIR)'
 	$(shell cp $(ELF) $(BUILD_ELF_DIR))
 
+clean-all: clean
+	$(RM) *.elf
+
 clean:
 	$(RM) $(OBJDIR)*.o $(OBJDIR)*.d $(ELF)
 
-.PHONY: all clean copy check
+.PHONY: all clean copy check clean-all
 
 .FORCE:
