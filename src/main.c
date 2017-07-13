@@ -1385,6 +1385,9 @@ int main()
 
 	   InitialiseEthernetInterfaceParameters();
 
+     /* set bit#1 in C_WR_BRD_CTL_STAT_1_ADDR to 1 to connect 40gbe to user fabric */
+     WriteBoardRegister(C_WR_BRD_CTL_STAT_1_ADDR, 0x2);
+
 	   iStatus = XST_SUCCESS;
 
 	   ReadAndPrintFPGADNA();
