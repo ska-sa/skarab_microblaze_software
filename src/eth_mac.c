@@ -156,6 +156,27 @@ void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 }
 
 //=================================================================================
+//  SetFabricNetmask
+//--------------------------------------------------------------------------------
+//  This method sets the netmask of the FPGA fabric.
+//
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId       IN    ID of the ETH MAC to set netmask of
+//  uNetmask  IN    Netmask of FPGA fabric
+//
+//  Return
+//  ------
+//  None
+//=================================================================================
+void SetFabricNetmask(u8 uId, u32 uNetmask)
+{
+  u32 uAddressOffset = GetAddressOffset(uId);
+
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_NETMASK), uNetmask);
+}
+
+//=================================================================================
 //	SetMultiCastIPAddress
 //--------------------------------------------------------------------------------
 //	This method sets the Multicast IP address parameters.

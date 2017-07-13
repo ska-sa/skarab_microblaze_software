@@ -39,6 +39,7 @@
 #define ETH_MAC_REG_SOURCE_MAC_LOWER_32			0x1u
 #define ETH_MAC_REG_GATEWAY						0x3u
 #define ETH_MAC_REG_SOURCE_IP_ADDRESS			0x4u
+#define ETH_MAC_REG_NETMASK         0xEu
 #define ETH_MAC_REG_BUFFER_LEVEL				0x6u
 #define ETH_MAC_REG_SOURCE_PORT_AND_ENABLE		0x8u
 #define ETH_MAC_REG_XAUI_STATUS					0x9u
@@ -63,6 +64,7 @@ int SoftReset(u8 uId);
 void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits);
 void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress);
 void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress);
+void SetFabricNetmask(u8 uId, u32 uNetmask);
 void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress);
 void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddressMask);
 void EnableFabricInterface(u8 uId, u8 uEnable);
