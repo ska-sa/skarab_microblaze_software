@@ -52,7 +52,7 @@ volatile u32 uWriteBoardShadowRegs[NUM_REGISTERS];
 volatile u32 uTransmitBuffer[256];
 
 // Single receive buffer
-volatile u32 uReceiveBuffer[256];
+volatile u32 uReceiveBuffer[512]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
 
 // Transmit and receive buffers for loopback testing of second interface
 volatile u32 uLoopbackTransmitBuffer[256];
