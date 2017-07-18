@@ -955,4 +955,11 @@ typedef struct sHMCReadI2CBytesResp {
 #define MEZZANINE_2_I2C_BUS_ID		0x3
 #define MEZZANINE_3_I2C_BUS_ID		0x4
 
+#define PCA9546_I2C_DEVICE_ADDRESS	0x70	// Address without read/write bit
+#define FAN_CONT_SWITCH_SELECT		0x01
+#define MONITOR_SWITCH_SELECT		0x02
+#define ONE_GBE_SWITCH_SELECT		0x04
+
+#define GBE_88E1111_I2C_DEVICE_ADDRESS	0x58	// Without read/write bit
+
 #endif
