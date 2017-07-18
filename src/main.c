@@ -405,7 +405,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 				}
 				else
         {
-          xil_printf("check UDP header failed: src mac %.4x.%.4x.%.4x\r\n", EthHdr->uSourceMacHigh, EthHdr->uSourceMacMid, EthHdr->uSourceMacLow);
+          xil_printf("check UDP header failed: src mac %04x.%04x.%04x\r\n", EthHdr->uSourceMacHigh, EthHdr->uSourceMacMid, EthHdr->uSourceMacLow);
 					return XST_FAILURE;
         }
 			}
@@ -1353,14 +1353,19 @@ int main()
 
 	   iStatus = XWdtTb_Initialize(& WatchdogTimer, XPAR_WDTTB_0_DEVICE_ID);
 
+	   // GT 31/03/2017 FIX DETECTION OF WHETHER PREVIOUS RESET WAS RESULT OF WATCHDOG
 	   if (iStatus == XST_DEVICE_IS_STARTED)
 	   {
+		   if (XWdtTb_IsWdtExpired(& WatchdogTimer))
+			   xil_printf("Previous reset result of WDT.\r\n");
+
 		   XWdtTb_Stop(& WatchdogTimer);
 
 		   iStatus = XWdtTb_Initialize(& WatchdogTimer, XPAR_WDTTB_0_DEVICE_ID);
-	   }
 
-	   if (iStatus == XST_SUCCESS)
+		   XWdtTb_Start(& WatchdogTimer);
+	   }
+	   else if (iStatus == XST_SUCCESS)
 	   {
 		   if (XWdtTb_IsWdtExpired(& WatchdogTimer))
 			   xil_printf("Previous reset result of WDT.\r\n");
