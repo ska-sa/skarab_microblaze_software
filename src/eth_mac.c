@@ -381,7 +381,7 @@ void AckHostPacketReceive(u8 uId)
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords)
+int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 {
 	unsigned uTimeout = 0x0;
 	u32 uHostTransmitBufferLevel = 0x0;
@@ -391,7 +391,10 @@ int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords)
 
 	// Must be a multiple of 64 bits
 	if ((uNumWords % 2) != 0x0)
+	{
+		xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %x.\r\n", uNumWords);
 		return XST_FAILURE;
+	}
 
 	// Check that the transmit buffer is ready for a packet
 	do
@@ -402,7 +405,10 @@ int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords)
 	while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
 
 	if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  {
+		xil_printf("TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uHostTransmitBufferLevel);
 		return XST_FAILURE;
+  }
 
 	// Program transmit packet words into FIFO
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
@@ -424,7 +430,10 @@ int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords)
 	while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
 
 	if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  {
+		xil_printf("TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uHostTransmitBufferLevel);
 		return XST_FAILURE;
+  }
 
 	return XST_SUCCESS;
 
@@ -445,14 +454,24 @@ int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords)
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int ReadHostPacket(u8 uId, u32 *puReceivePacket, u32 uNumWords)
+int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
 	unsigned uIndex = 0x0;
 	u32 uAddressOffset = GetAddressOffset(uId);
 	//u32 uReg;
 
-	if (uNumWords > GetHostReceiveBufferLevel(uId))
+	// GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
+	//if (uNumWords > GetHostReceiveBufferLevel(uId))
+	//{
+	//	xil_printf("ReadHostPacket: Packet too big!\r\n");
+	//	return XST_FAILURE;
+	//}
+
+	if (uNumWords > 512)
+	{
+		xil_printf("ReadHostPacket: Packet size exceeds 512 words. SIZE: %x\r\n", uNumWords);
 		return XST_FAILURE;
+	}
 
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
 	{

@@ -73,7 +73,7 @@ u32 GetHostTransmitBufferLevel(u8 uId);
 u32 GetHostReceiveBufferLevel(u8 uId);
 void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel);
 void AckHostPacketReceive(u8 uId);
-int TransmitHostPacket(u8 uId, u32 *puTransmitPacket, u32 uNumWords);
-int ReadHostPacket(u8 uId, u32 *puReceivePacket, u32 uNumWords);
+int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords);	// GT 31/03/2017 INSTRUCT COMPILER BUFFER IS VOLATILE
+int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords); // GT 31/03/2017 INSTRUCT COMPILER BUFFER IS VOLATILE
 
 #endif
