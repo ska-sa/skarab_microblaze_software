@@ -989,17 +989,6 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
     pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 15; //domain name
   }
 
-#ifndef GITVERSION
-#define GITVERSION "unknown-state"
-#endif
-#ifndef GITVERSION_SIZE
-#define GITVERSION_SIZE 13
-#endif
-#define VENDOR_ID (GITVERSION" "__DATE__" "__TIME__)    /* build a string */
-#define VENDOR_ID_LEN (21 + (GITVERSION_SIZE))  /* length of the above string */
-#define STRING(x) XSTRING(x)
-#define XSTRING(x) #x
- 
 #pragma message "vendor id length is " STRING(VENDOR_ID_LEN)
 
   /* DHCP vendor class identifier - enabled by flag */
@@ -1009,11 +998,6 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
     memcpy(pBuffer + DHCP_OPTIONS_BASE + uIndex, VENDOR_ID, VENDOR_ID_LEN);
     uIndex += VENDOR_ID_LEN;
   }
-
-#undef VENDOR_ID
-#undef VENDOR_ID_LEN
-#undef GITVERSION
-#undef GITVERSION_SIZE
 
   /* DHCP end option - indicates end of DHCP message options */
   pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 0xff;

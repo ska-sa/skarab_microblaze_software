@@ -383,6 +383,8 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 							return XST_FAILURE;
 
 					}
+/**** DHCP NOW handled by new DHCP code ****/
+#if 0
 					else if (uUdpDstPort == DHCP_CLIENT_UDP_PORT)
 					{
 						iStatus = CheckDHCPHeader(uId, uL5PktLen, pL5Ptr);
@@ -399,6 +401,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 						else
 							return XST_FAILURE;
 					}
+#endif
 					else
 						return XST_FAILURE;
 
@@ -1329,7 +1332,11 @@ int main()
 	   }
 #endif
 
-	   xil_printf("---Entering main---\n\r");
+	   xil_printf("\r\n---Entering main---\n\r");
+	   xil_printf("Embedded software version: %d.%d.%d\n\r", EMBEDDED_SOFTWARE_VERSION_MAJOR,
+                                                           EMBEDDED_SOFTWARE_VERSION_MINOR,
+                                                           EMBEDDED_SOFTWARE_VERSION_PATCH);
+	   xil_printf("Running ELF version: %s\n\r", VENDOR_ID);
 
 #ifdef DEV_PLATFORM
 	   iStatus = I2CProgramSFPClkOsc();
@@ -1437,7 +1444,7 @@ int main()
        uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
        uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
 
-       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) uReceiveBuffer, (256 * 4), uTransmitBuffer, (256 * 4), uTempMac);
+       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) uReceiveBuffer, (512 * 4), uTransmitBuffer, (256 * 4), uTempMac);
        eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
        eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
        vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
@@ -1518,6 +1525,7 @@ int main()
 
              /* validate and set flag */
              if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
+               xil_printf("DHCP [%02x] packet received!\r\n", uEthernetId);
                uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
                uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
                //xil_printf("run dhcp task\n\r");
@@ -1668,7 +1676,7 @@ int main()
 
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   u8 uEthernetId;
-  u8 r;
+  u8 uReturnValue;
   u32 size;
   u16 *buffer;
   u32 uIndex;
@@ -1684,9 +1692,14 @@ static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
 
   uEthernetId = * ((u8 *) pUserData);
   size = size >> 1;   /*  32-bit words */
-  r = TransmitHostPacket(uEthernetId, (u32 *) buffer, size);
+  uReturnValue = TransmitHostPacket(uEthernetId, (u32 *) buffer, size);
+  if (uReturnValue == XST_SUCCESS){
+    xil_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\n\r", uEthernetId, pDHCPObjectPtr->uDHCPXidCached);
+  } else {
+    xil_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\n\r", uEthernetId, pDHCPObjectPtr->uDHCPXidCached);
+  }
 
-  return 0;
+  return uReturnValue;
 }
 
 
