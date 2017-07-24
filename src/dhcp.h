@@ -158,6 +158,20 @@
 
 /*prefix: arr = array, t = enumerated type, p = pointer, u = unsigned data type, i = integer, s = struct*/
 
+/* versioning macros */
+#ifndef GITVERSION
+#define GITVERSION "unknown-state"
+#endif
+
+#ifndef GITVERSION_SIZE
+#define GITVERSION_SIZE 13
+#endif
+
+#define VENDOR_ID (GITVERSION" "__DATE__" "__TIME__)    /* build a string */
+#define VENDOR_ID_LEN (21 + (GITVERSION_SIZE))  /* length of the above string */
+#define STRING(x) XSTRING(x)
+#define XSTRING(x) #x
+
 typedef enum {INIT=0,
               RANDOMIZE,
               SELECT,
