@@ -392,7 +392,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 	// Must be a multiple of 64 bits
 	if ((uNumWords % 2) != 0x0)
 	{
-		xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %x.\r\n", uNumWords);
+		xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uNumWords);
 		return XST_FAILURE;
 	}
 

@@ -2757,12 +2757,14 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
 	struct sEthernetHeader *EthernetHeader = (struct sEthernetHeader *) pTransmitBuffer;
 	u8 * uIPV4Header = pTransmitBuffer + sizeof(sEthernetHeaderT);
 	struct sIPV4Header *IPHeader = (struct sIPV4Header *) uIPV4Header;
-	u8 * uIGMPHeader = uIPV4Header + sizeof(sIPV4HeaderT);
+  u8 * uIPV4HeaderOptions = uIPV4Header + sizeof(sIPV4HeaderT); 
+	struct sIPV4HeaderOptions *IPHeaderOptions = (struct sIPV4HeaderOptions *) uIPV4HeaderOptions;
+  u8 * uIGMPHeader = uIPV4HeaderOptions + sizeof(sIPV4HeaderOptionsT);
 	struct sIGMPHeader * IGMPHeader = (struct sIGMPHeader *) uIGMPHeader;
 
 	u8 uIndex;
 	u32 uChecksum;
-	u32 uIPHeaderLength = sizeof(sIPV4HeaderT);
+	u32 uIPHeaderLength = sizeof(sIPV4HeaderT) + sizeof(sIPV4HeaderOptionsT);
 	u32 uIGMPHeaderLength = sizeof(sIGMPHeaderT);
 
 	u32 uTempGroupAddress;
@@ -2784,10 +2786,12 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
 
 	EthernetHeader->uEthernetType = ETHERNET_TYPE_IPV4;
 
-	IPHeader->uVersion = 0x40 | sizeof(sIPV4HeaderT) / 4;
+	IPHeader->uVersion = 0x40 | (sizeof(sIPV4HeaderT) + sizeof(sIPV4HeaderOptionsT)) / 4;
 
 	IPHeader->uTypeOfService = 0;
-	IPHeader->uTotalLength = sizeof(sIPV4HeaderT) + sizeof(sIGMPHeaderT);
+	IPHeader->uTotalLength = sizeof(sIPV4HeaderT) + sizeof(sIPV4HeaderOptionsT) + sizeof(sIGMPHeaderT) - 18;  /* minus the padding bytes = 9 x 2 */
+                                                                                                            /* RFC 894 - Frame Format - */
+                                                                                                            /* par.2 padding bytes not part of IP packet ie IP Total Length */
 
 	IPHeader->uFlagsFragment = 0x4000;
 	IPHeader->uIdentification = uIPIdentification[uId]++;
@@ -2808,7 +2812,14 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
 	IPHeader->uDestinationIPHigh = ((uTempGroupAddress >> 16) & 0xFFFF);
 	IPHeader->uDestinationIPLow = (uTempGroupAddress & 0xFFFF);
 
-	uChecksum = CalculateIPChecksum(0, uIPHeaderLength / 2, (u16 *) IPHeader);
+  /* RFC 2236 - last par on pg. 23: "The IGMPv2 spec requires the presence of the IP Router Alert option
+      [RFC 2113] in all packets described in this memo." */
+
+  /* Router Alert Option - RFC 2113 */
+  IPHeaderOptions->uOptionsHigh = 0x9404;  /* Copied flag = 1; Option class = 0; Option Number = 20; Length = 4; */
+  IPHeaderOptions->uOptionsLow = 0;  /* Router shall examine packet */
+
+	uChecksum = CalculateIPChecksum(0, (uIPHeaderLength + 1) / 2, (u16 *) IPHeader);
 	IPHeader->uChecksum = ~uChecksum;
 
 	IGMPHeader->uType = uMessageType;
@@ -2818,13 +2829,13 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
 	IGMPHeader->uGroupAddressHigh = ((uGroupAddress >> 16) & 0xFFFF);
 	IGMPHeader->uGroupAddressLow = (uGroupAddress & 0xFFFF);
 
-	for (uIndex = 0; uIndex < 11; uIndex++)
+	for (uIndex = 0; uIndex < 9; uIndex++)
 		IGMPHeader->uPadding[uIndex] = 0x0;
 
-	uChecksum = CalculateIPChecksum(0, uIGMPHeaderLength / 2, (u16 *) IGMPHeader);
+	uChecksum = CalculateIPChecksum(0, (uIGMPHeaderLength + 1) / 2, (u16 *) IGMPHeader);
 	IGMPHeader->uChecksum = ~uChecksum;
 
-	* uResponseLength = sizeof(sIGMPHeaderT) + sizeof(sIPV4HeaderT) + sizeof(sEthernetHeaderT);
+	* uResponseLength = sizeof(sIGMPHeaderT) + sizeof(sIPV4HeaderOptionsT) + sizeof(sIPV4HeaderT) + sizeof(sEthernetHeaderT);
 }
 
 //=================================================================================

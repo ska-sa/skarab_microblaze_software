@@ -123,7 +123,7 @@ volatile u16 uPreviousSequenceNumber;
 /* <major>.<minor>.<patch> */
 #define EMBEDDED_SOFTWARE_VERSION_MAJOR		3
 #define EMBEDDED_SOFTWARE_VERSION_MINOR		1
-#define EMBEDDED_SOFTWARE_VERSION_PATCH		6
+#define EMBEDDED_SOFTWARE_VERSION_PATCH		7
 
 // WISHBONE SLAVE ADDRESSES
 #define BOARD_REGISTER_ADDR			0x00000000
@@ -432,6 +432,12 @@ typedef struct sIPV4Header {
 	u16  uDestinationIPLow;
 } sIPV4HeaderT;
 
+/* added to allow Router Alert Option for IGMP v2 */
+typedef struct sIPV4HeaderOptions {
+  u16  uOptionsHigh;
+  u16  uOptionsLow;
+} sIPV4HeaderOptionsT;
+
 typedef struct sICMPHeader {
 	u8 	uCode;
 	u8 	uType;
@@ -448,7 +454,7 @@ typedef struct sIGMPHeader {
 	u16 uGroupAddressHigh;
 	u16 uGroupAddressLow;
 
-	u16 uPadding[11];
+	u16 uPadding[9];
 } sIGMPHeaderT;
 
 typedef struct sUDPHeader {
