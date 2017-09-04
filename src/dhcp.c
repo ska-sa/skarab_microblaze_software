@@ -14,11 +14,15 @@
 /* vim settings: "set sw=2 ts=2 expandtab autoindent" */
 
 /* standard C lib includes */
-#include <stdio.h>
-#include <string.h>
+//#include <stdio.h>
+//#include <string.h>
+
+#include <xil_types.h>
+#include <xenv_standalone.h>
 
 /* local includes */
 #include "dhcp.h"
+#include "net_utils.h"
 
 /* Local function prototypes  */
 static typeDHCPState init_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
@@ -33,7 +37,6 @@ static typeDHCPState rebind_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
 static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags);
 static typeDHCPMessage tDHCPProcessMsg(struct sDHCPObject *pDHCPObjectPtr);
 
-static u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd);
 static u32 uDHCPRandomNumber(u32 uSeed);
 
 static void vDHCPAuxClearFlag(u8 *pFlagRegister, typeDHCPRegisterFlags tBitPosition);
@@ -1160,66 +1163,6 @@ static typeDHCPMessage tDHCPProcessMsg(struct sDHCPObject *pDHCPObjectPtr){
 }
 
 /**********  Some auxiliary functions **********/
-
-//=================================================================================
-//  uChecksum16Calc
-//---------------------------------------------------------------------------------
-//  This method calculates a 16-bit word checksum.
-//
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
-//  pDataPtr        IN    pointer to buffer with data to be "checksummed"
-//  uIndexStart     IN    starting index in the data buffer
-//  uIndexEnd       IN    ending index in the data buffer
-//
-//  Return
-//  ------
-//  0xffff or valid checksum
-//=================================================================================
-static u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd){
-  u16 uChkIndex;
-  u16 uChkLength;
-  u16 uChkTmp = 0;
-  u32 uChecksumValue = 0;
-  u32 uChecksumCarry = 0;
-
-  if (pDataPtr == NULL){
-    return 0xffff /* ? */;
-  }
-
-  /* range indexing error */
-  if (uIndexStart > uIndexEnd){
-    return 0xffff;  /* ? */
-  }
-
-  uChkLength = uIndexEnd - uIndexStart + 1;
-
-  for (uChkIndex = uIndexStart; uChkIndex < (uIndexStart + uChkLength); uChkIndex += 2){
-    uChkTmp = (u8) pDataPtr[uChkIndex];
-    uChkTmp = uChkTmp << 8;
-    if (uChkIndex == (uChkLength - 1)){     //last iteration - only valid for (uChkLength%2 == 1)
-      uChkTmp = uChkTmp + 0;
-    }
-    else{
-      uChkTmp = uChkTmp + (u8) pDataPtr[uChkIndex + 1];
-    }
-
-    /* get 1's complement of data */
-    uChkTmp = ~uChkTmp;
-
-    /* aggregate -> doing 16bit arithmetic within 32bit words to preserve overflow */
-    uChecksumValue = uChecksumValue + uChkTmp;
-
-    /* get overflow */
-    uChecksumCarry = uChecksumValue >> 16;
-
-    /* add to checksum */
-    uChecksumValue = (0xffff & uChecksumValue) + uChecksumCarry;
-    /* FIXME: repeat if this operation also produces an overflow!! */
-  }
-
-  return uChecksumValue;
-}
 
 //=================================================================================
 //  uDHCPRandomNumber

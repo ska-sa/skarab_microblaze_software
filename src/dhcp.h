@@ -17,23 +17,6 @@
 
 /* Xilinx lib includes */
 #include <xstatus.h>
-#include <xenv_standalone.h>
-
-/* some portability stuff */
-/* for datatypes used */
-#include <stdint.h>
-
-#ifndef u8
-#define u8 uint8_t
-#endif
-
-#ifndef u16
-#define u16 uint16_t
-#endif
-
-#ifndef u32
-#define u32 uint32_t
-#endif
 
 /* link custom return values */
 #define DHCP_RETURN_OK            XST_SUCCESS
