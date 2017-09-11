@@ -1074,7 +1074,23 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 #ifdef DEBUG_PRINT
     xil_printf("Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
     xil_printf("Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
+		xil_printf("About to send IGMP leave messages.\r\n");
 #endif
+
+    /* The clear sdram command is usually called before programming. Thus, in anticipation of a new sdram image being sent */
+    /* to the skarab, unsubscribe from all igmp groups. */
+
+    // Check which Ethernet interfaces are part of IGMP groups
+    // and send leave messages immediately
+    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
+    {
+      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
+      {
+        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
+        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
+        uCurrentIGMPMessage[uIndex] = 0x0;
+      }
+    }
   }
 
 	if (Command->uFinishedWritingToSdram == 1)
