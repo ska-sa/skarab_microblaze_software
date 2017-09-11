@@ -46,7 +46,7 @@ static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserDa
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
-static volatile u8 uFlagRunTask_LLDP = 0;
+static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
 static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 
 //=================================================================================
@@ -83,15 +83,15 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   //uFlagRunTask_LLDP = 1;
 
 	// LLDP every 10 seconds (timer every 100 ms)
-	if(uLLDPTimerCounter == 0x64)
+	if(uLLDPTimerCounter == 0x258)
 	{
 		uLLDPTimerCounter = 0x0;
 		uFlagRunTask_LLDP = 1;
 
 	}
-	else
+	else{
 		uLLDPTimerCounter++;
-
+	}
 
 
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
@@ -1488,26 +1488,6 @@ int main()
 
       }
 
-      /* if(uFlagRunTask_LLDP){
-	  uFlagRunTask_LLDP = 0;
-	  for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-             uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-             u32 size = uResponsePacketLength >> 1;  //16 bit words 
-             u16 * buffer = (u16*)uTransmitBuffer;
-
-             for(u32 uIndex = 0; uIndex < size; uIndex++){
-                buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
-             }
-
-             size = size >> 1; // 32 bit words
-             xil_printf("size = %d\n\r", size);
-             iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
-             xil_printf("status = %d\n\r", iStatus);
-          }
-        }*/
-
-
-
 		   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
 		   {
 			   UpdateEthernetLinkUpStatus(uEthernetId);
@@ -1619,17 +1599,16 @@ int main()
                                       if(uFlagRunTask_LLDP){
 					for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
 					  iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-					  xil_printf("LLDP Packet build status : %d\n\r", iStatus);
+					 
 					  if(iStatus == XST_SUCCESS){
 					    u32 size = uResponsePacketLength >> 1; /* 16 bit words */
 					    u16 * buffer = (u16*)uTransmitBuffer;
-					    xil_printf("packet size, 16 bit words : %d\n\r", size);
+					 
 					    for(u32 uIndex = 0; uIndex < size; uIndex++){
 					      buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
 					    }
 					    size = size >> 1; /* 32 bit words*/
 					    iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
-					    xil_printf("LLDP Packet transmit status :%d\n\r", iStatus);
 					  }
 					}
 					  uFlagRunTask_LLDP = 0;	
@@ -1775,7 +1754,7 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   uDHCPState[id] = DHCP_STATE_COMPLETE;
 
   EnableFabricInterface(id, 1);
-
+  uFlagRunTask_LLDP = 1;
   return 0;
 }
 

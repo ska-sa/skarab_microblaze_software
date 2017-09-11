@@ -71,7 +71,9 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
         uIPAddr[2] = (uIPAddress & 0x0000ff00) >> 8;
         uIPAddr[1] = (uIPAddress & 0x00ff0000) >> 16;
         uIPAddr[0] = (uIPAddress & 0xff000000) >> 24;
+	memset(pIPBuffer,'\0', 15);
         uIPLength = uIPToString(pIPBuffer, uIPAddr);
+
 	if(uIPLength > 0){
 		pTransmitBuffer[LLDP_PORT_ID_TLV_TYPE_OFFSET] =  LLPD_PORT_ID_TLV;
 		pTransmitBuffer[LLDP_PORT_ID_TLV_LEN_OFFSET] =  LLDP_PORT_ID_TLV_LEN + uIPLength;
@@ -107,13 +109,17 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 	if(first_part > 0){
 		memcpy(pTransmitBuffer + LLDP_SYSTEM_DESCR_TLV_OFFSET + uIPLength, "BSP", LLDP_SYSTEM_DESCR_TLV_LEN);
 	}
-	else
+	else{
 		 memcpy(pTransmitBuffer + LLDP_SYSTEM_DESCR_TLV_OFFSET + uIPLength, "TLF", LLDP_SYSTEM_DESCR_TLV_LEN);
+	}
 	/* LLDP END OF LLDPDU TLV */
 	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_TYPE_OFFSET + uIPLength] = LLDP_END_OF_LLDPDU_TLV;
 	pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + uIPLength] = 0;
 
-	*uResponseLength = LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + uIPLength + 1;
+	*uResponseLength = LLDP_END_OF_LLDPDU_TLV_OFFSET + uIPLength;
+	if(*uResponseLength < LLDP_MIN_BUFFER_SIZE){ // make minimum packet length 72
+		*uResponseLength = *uResponseLength + (LLDP_MIN_BUFFER_SIZE % (*uResponseLength));
+	}
 	
 	return LLDP_RETURN_OK;
 
@@ -157,12 +163,10 @@ int uIPToString(char* pIPBuffer, u8* pIPAddr){
 			b = b - (i * c);
 		}
 		pIPBuffer[len++] = lookup[b];
-		if(k != 3)
+		if(k != 3){
 			pIPBuffer[len++] = '.';
-		else
-			pIPBuffer[len++] = '\0';
+		}
 
 	}
-	len--;
 	return len;
 }

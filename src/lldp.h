@@ -76,10 +76,10 @@
 #define LLDP_END_OF_LLDPDU_TLV_LEN_LEN           1
 #define LLDP_END_OF_LLDPDU_TLV_OFFSET            (LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET + LLDP_END_OF_LLDPDU_TLV_LEN_LEN) //51 + uIPLength
 
-
+#define LLDP_MIN_BUFFER_SIZE    72
 #define LLDP_MAX_BUFFER_SIZE    1024
 volatile u8 uIPAddr[4];  // for IP address before dot notation 
-volatile char pIPBuffer[16]; // for IP address string in dot notation 
+volatile char pIPBuffer[15]; // for IP address string in dot notation 
 
 enum LLDP_TLV_TYPE {
 
