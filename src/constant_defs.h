@@ -212,7 +212,7 @@ volatile u16 uPreviousSequenceNumber;
 #define NO_REBOOT				0x2
 
 // COMMAND TYPES
-#define HIGHEST_DEFINED_COMMAND	    0x0049//0x0033
+#define HIGHEST_DEFINED_COMMAND	    0x0051//0x0033
 
 #define WRITE_REG					0x0001
 #define READ_REG					0x0003
@@ -244,7 +244,7 @@ volatile u16 uPreviousSequenceNumber;
 //#define SPARE3                      0x0037
 //#define SPARE4                      0x0039
 //#define SPARE5                      0x0041
-
+#define SDRAM_PROGRAM_OVER_WISHBONE 0x0051
 
 // ETHERNET TYPE CODES
 #define ETHERNET_TYPE_IPV4   	0x800
@@ -953,6 +953,38 @@ typedef struct sHMCReadI2CBytesResp {
     u16				uReadSuccess;
 	u16				uPadding[2];
 } sHMCReadI2CBytesRespT;
+
+/* rvw - new SDRAM programming request / response */
+#define CHUNK_SIZE  512
+
+typedef struct sSDRAMProgramReq {
+	sCommandHeaderT Header;
+	u16 uChunkNum;
+	u16	uChunkTotal;
+	u16 uBitstreamChunk[CHUNK_SIZE];
+} sSDRAMProgramReqT;
+
+typedef struct sSDRAMProgramResp {
+  sCommandHeaderT Header;
+  u16 uChunkNum;
+  u16 uStatus;
+  u16 uPadding[7];
+} sSDRAMProgramRespT;
+
+/* testing of the sdram program feature */
+typedef struct sSDRAMProgramTestReq {
+	sCommandHeaderT Header;
+	u16 uSDRAMWordHigh;
+	u16 uSDRAMWordLow;
+} sSDRAMProgramTestReqT;
+
+typedef struct sSDRAMProgramTestResp {
+  sCommandHeaderT Header;
+	u16 uSDRAMWordHigh;
+	u16 uSDRAMWordLow;
+  u16 uPadding[7];
+} sSDRAMProgramTestRespT;
+
 
 // I2C BUS DEFINES
 #define	MB_I2C_BUS_ID				0x0

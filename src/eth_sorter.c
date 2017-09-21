@@ -495,6 +495,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(BigReadWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == BIG_WRITE_WISHBONE)
 			return(BigWriteWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
+			return(SDRAMProgramCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
 			xil_printf("Invalid Opcode Detected!\n\r");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3133,3 +3135,119 @@ int HMCReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
 
 	return XST_SUCCESS;
 }
+
+
+//=================================================================================
+//	SDRAMProgramCommandHandler
+//--------------------------------------------------------------------------------
+//
+//	Return
+//	------
+//	XST_SUCCESS if successful
+//=================================================================================
+int SDRAMProgramCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+	u8 uPaddingIndex;
+  u16 uChunkByteIndex;
+  u32 uTemp = 0;
+  u8 uRetVal;
+
+  /* State variables */
+  static u8 uCurrentProgrammingId;      /* the interface Id we are currently receiving sdram data on */
+  static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
+
+	sSDRAMProgramReqT *Command = (sSDRAMProgramReqT *) pCommand;
+	sSDRAMProgramRespT *Response = (sSDRAMProgramRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sSDRAMProgramReqT)){
+		return XST_FAILURE;
+  }
+
+	for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	Response->uChunkNum = Command->uChunkNum; 
+	Response->uStatus = 0x0;
+
+	*uResponseLength = sizeof(sSDRAMProgramRespT);
+
+  /* Chunk number 0 is special case, resets everything */
+  if(Command->uChunkNum == 0x0){
+    xil_printf("chunk 0: about to clear sdram\n\r");
+    ClearSdram();
+		SetOutputMode(0x1, 0x1);
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x14024, 0x1);
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x1402C, 0x2);
+
+    uRetVal = XST_SUCCESS;
+
+  } else if (Command->uChunkNum == (uChunkIdCached + 1)){
+    xil_printf("chunk %d: about to write to sdram\n\r", Command->uChunkNum);
+    for (uChunkByteIndex = 0; uChunkByteIndex < CHUNK_SIZE; uChunkByteIndex = uChunkByteIndex + 2){
+      uTemp = (Command->uBitstreamChunk[uChunkByteIndex] << 16 & 0xFFFF0000) | (Command->uBitstreamChunk[uChunkByteIndex + 1] & 0x0000FFFF);
+      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x14028, uTemp);
+      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x1402C, 0x2);
+    }
+
+    if (Command->uChunkNum == Command->uChunkTotal){
+      xil_printf("chunk %d: about to end sdram write\n\r", Command->uChunkNum);
+      SetOutputMode(0x2, 0x1);
+      FinishedWritingToSdram();
+      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x1402C, 0x4);
+      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x14024, 0x0);
+      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + 0x1402C, 0x0);
+    }
+    uChunkIdCached = Command->uChunkNum;
+
+    uRetVal = XST_SUCCESS;
+
+  } else if (Command->uChunkNum == uChunkIdCached){
+    uRetVal = XST_SUCCESS;
+    xil_printf("chunk %d: already received\n\r", Command->uChunkNum);
+  } else {
+    uRetVal = XST_FAILURE;
+  }
+
+  return uRetVal;
+}
+
+#if 0
+
+int SDRAMProgramTestCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+	u8 uPaddingIndex;
+
+	sSDRAMProgramTestReqT *Command = (sSDRAMProgramTestReqT *) pCommand;
+	sSDRAMProgramTestRespT *Response = (sSDRAMProgramTestRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sSDRAMProgramTestReqT)){
+		return XST_FAILURE;
+  }
+
+	for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  //  WriteBoardRegister(C_WR_LOOPBACK_ADDR, uTemp);
+  //  ReadBoardRegister(C_RD_LOOPBACK_ADDR);
+
+	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);
+
+  xil_printf("Word: High=0x%4x Low=0x%4x\n\r", Command->uSDRAMWordHigh, Command->uSDRAMWordLow);
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	Response->uSDRAMWordHigh = Command->uSDRAMWordHigh; 
+	Response->uSDRAMWordLow = Command->uSDRAMWordLow; 
+
+	*uResponseLength = sizeof(sSDRAMProgramTestRespT);
+
+	return XST_SUCCESS;
+}
+
+#endif
