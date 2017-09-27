@@ -122,8 +122,8 @@ volatile u16 uPreviousSequenceNumber;
 
 /* <major>.<minor>.<patch> */
 #define EMBEDDED_SOFTWARE_VERSION_MAJOR		3
-#define EMBEDDED_SOFTWARE_VERSION_MINOR		1
-#define EMBEDDED_SOFTWARE_VERSION_PATCH		7
+#define EMBEDDED_SOFTWARE_VERSION_MINOR		3
+#define EMBEDDED_SOFTWARE_VERSION_PATCH		0
 
 // WISHBONE SLAVE ADDRESSES
 #define BOARD_REGISTER_ADDR			0x00000000
@@ -950,41 +950,26 @@ typedef struct sHMCReadI2CBytesResp {
 	u16				uSlaveAddress;
 	u16				uReadAddress[4];
 	u16				uReadBytes[4];
-    u16				uReadSuccess;
+  u16				uReadSuccess;
 	u16				uPadding[2];
 } sHMCReadI2CBytesRespT;
 
-/* rvw - new SDRAM programming request / response */
-#define CHUNK_SIZE  512
+/* new SDRAM programming request / response */
+#define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
 
-typedef struct sSDRAMProgramReq {
+typedef struct sSDRAMProgramOverWishboneReq {
 	sCommandHeaderT Header;
 	u16 uChunkNum;
 	u16	uChunkTotal;
 	u16 uBitstreamChunk[CHUNK_SIZE];
-} sSDRAMProgramReqT;
+} sSDRAMProgramOverWishboneReqT;
 
-typedef struct sSDRAMProgramResp {
+typedef struct sSDRAMProgramOverWishboneResp {
   sCommandHeaderT Header;
   u16 uChunkNum;
   u16 uStatus;
   u16 uPadding[7];
-} sSDRAMProgramRespT;
-
-/* testing of the sdram program feature */
-typedef struct sSDRAMProgramTestReq {
-	sCommandHeaderT Header;
-	u16 uSDRAMWordHigh;
-	u16 uSDRAMWordLow;
-} sSDRAMProgramTestReqT;
-
-typedef struct sSDRAMProgramTestResp {
-  sCommandHeaderT Header;
-	u16 uSDRAMWordHigh;
-	u16 uSDRAMWordLow;
-  u16 uPadding[7];
-} sSDRAMProgramTestRespT;
-
+} sSDRAMProgramOverWishboneRespT;
 
 // I2C BUS DEFINES
 #define	MB_I2C_BUS_ID				0x0
