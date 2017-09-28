@@ -53,6 +53,14 @@
 #define FLASH_SDRAM_GBE_STATS_REG_ADDRESS		0x400C
 #define FLASH_CONTINUITY_TEST_OUTPUT_REG 		0x4020
 
+#define FLASH_SDRAM_WB_PROGRAM_EN_REG_ADDRESS       0x4024  /* enables the programming of the SDRAM via the wishbone bus */
+                                                            /* as opposed to the alternative method via the fpga fabric port. */
+                                                            /* Set to zero to revert back to original programming via fabric port */
+#define FLASH_SDRAM_WB_PROGRAM_DATA_WR_REG_ADDRESS  0x4028  /* The 32-bit data words to be written to the SDRAM are placed in this register */
+#define FLASH_SDRAM_WB_PROGRAM_CTL_REG_ADDRESS      0x402C  /* Control Register: bit 0: '1' = Set by firmware to ack reception of data word. Cleared by microblaze */
+                                                            /*                   bit 1: microblaze sets to '1' to indicate start SDRAM programming */
+                                                            /*                   bit 2: microblaze sets to '1' to indicate done SDRAM programming */
+
 #define FLASH_READ_ARRAY					0xFF
 #define FLASH_READ_DEVICE_IDENTIFIER		0x90
 #define FLASH_CFI_QUERY						0x98
