@@ -36,6 +36,15 @@
 //#define DO_1GBE_LOOPBACK_TEST
 #endif
 
+//DEFINE INTERFACE NAMES
+
+#ifndef ONE_GBE_INTERFACE
+#define ONE_GBE_INTERFACE          "I/F-01GBE-00"
+#endif
+#ifndef FORTY_GBE_INTERFACE
+#define FORTY_GBE_INTERFACE       "I/F-40GBE-01"
+#endif
+
 #define DEBUG_PRINT
 //uncomment if you want to see more debug output
 //#define TRACE_PRINT
@@ -82,6 +91,9 @@ volatile u8 uEnableArpRequests[NUM_ETHERNET_INTERFACES];
 volatile u8 uCurrentArpRequest;
 volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES];
 volatile u8 uEthernetNeedsReset[NUM_ETHERNET_INTERFACES];
+
+volatile u32 uLLDPTimerCounter;
+volatile u8 uLLDPRetryTimer[NUM_ETHERNET_INTERFACES];
 
 volatile u32 uDHCPTimerCounter;
 volatile u32 uDHCPTransactionID[NUM_ETHERNET_INTERFACES];
@@ -249,6 +261,7 @@ volatile u16 uPreviousSequenceNumber;
 // ETHERNET TYPE CODES
 #define ETHERNET_TYPE_IPV4   	0x800
 #define ETHERNET_TYPE_ARP    	0x806
+#define ETHERNET_TYPE_LLDP      0x88cc
 
 // IP PROTOCOL CODES
 #define IP_PROTOCOL_UDP     	0x11
@@ -311,6 +324,9 @@ volatile u16 uPreviousSequenceNumber;
 
 #define DHCP_RETRY_ENABLED	0x1
 #define DHCP_RETRY_DISABLED	0x0
+
+#define LLDP_RETRY_ENABLED      0X1
+#define LLDP_RETRY_DISABLED     0X0
 
 // TIMER DEFINES
 #define DHCP_RETRY_TIMER_ID		0x0
