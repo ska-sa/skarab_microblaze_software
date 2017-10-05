@@ -180,11 +180,16 @@ u8 uDHCPInit(struct sDHCPObject *pDHCPObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffer
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL or DHCP_RETURN_INVALID
 //=================================================================================
 u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
-  /* u8 uBootpPort[] = {0x00, 0x44}; */
+  u8 uBootpPort[] = {0x00, 0x44};
   u8 arrDHCPCookie[] = {0x63, 0x82, 0x53, 0x63};
   u8 uIPLen;
   u8 uIndex;
   u8 *pUserBufferPtr;
+  u16 uCheckTemp = 0;
+  u16 uCheckAdd = 0;
+  u8 uPseudoHdr[12] = {0};
+  u16 uUDPLength = 0;
+  int RetVal = -1;
 
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -198,32 +203,24 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
 
   /* TODO: check for buffer overruns */
 
+  /* do the quicker chekcs first! */
+
   /*adjust ip base value if ip length greater than 20 bytes*/
   uIPLen = (((pUserBufferPtr[IP_FRAME_BASE] & 0x0F) * 4) - 20);
   if (uIPLen > 40){
     return DHCP_RETURN_INVALID;
   }
 
-/*TODO: checksum validation*/
-
-#if 0 /* short circuit these checks since a valid dhcp magic cookie should be good enough */
-
-  if (pUserBufferPtr[IP_FRAME_BASE + IP_PROT_OFFSET] != 0x11){                                   /*udp?*/
-    return DHCP_RETURN_INVALID; /* not a udp packet */
-  }
-
-  if (memcmp(pUserBufferPtr + uIPLen + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET, uBootPort, 2) != 0){   /*port 68?*/
-    return DHCP_RETURN_INVALID;
-  }
-
-  if (pUserBuffer[uIPLen + BOOTP_FRAME_BASE + BOOTP_OPTYPE_OFFSET] != 0x02){                  /*bootp reply?*/
-    return DHCP_RETURN_INVALID;
-  }
-#endif
-
   if (memcmp(pUserBufferPtr + uIPLen + DHCP_OPTIONS_BASE, arrDHCPCookie, 4) != 0){                 /*dhcp magic cookie?*/
     return DHCP_RETURN_INVALID;
   }
+
+#if 0
+  xil_printf("dhcp cookie %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE]);
+  xil_printf(" %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +1]);
+  xil_printf(" %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +2]);
+  xil_printf(" %02x\n\r", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +3]);
+#endif
 
   /* check message-xid against cached-xid */
   for (uIndex = 0; uIndex < 4; uIndex++){
@@ -231,7 +228,88 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
       return DHCP_RETURN_INVALID;
     }
   }
-  
+
+  /* is the port number correct for a bootp/dhcp reply */
+  if (memcmp(pUserBufferPtr + uIPLen + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET, uBootpPort, 2) != 0){   /*port 68?*/
+    return DHCP_RETURN_INVALID;
+  }
+
+  if (pUserBufferPtr[uIPLen + BOOTP_FRAME_BASE + BOOTP_OPTYPE_OFFSET] != 0x02){                  /*bootp reply?*/
+    return DHCP_RETURN_INVALID;
+  }
+
+  /* IP checksum validation*/
+  RetVal = uChecksum16Calc(pUserBufferPtr, IP_FRAME_BASE, UDP_FRAME_BASE + uIPLen - 1, &uCheckTemp, 0);
+  if(RetVal){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (uCheckTemp != 0xFFFF){
+    xil_printf("DHCP: IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
+    return DHCP_RETURN_INVALID;
+  }
+
+#if 0
+  xil_printf("IP Checksum %04x\n\r", uCheckTemp);
+#endif
+
+
+  /* is this a UDP packet? */
+  if (pUserBufferPtr[IP_FRAME_BASE + IP_PROT_OFFSET] != 0x11){
+    return DHCP_RETURN_INVALID; /* not a udp packet */
+  }
+
+  /* now check the UDP checksum */
+
+  /* build the pseudo IP header for UDP checksum calculation */
+  memcpy(&(uPseudoHdr[0]), pUserBufferPtr + IP_FRAME_BASE + IP_SRC_OFFSET, 4);
+  memcpy(&(uPseudoHdr[4]), pUserBufferPtr + IP_FRAME_BASE + IP_DST_OFFSET, 4);
+  uPseudoHdr[8] = 0;
+  uPseudoHdr[9] = pUserBufferPtr[IP_FRAME_BASE + IP_PROT_OFFSET];
+  memcpy(&(uPseudoHdr[10]), pUserBufferPtr + uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
+
+#if 0
+  xil_printf("pseudo header: \n\r");
+  for (int i=0; i< 12; i++){
+    xil_printf(" %02x", uPseudoHdr[i]);
+  }
+  xil_printf("\n\r");
+#endif
+
+  RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckAdd, 0);
+  if(RetVal){
+    return DHCP_RETURN_FAIL;
+  }
+
+#if 0
+  xil_printf("IP Pseudo Hdr Checksum %04x\n\r", uCheckTemp);
+#endif
+
+  uUDPLength = (pUserBufferPtr[uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET] << 8) & 0xFF00;
+  uUDPLength |= ((pUserBufferPtr[uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET + 1] ) & 0x00FF);
+
+#if 0
+  xil_printf("UDP length %d\n\r", uUDPLength);
+#endif
+
+
+  /* UDP checksum validation*/
+  RetVal = uChecksum16Calc(pUserBufferPtr, uIPLen + UDP_FRAME_BASE, uIPLen + UDP_FRAME_BASE + uUDPLength - 1, &uCheckTemp, 0);
+  if(RetVal){
+    return DHCP_RETURN_FAIL;
+  }
+
+  uCheckAdd = uCheckAdd + uCheckTemp;
+
+  if (uCheckAdd != 0xFFFF){
+    xil_printf("DHCP: UDP Checksum %04x - Invalid!\n\r", uCheckAdd);
+    return DHCP_RETURN_INVALID;
+  }
+
+#if 0
+  xil_printf("UDP Checksum %04x\n\r", uCheckTemp);
+#endif
+
   return DHCP_RETURN_OK;   /* valid reply */
 }
 
@@ -1016,7 +1094,7 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
   pBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1] = (u8) (uLength & 0xff);
 
   /* calculate checksums - ip mandatory, udp optional */
-  uChecksum = uChecksum16Calc(pBuffer, IP_FRAME_BASE, UDP_FRAME_BASE - 1);
+  uChecksum16Calc(pBuffer, IP_FRAME_BASE, UDP_FRAME_BASE - 1, &uChecksum, 0);
   pBuffer[IP_FRAME_BASE + IP_CHKSM_OFFSET    ] = (u8) ((uChecksum & 0xff00) >> 8);
   pBuffer[IP_FRAME_BASE + IP_CHKSM_OFFSET + 1] = (u8) (uChecksum & 0xff);
 

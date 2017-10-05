@@ -1635,25 +1635,26 @@ int main()
 						   // Send the response packet now
 						   uResponsePacketLength = (uResponsePacketLength >> 2);
 						   iStatus = TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
-					   }
+					   } else {
 
-             /* DHCP new */
-             /* TODO remove the following inline data declarations */
-             int size = uNumWords << 1;     /* 16bit words */
-             int i;
+               /* DHCP new */
+               /* TODO remove the following inline data declarations */
+               int size = uNumWords << 1;     /* 16bit words */
+               int i;
 
-             for (i = 0; i < size; i++){
-               buffer[i] = Xil_EndianSwap16(buffer[i]);
+               for (i = 0; i < size; i++){
+                 buffer[i] = Xil_EndianSwap16(buffer[i]);
+               }
+
+               /* validate and set flag */
+               if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
+                 xil_printf("DHCP [%02x] packet received!\r\n", uEthernetId);
+                 uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
+                 uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
+                 //xil_printf("run dhcp task\n\r");
+               }
+               /* DHCP new */
              }
-
-             /* validate and set flag */
-             if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
-               xil_printf("DHCP [%02x] packet received!\r\n", uEthernetId);
-               uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
-               uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
-               //xil_printf("run dhcp task\n\r");
-             }
-             /* DHCP new */            
 					}
 
 #ifdef DO_40GBE_LOOPBACK_TEST
@@ -1845,19 +1846,20 @@ static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
 
 
 int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
-  u32 ip, netmask;
+  u32 ip = 0;
+  u32 netmask = 0;
   u8 id;
 
   id = * ((u8 *) pUserData);
-  ip = pDHCPObjectPtr->arrDHCPAddrYIPCached[0] << 24 |
-        pDHCPObjectPtr->arrDHCPAddrYIPCached[1] << 16 |
-        pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 |
+  ip = (pDHCPObjectPtr->arrDHCPAddrYIPCached[0] << 24) |
+       (pDHCPObjectPtr->arrDHCPAddrYIPCached[1] << 16) |
+       (pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 ) |
         pDHCPObjectPtr->arrDHCPAddrYIPCached[3];
 
-  netmask = pDHCPObjectPtr->arrDHCPAddrSubnetMask[0] << 24 |
-            pDHCPObjectPtr->arrDHCPAddrSubnetMask[1] << 16 |
-            pDHCPObjectPtr->arrDHCPAddrSubnetMask[2] << 8 |
-            pDHCPObjectPtr->arrDHCPAddrSubnetMask[3];
+  netmask = (pDHCPObjectPtr->arrDHCPAddrSubnetMask[0] << 24) |
+            (pDHCPObjectPtr->arrDHCPAddrSubnetMask[1] << 16) |
+            (pDHCPObjectPtr->arrDHCPAddrSubnetMask[2] << 8 ) |
+             pDHCPObjectPtr->arrDHCPAddrSubnetMask[3];
 
   //xil_printf("setting ip of interface %d to %x\n\r", id, ip);
 
@@ -1875,10 +1877,10 @@ int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
   uEthernetSubnet[id] = (ip & netmask);
 
-  uEthernetGatewayIPAddress[id] = pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24 |
-    pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16 |
-    pDHCPObjectPtr->arrDHCPAddrRoute[2] << 8 |
-    pDHCPObjectPtr->arrDHCPAddrRoute[3];
+  uEthernetGatewayIPAddress[id] = (pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24) |
+                                  (pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16) |
+                                  (pDHCPObjectPtr->arrDHCPAddrRoute[2] << 8 ) |
+                                   pDHCPObjectPtr->arrDHCPAddrRoute[3];
 
   ProgramARPCacheEntry(id, (ip & 0xFF), uEthernetFabricMacHigh[id], ((uEthernetFabricMacMid[id] << 16) | uEthernetFabricMacLow[id]));
 
