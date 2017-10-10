@@ -186,7 +186,6 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
   u8 uIndex;
   u8 *pUserBufferPtr;
   u16 uCheckTemp = 0;
-  u16 uCheckAdd = 0;
   u8 uPseudoHdr[12] = {0};
   u16 uUDPLength = 0;
   int RetVal = -1;
@@ -203,7 +202,7 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
 
   /* TODO: check for buffer overruns */
 
-  /* do the quicker chekcs first! */
+  /* do the quicker checks first! */
 
   /*adjust ip base value if ip length greater than 20 bytes*/
   uIPLen = (((pUserBufferPtr[IP_FRAME_BASE] & 0x0F) * 4) - 20);
@@ -214,13 +213,6 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
   if (memcmp(pUserBufferPtr + uIPLen + DHCP_OPTIONS_BASE, arrDHCPCookie, 4) != 0){                 /*dhcp magic cookie?*/
     return DHCP_RETURN_INVALID;
   }
-
-#if 0
-  xil_printf("dhcp cookie %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE]);
-  xil_printf(" %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +1]);
-  xil_printf(" %02x", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +2]);
-  xil_printf(" %02x\n\r", pUserBufferPtr[uIPLen + DHCP_OPTIONS_BASE +3]);
-#endif
 
   /* check message-xid against cached-xid */
   for (uIndex = 0; uIndex < 4; uIndex++){
@@ -239,20 +231,15 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
   }
 
   /* IP checksum validation*/
-  RetVal = uChecksum16Calc(pUserBufferPtr, IP_FRAME_BASE, UDP_FRAME_BASE + uIPLen - 1, &uCheckTemp, 0);
+  RetVal = uChecksum16Calc(pUserBufferPtr, IP_FRAME_BASE, UDP_FRAME_BASE + uIPLen - 1, &uCheckTemp, 0, 0);
   if(RetVal){
     return DHCP_RETURN_FAIL;
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("DHCP: IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
+    xil_printf("DHCP: RX - IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
-
-#if 0
-  xil_printf("IP Checksum %04x\n\r", uCheckTemp);
-#endif
-
 
   /* is this a UDP packet? */
   if (pUserBufferPtr[IP_FRAME_BASE + IP_PROT_OFFSET] != 0x11){
@@ -268,47 +255,24 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
   uPseudoHdr[9] = pUserBufferPtr[IP_FRAME_BASE + IP_PROT_OFFSET];
   memcpy(&(uPseudoHdr[10]), pUserBufferPtr + uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
-#if 0
-  xil_printf("pseudo header: \n\r");
-  for (int i=0; i< 12; i++){
-    xil_printf(" %02x", uPseudoHdr[i]);
-  }
-  xil_printf("\n\r");
-#endif
-
-  RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckAdd, 0);
+  RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0);
   if(RetVal){
     return DHCP_RETURN_FAIL;
   }
-
-#if 0
-  xil_printf("IP Pseudo Hdr Checksum %04x\n\r", uCheckTemp);
-#endif
 
   uUDPLength = (pUserBufferPtr[uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET] << 8) & 0xFF00;
   uUDPLength |= ((pUserBufferPtr[uIPLen + UDP_FRAME_BASE + UDP_ULEN_OFFSET + 1] ) & 0x00FF);
 
-#if 0
-  xil_printf("UDP length %d\n\r", uUDPLength);
-#endif
-
-
   /* UDP checksum validation*/
-  RetVal = uChecksum16Calc(pUserBufferPtr, uIPLen + UDP_FRAME_BASE, uIPLen + UDP_FRAME_BASE + uUDPLength - 1, &uCheckTemp, 0);
+  RetVal = uChecksum16Calc(pUserBufferPtr, uIPLen + UDP_FRAME_BASE, uIPLen + UDP_FRAME_BASE + uUDPLength - 1, &uCheckTemp, 0, uCheckTemp);
   if(RetVal){
     return DHCP_RETURN_FAIL;
   }
 
-  uCheckAdd = uCheckAdd + uCheckTemp;
-
-  if (uCheckAdd != 0xFFFF){
-    xil_printf("DHCP: UDP Checksum %04x - Invalid!\n\r", uCheckAdd);
+  if (uCheckTemp != 0xFFFF){
+    xil_printf("DHCP: RX - UDP Checksum %04x - Invalid!\n\r", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
-
-#if 0
-  xil_printf("UDP Checksum %04x\n\r", uCheckTemp);
-#endif
 
   return DHCP_RETURN_OK;   /* valid reply */
 }
@@ -908,6 +872,10 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
   u16 uChecksum;
   u32 uSeconds = 0;
   u32 uTempXid = 0;
+  u8 uPseudoHdr[12] = {0};
+  int RetVal = (-1);
+  u16 uCheckTemp = 0;
+  u16 uUDPLength = 0;
 
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -1085,6 +1053,7 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
 
   /* calculate and fill in udp frame packet lengths */
   uLength = UDP_FRAME_TOTAL_LEN + BOOTP_FRAME_TOTAL_LEN + uIndex;
+  uUDPLength = uLength; /* save for pseudo header later */
   pBuffer[UDP_FRAME_BASE + UDP_ULEN_OFFSET    ] = (u8) ((uLength & 0xff00) >> 8);
   pBuffer[UDP_FRAME_BASE + UDP_ULEN_OFFSET + 1] = (u8) (uLength & 0xff);
 
@@ -1094,12 +1063,44 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
   pBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1] = (u8) (uLength & 0xff);
 
   /* calculate checksums - ip mandatory, udp optional */
-  uChecksum16Calc(pBuffer, IP_FRAME_BASE, UDP_FRAME_BASE - 1, &uChecksum, 0);
+  uChecksum16Calc(pBuffer, IP_FRAME_BASE, UDP_FRAME_BASE - 1, &uChecksum, 0, 0);
   pBuffer[IP_FRAME_BASE + IP_CHKSM_OFFSET    ] = (u8) ((uChecksum & 0xff00) >> 8);
   pBuffer[IP_FRAME_BASE + IP_CHKSM_OFFSET + 1] = (u8) (uChecksum & 0xff);
 
-  /* TODO: calculate udp checksum value */
+  /* calculate udp checksum value */
 
+  /* build the pseudo IP header for UDP checksum calculation */
+  memcpy(&(uPseudoHdr[0]), pBuffer + IP_FRAME_BASE + IP_SRC_OFFSET, 4);
+  memcpy(&(uPseudoHdr[4]), pBuffer + IP_FRAME_BASE + IP_DST_OFFSET, 4);
+  uPseudoHdr[8] = 0;
+  uPseudoHdr[9] = pBuffer[IP_FRAME_BASE + IP_PROT_OFFSET];
+  memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
+
+#ifdef TRACE_PRINT
+  xil_printf("DHCP: UDP pseudo header: \n\r");
+  for (int i=0; i< 12; i++){
+    xil_printf(" %02x", uPseudoHdr[i]);
+  }
+  xil_printf("\n\r");
+#endif
+
+  RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0);
+  if(RetVal){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* UDP checksum validation*/
+  RetVal = uChecksum16Calc(pBuffer, UDP_FRAME_BASE, UDP_FRAME_BASE + uUDPLength - 1, &uCheckTemp, 0, uCheckTemp);
+  if(RetVal){
+    return DHCP_RETURN_FAIL;
+  }
+
+#ifdef TRACE_PRINT
+  xil_printf("DHCP: UDP checksum value = %04x\n\r", uCheckTemp);
+#endif
+
+  pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET    ] = (u8) ((uCheckTemp & 0xff00) >> 8);
+  pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET + 1] = (u8) (uCheckTemp & 0xff);
 
   /* pad to nearest 64 bit boundary */
   /* simply increase total length by following amount - these bytes already zero due to earlier memset */

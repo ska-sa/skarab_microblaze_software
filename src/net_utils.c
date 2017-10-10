@@ -32,7 +32,7 @@
 //  ------
 //  0 for success and -1 for error
 //=================================================================================
-int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksumPtr, u8 ByteSwap){
+int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksumPtr, u8 ByteSwap, u16 uChecksumStartValue){
   u16 uChkIndex;
   u16 uChkLength;
   u16 uChkTmp = 0;
@@ -55,20 +55,19 @@ int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksum
     Offset = 0;
   }
 
+  uChecksumValue = ( (u32) uChecksumStartValue) & 0x0000FFFF;
+
   uChkLength = uIndexEnd - uIndexStart + 1;
 
   for (uChkIndex = uIndexStart; uChkIndex < (uIndexStart + uChkLength); uChkIndex += 2){
     uChkTmp = (u8) pDataPtr[uChkIndex + Offset];
     uChkTmp = uChkTmp << 8;
-    if (uChkIndex == (uChkLength - 1)){     //last iteration - only valid for (uChkLength%2 == 1)
+    if (uChkIndex == (uIndexStart + uChkLength - 1)){     //last iteration - only valid for (uChkLength%2 == 1)
       uChkTmp = uChkTmp + 0;
     }
     else{
       uChkTmp = uChkTmp + (u8) pDataPtr[uChkIndex + 1 - Offset];
     }
-#ifdef TRACE_PRINT
-    xil_printf("check data %04x\n\r", uChkTmp);
-#endif
 
     /* get 1's complement of data */
     uChkTmp = ~uChkTmp;
@@ -84,9 +83,6 @@ int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksum
   }
 
   *pChecksumPtr = uChecksumValue;
-#ifdef TRACE_PRINT
-  xil_printf("checksum value =  %04x\n\r", *pChecksumPtr );
-#endif
 
   return 0;
 }

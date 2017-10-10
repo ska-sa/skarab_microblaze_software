@@ -1648,10 +1648,11 @@ int main()
 
                /* validate and set flag */
                if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
-                 xil_printf("DHCP [%02x] packet received!\r\n", uEthernetId);
+#ifdef DEBUG_PRINT
+                 xil_printf("DHCP [%02x] valid packet received!\r\n", uEthernetId);
+#endif
                  uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
                  uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
-                 //xil_printf("run dhcp task\n\r");
                }
                /* DHCP new */
              }
