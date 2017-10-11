@@ -555,6 +555,8 @@ static typeDHCPState init_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
   /* TODO implement API function uDHCPSetAutoRediscoverEnable */
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_AUTO_REDISCOVER);
+  /* TODO implement API function uDHCPSetShortCircuitRenew */
+  vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_SHORT_CIRCUIT_RENEW);
   pDHCPObjectPtr->uDHCPErrors = 0;
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPTimeout = 0;
@@ -729,12 +731,23 @@ static typeDHCPState bound_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
 
   if ((pDHCPObjectPtr->uDHCPInternalTimer * POLL_INTERVAL) >= (pDHCPObjectPtr->uDHCPT1 * 1000)){
     /* time to renew our lease */
-    if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_UNICAST | 1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
-      pDHCPObjectPtr->uDHCPErrors++;
+    if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_SHORT_CIRCUIT_RENEW) == statusCLR){
+      /* if the renew step is not short-circuited (see note in dhcp.h), send the renew DHCPREQUEST */
+      if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_UNICAST | 1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+        pDHCPObjectPtr->uDHCPErrors++;
+      } else {
+        pDHCPObjectPtr->uDHCPTx++;
+      }
+      return RENEW;
     } else {
-      pDHCPObjectPtr->uDHCPTx++;
+      /* re-discover the dhcp lease */
+      /* reset flags and counters */
+      vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
+      pDHCPObjectPtr->uDHCPInternalTimer = 0;
+      pDHCPObjectPtr->uDHCPRandomWait = 0;
+      pDHCPObjectPtr->uDHCPRetries = 0;
+      return RANDOMIZE;
     }
-    return RENEW;
   }
   
   return BOUND;
@@ -835,7 +848,7 @@ static typeDHCPState rebind_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
       pDHCPObjectPtr->uDHCPRandomWait = 0;
       pDHCPObjectPtr->uDHCPRetries = 0;
     }
-    return RANDOMIZE; 
+    return RANDOMIZE;
   }
   
   return REBIND; 

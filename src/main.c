@@ -1580,34 +1580,6 @@ int main()
 		   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)
 			   UpdateQSFPStatus();
 
-			if (uUpdateArpRequests == ARP_REQUEST_UPDATE)
-			   ArpRequestHandler();
-
-      /* simple interrupt driven multi-tasking scheduler */
-
-      /* is it time... */
-      /* ... to run the dhcp task */
-      if (uFlagRunTask_DHCP){
-        uFlagRunTask_DHCP = 0;     /* reset task flag */
-        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
-        }
-
-#ifdef DEBUG_PRINT
-        uCountDumpStats_DHCP++;
-        if (uCountDumpStats_DHCP == 3000){
-          uCountDumpStats_DHCP=0;
-          /* dump dhcp stats to terminal once in a while */
-          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-            xil_printf("DHCP[%d] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,\
-                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,\
-                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
-          }
-        }
-#endif
-
-      }
-
 		   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
 		   {
 			   UpdateEthernetLinkUpStatus(uEthernetId);
@@ -1657,6 +1629,36 @@ int main()
                /* DHCP new */
              }
 					}
+
+      /* simple interrupt driven multi-tasking scheduler */
+
+      /* is it time... */
+      /* ... to run the dhcp task */
+      if (uFlagRunTask_DHCP){
+        uFlagRunTask_DHCP = 0;     /* reset task flag */
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
+        }
+
+#ifdef DEBUG_PRINT
+        uCountDumpStats_DHCP++;
+        if (uCountDumpStats_DHCP == 3000){
+          uCountDumpStats_DHCP=0;
+          /* dump dhcp stats to terminal once in a while */
+          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+            xil_printf("DHCP[%d] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,\
+                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,\
+                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
+          }
+        }
+#endif
+
+      }
+
+
+			if (uUpdateArpRequests == ARP_REQUEST_UPDATE)
+			   ArpRequestHandler();
+
 
 #ifdef DO_40GBE_LOOPBACK_TEST
 					// Testing 40GBE in loopback so won't get an IP address from DHCP
