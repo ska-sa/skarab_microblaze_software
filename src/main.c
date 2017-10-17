@@ -1586,36 +1586,6 @@ int main()
              }
 					}
 
-      /* simple interrupt driven multi-tasking scheduler */
-
-      /* is it time... */
-      /* ... to run the dhcp task */
-      if (uFlagRunTask_DHCP){
-        uFlagRunTask_DHCP = 0;     /* reset task flag */
-        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
-        }
-
-#ifdef DEBUG_PRINT
-        uCountDumpStats_DHCP++;
-        if (uCountDumpStats_DHCP == 3000){
-          uCountDumpStats_DHCP=0;
-          /* dump dhcp stats to terminal once in a while */
-          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-            xil_printf("DHCP[%d] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,\
-                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,\
-                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
-          }
-        }
-#endif
-
-      }
-
-
-			if (uUpdateArpRequests == ARP_REQUEST_UPDATE)
-			   ArpRequestHandler();
-
-
 #ifdef DO_40GBE_LOOPBACK_TEST
 					// Testing 40GBE in loopback so won't get an IP address from DHCP
 					if (uEthernetId != 0x0)
@@ -1675,25 +1645,6 @@ int main()
 						EnableFabricInterface(uEthernetId, 0x1);
 					}
 #endif 
-				     /* is it time to run the lldp task?
-				        if so, do so*/
-                                      if(uFlagRunTask_LLDP){
-					for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-					  iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-					 
-					  if(iStatus == XST_SUCCESS){
-					    u32 size = uResponsePacketLength >> 1; /* 16 bit words */
-					    u16 * buffer = (u16*)uTransmitBuffer;
-					 
-					    for(u32 uIndex = 0; uIndex < size; uIndex++){
-					      buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
-					    }
-					    size = size >> 1; /* 32 bit words*/
-					    iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
-					  }
-					}
-					  uFlagRunTask_LLDP = 0;	
-				      }
 
 					if (uIGMPSendMessage[uEthernetId] == IGMP_SEND_MESSAGE)
 					{
@@ -1736,31 +1687,78 @@ int main()
 			   }
 		   }
 
-		   if (uDoReboot == REBOOT_REQUESTED)
-		   {
-			   // Only do a reboot if all the Ethernet interfaces are no longer part of groups
-			   uOKToReboot = 1;
+      /* simple interrupt driven multi-tasking scheduler */
 
-			   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
-			   {
-				   if (uIGMPState[uEthernetId] != IGMP_STATE_NOT_JOINED)
-					   uOKToReboot = 0;
+      /* is it time... */
+      /* ... to run the dhcp task */
+      if (uFlagRunTask_DHCP){
+        uFlagRunTask_DHCP = 0;     /* reset task flag */
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
+        }
+#ifdef DEBUG_PRINT
+        uCountDumpStats_DHCP++;
+        if (uCountDumpStats_DHCP == 3000){
+          uCountDumpStats_DHCP=0;
+          /* dump dhcp stats to terminal once in a while */
+          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+            xil_printf("DHCP[%d] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,
+                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,
+                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
+          }
+        }
+#endif
+      }
 
-			   }
+      /* ... time to do ARP requests? */
+			if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
+			   ArpRequestHandler();
+      }
 
-			   if (uOKToReboot == 1)
-				   IcapeControllerInSystemReconfiguration();
+      /* is it time to run the lldp task? */
+      if(uFlagRunTask_LLDP){
+        for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
 
-		   }
+          if(iStatus == XST_SUCCESS){
+            u32 size = uResponsePacketLength >> 1; /* 16 bit words */
+            u16 * buffer = (u16*)uTransmitBuffer;
 
-		   // Pat the watchdog
-		   XWdtTb_RestartWdt(& WatchdogTimer);
-	   }
+            for(u32 uIndex = 0; uIndex < size; uIndex++){
+              buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+            }
+            size = size >> 1; /* 32 bit words*/
+            iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
+          }
+        }
+        uFlagRunTask_LLDP = 0;	
+      }
 
-    xil_printf("---Exiting main---\n\r");
-	Xil_DCacheDisable();
-	Xil_ICacheDisable();
-	return 0;
+      if (uDoReboot == REBOOT_REQUESTED)
+      {
+        // Only do a reboot if all the Ethernet interfaces are no longer part of groups
+        uOKToReboot = 1;
+
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
+        {
+          if (uIGMPState[uEthernetId] != IGMP_STATE_NOT_JOINED){
+            uOKToReboot = 0;
+          }
+        }
+        if (uOKToReboot == 1){
+          IcapeControllerInSystemReconfiguration();
+        }
+
+      }
+
+      // Pat the watchdog
+      XWdtTb_RestartWdt(& WatchdogTimer);
+     }
+
+     xil_printf("---Exiting main---\n\r");
+     Xil_DCacheDisable();
+     Xil_ICacheDisable();
+     return 0;
 }
 
 
