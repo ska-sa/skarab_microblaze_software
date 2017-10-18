@@ -2552,7 +2552,7 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	//u8 uDHCPOptionByteSwap[64]; // COULD CAUSE PROBLEMS IF DHCP SERVER CREATES LARGE OPTIONS!!!
 
 	u16 uIndex;
-	u8 uFoundTerminate = 0x0;
+	/* u8 uFoundTerminate = 0x0; */
 
 	// Need to swap the bytes as process received DHCP packet
 	uIndex = 0;
@@ -2698,9 +2698,9 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	else if (uDHCPMessageOption == DHCP_MESSAGE_ACK)
 	{
 #ifdef DEBUG_PRINT
-		xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", uId, ((uDHCPRequestedIPAddress >> 24) & 0xFF), \ 
-                                                                          ((uDHCPRequestedIPAddress >> 16) & 0xFF), \
-                                                                          ((uDHCPRequestedIPAddress >> 8) & 0xFF),  \
+		xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", uId, ((uDHCPRequestedIPAddress >> 24) & 0xFF), 
+                                                                          ((uDHCPRequestedIPAddress >> 16) & 0xFF),
+                                                                          ((uDHCPRequestedIPAddress >> 8) & 0xFF),
                                                                           (uDHCPRequestedIPAddress & 0xFF));
 #endif
 
@@ -3177,7 +3177,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 	u8 uIndex;
 
   /* State variables */
-  static u8 uCurrentProgrammingId;      /* the interface Id we are currently receiving sdram data on */
+  /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
   static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
 
 	sSDRAMProgramOverWishboneReqT *Command = (sSDRAMProgramOverWishboneReqT *) pCommand;

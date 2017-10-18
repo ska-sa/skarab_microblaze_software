@@ -252,6 +252,7 @@ struct sDHCPObject{
   u8  uDHCPErrors;
   u8  uDHCPInvalid;
   u8  uDHCPRetries;
+  u8  uDHCPTimeoutStatus;   /* indicates that the DHCP process has failed after <DHCP_SM_RETRIES> attempts */
 
   /* internal states and variables */
   u16 uDHCPTimeout;         /* counter used to timeout if "stuck" in a state */
@@ -312,6 +313,8 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr);
 
 /* then... set flag once there's a valid message in the user Rx buffer */
 u8 uDHCPSetGotMsgFlag(struct sDHCPObject *pDHCPObjectPtr);
+
+/* u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr); */
 
 #if 0
 /* TODO: the other option is to read the user RX buffer and wait for valid message */

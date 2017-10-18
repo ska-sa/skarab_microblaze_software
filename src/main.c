@@ -40,6 +40,8 @@
 #include "invalid_nack.h"
 #include "dhcp.h"
 
+#define DHCP_BOUND_COUNTER_VALUE  600
+
 /* local function prototypes */
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
 static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
@@ -47,6 +49,7 @@ static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserDa
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
 static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
+static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
 static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 
 //=================================================================================
@@ -66,14 +69,14 @@ static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO ca
 void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 {
 	u8 uIndex;
-	u8 u40GbE1_Dhcp_En;
-	u8 u40GbE2_Dhcp_En;
-	u8 u40GbE3_Dhcp_En;
-	u8 u40GbE4_Dhcp_En;
-	u8 u40GbE1_Link_Up;
-	u8 u40GbE2_Link_Up;
-	u8 u40GbE3_Link_Up;
-	u8 u40GbE4_Link_Up;
+	u8 u40GbE1_Dhcp_En = 0;
+	u8 u40GbE2_Dhcp_En = 0;
+	u8 u40GbE3_Dhcp_En = 0;
+	u8 u40GbE4_Dhcp_En = 0;
+	u8 u40GbE1_Link_Up = 0;
+	u8 u40GbE2_Link_Up = 0;
+	u8 u40GbE3_Link_Up = 0;
+	u8 u40GbE4_Link_Up = 0;
 
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
@@ -96,6 +99,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   uFlagRunTask_DHCP = 1;
+
+  uFlagRunTask_CheckDHCPBound = 1;
 
 	// DHCP every 10 seconds (timer every 100 ms)
 	if (uDHCPTimerCounter == 0x64)
@@ -147,6 +152,12 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 	else
 		uQSFPStateCounter++;
 
+  /* TODO: move the following code to main() rather */
+  /* use macros for now to get rid of potential bugs and compiler warnings since
+     the following code indexes the array above the array bounds if all possible
+     40gbe i/f are not enabled */
+
+#if NUM_ETHERNET_INTERFACES > 1
     //if 40GbE link 1 is up enable link else disable link
 	if(uEthernetLinkUp[1] == LINK_UP)
 	{
@@ -166,7 +177,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		u40GbE1_Link_Up = 0x00;
 		u40GbE1_Dhcp_En = 0x00;
 	}
+#endif
 
+#if NUM_ETHERNET_INTERFACES > 2
     //if 40GbE link 2 is up enable link else disable link
 	if(uEthernetLinkUp[2] == LINK_UP)
 	{
@@ -186,7 +199,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		u40GbE2_Link_Up = 0x00;
 		u40GbE2_Dhcp_En = 0x00;
 	}
+#endif
 
+#if NUM_ETHERNET_INTERFACES > 3
     //if 40GbE link 3 is up enable link else disable link
 	if(uEthernetLinkUp[3] == LINK_UP)
 	{
@@ -206,7 +221,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		u40GbE3_Link_Up = 0x00;
 		u40GbE3_Dhcp_En = 0x00;
 	}
+#endif
 
+#if NUM_ETHERNET_INTERFACES > 4
     //if 40GbE link 4 is up enable link else disable link
 	if(uEthernetLinkUp[4] == LINK_UP)
 	{
@@ -226,6 +243,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		u40GbE4_Link_Up = 0x00;
 		u40GbE4_Dhcp_En = 0x00;
 	}
+#endif
 
 	uFrontPanelLedsValue = u40GbE4_Link_Up <<7 | u40GbE4_Dhcp_En <<6 | u40GbE3_Link_Up <<5 | u40GbE3_Dhcp_En <<4 | u40GbE2_Link_Up<<3 | u40GbE2_Dhcp_En<<2 | u40GbE1_Link_Up<<1 | u40GbE1_Dhcp_En;
 	WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
@@ -353,7 +371,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 		if (iStatus == XST_SUCCESS)
 		{
 
-			pL4Ptr = ExtractIPV4FieldsAndGetPayloadPointer(pL3Ptr, &uL4PktLen, &uResponseIPAddr, &uL3Proto, &uL3TOS);
+			pL4Ptr = ExtractIPV4FieldsAndGetPayloadPointer(pL3Ptr, &uL4PktLen, (u32 *) &uResponseIPAddr, &uL3Proto, &uL3TOS);
 
 			if ((uL3Proto == IP_PROTOCOL_ICMP)&&(uL3TOS == IP_PING_TOS))
 			{
@@ -1358,6 +1376,8 @@ int main()
 	   XWdtTb WatchdogTimer;
 	   u32 uIGMPGroupAddress;
 	   u8 uOKToReboot;
+     u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0};
+     u8 uDHCPBoundTimeout = 0;
 #ifdef DO_40GBE_LOOPBACK_TEST
 	   u32 uTemp40GBEIPAddress = 0x0A000802;
 	   u8 uConfig40GBE[4];
@@ -1529,7 +1549,7 @@ int main()
        eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
        eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
        vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
-       uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE);
+       /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
      }
 
 	   while(1)
@@ -1733,6 +1753,36 @@ int main()
         }
         uFlagRunTask_LLDP = 0;	
       }
+
+      /* keep track of how long we have been "unbound" w.r.t. dhcp - if too long, reset and reload image from sdram */
+      if(uFlagRunTask_CheckDHCPBound){
+        uFlagRunTask_CheckDHCPBound = 0;
+        uDHCPBoundTimeout = 0;
+        for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          /* TODO: create API function to get state */
+          if (DHCPContextState[uEthernetId].tDHCPCurrentState < BOUND){
+            if (uDHCPBoundCount[uEthernetId] < DHCP_BOUND_COUNTER_VALUE){ /*  prevent overflows */
+              uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
+            }
+          } else {
+            uDHCPBoundCount[uEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
+          }
+          if (uDHCPBoundCount[uEthernetId] >= DHCP_BOUND_COUNTER_VALUE){
+            uDHCPBoundTimeout++;
+          }
+        }
+        /* if we timeout on all the interfaces, line up a reset and reload the image in SDRAM */
+        if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
+          SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+          ResetSdramReadAddress();
+          AboutToBootFromSdram();
+          uDoReboot = REBOOT_REQUESTED;
+#ifdef DEBUG_PRINT
+          xil_printf("DHCP: RESET - All I/F's timed out!\n\r");
+#endif
+        }
+      }
+
 
       if (uDoReboot == REBOOT_REQUESTED)
       {

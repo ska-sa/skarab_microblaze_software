@@ -18,6 +18,7 @@
 //#include <string.h>
 
 #include <xil_types.h>
+#include <xil_printf.h>
 #include <xenv_standalone.h>
 
 /* local includes */
@@ -124,6 +125,7 @@ u8 uDHCPInit(struct sDHCPObject *pDHCPObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffer
   pDHCPObjectPtr->uDHCPRetries = 0;
 
   pDHCPObjectPtr->uDHCPTimeout = 0;
+  pDHCPObjectPtr->uDHCPTimeoutStatus = 0;
 
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPCurrentClkTick = 0;
@@ -406,6 +408,31 @@ u8 vDHCPSetHostName(struct sDHCPObject *pDHCPObjectPtr, const char *stringHostNa
   return DHCP_RETURN_OK;
 }
 
+#if 0
+//=================================================================================
+//  uDHCPGetTimeoutStatus
+//---------------------------------------------------------------------------------
+//  
+//  
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pDHCPObjectPtr  IN    handle to DHCP state object
+//
+//  Return
+//  ------
+//  
+//=================================================================================
+u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return 0;
+  }
+  
+  return pDHCPObjectPtr->uDHCPTimeoutStatus; 
+}
+#endif
+
 /********** DHCP API event callback registration **********/
 
 //=================================================================================
@@ -514,9 +541,10 @@ u8 uDHCPStateMachine(struct sDHCPObject *pDHCPObjectPtr){
     if (pDHCPObjectPtr->uDHCPTimeout >= DHCP_SM_INTERVAL){
       pDHCPObjectPtr->tDHCPCurrentState = INIT;
       /* check if we must stop trying eventually...else keep trying */
-      if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_AUTO_REDISCOVER) == statusCLR){
       /* if we've retried <n> times, quit trying */
-        if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
+      if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
+        /* pDHCPObjectPtr->uDHCPTimeoutStatus = 1; */
+        if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_AUTO_REDISCOVER) == statusCLR){
           pDHCPObjectPtr->uDHCPRetries = 0;
           /* stop state machine */
           vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
