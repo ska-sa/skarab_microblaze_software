@@ -45,6 +45,9 @@
 #define FORTY_GBE_INTERFACE       "I/F-40GBE-01"
 #endif
 
+#ifndef HOSTNAME
+#define HOSTNAME                   "skarab"
+#endif
 #define DEBUG_PRINT
 //uncomment if you want to see more debug output
 //#define TRACE_PRINT
