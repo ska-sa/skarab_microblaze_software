@@ -39,6 +39,7 @@
 #include "improved_read_write.h"
 #include "invalid_nack.h"
 #include "dhcp.h"
+#include "lldp.h"
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);

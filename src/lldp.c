@@ -11,7 +11,7 @@
 /* local includes */
 #include "lldp.h"
 #include "constant_defs.h"
-
+#include "register.h"
 /* Local function prototypes*/
 
 /***********************LLDP API functions***************************/
@@ -33,7 +33,6 @@
 int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 	
 	u32 uIPAddress = uEthernetFabricIPAddress[uId];
-	u16 uIPLength;
 	u32 version;
 	u8 dst_mac_addr[ETH_DST_LEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
 
@@ -89,7 +88,7 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
 
 	case 1:
 		memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-01", 6);
-		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET + uIPLength, FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
+		memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
 		break;
 	}
 
