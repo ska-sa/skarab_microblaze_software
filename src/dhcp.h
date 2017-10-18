@@ -181,7 +181,14 @@ typedef enum {flagDHCP_SM_AUTO_REDISCOVER=0,
               flagDHCP_SM_GOT_MESSAGE,
               flagDHCP_SM_STATE_MACHINE_EN,
               flagDHCP_MSG_REQ_HOST_NAME,
-              flagDHCP_RESERVED_3,
+              flagDHCP_SM_SHORT_CIRCUIT_RENEW,    /* The flag used to short circuit the renewal step and move back to the discover step.
+                                                     This was implemented to circumvent the case where a relay agent has appended
+                                                     tags during the inital lease acquisition step and these tags were used to issue
+                                                     the lease. Upon renewal, the client unicasts a message directly to the dhcp server
+                                                     (in line with RFC 2131) thus bypassing the relay agent and in turn the tags are not
+                                                     appended. This may cause issues resulting in the lease not being successfully renewed.
+                                                     This flag bypasses the renew step altogether, and allows the client to re-discover
+                                                     the lease. */
               flagDHCP_RESERVED_2,
               flagDHCP_RESERVED_1
 } typeDHCPRegisterFlags;
@@ -245,6 +252,7 @@ struct sDHCPObject{
   u8  uDHCPErrors;
   u8  uDHCPInvalid;
   u8  uDHCPRetries;
+  u8  uDHCPTimeoutStatus;   /* indicates that the DHCP process has failed after <DHCP_SM_RETRIES> attempts */
 
   /* internal states and variables */
   u16 uDHCPTimeout;         /* counter used to timeout if "stuck" in a state */
@@ -305,6 +313,8 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr);
 
 /* then... set flag once there's a valid message in the user Rx buffer */
 u8 uDHCPSetGotMsgFlag(struct sDHCPObject *pDHCPObjectPtr);
+
+/* u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr); */
 
 #if 0
 /* TODO: the other option is to read the user RX buffer and wait for valid message */

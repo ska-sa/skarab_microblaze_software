@@ -19,6 +19,7 @@
 * ------------------------------------------------------------------------------*/
 
 #include "eth_sorter.h"
+#include "net_utils.h"
 
 //=================================================================================
 //	CalculateIPChecksum
@@ -2551,7 +2552,7 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	//u8 uDHCPOptionByteSwap[64]; // COULD CAUSE PROBLEMS IF DHCP SERVER CREATES LARGE OPTIONS!!!
 
 	u16 uIndex;
-	u8 uFoundTerminate = 0x0;
+	/* u8 uFoundTerminate = 0x0; */
 
 	// Need to swap the bytes as process received DHCP packet
 	uIndex = 0;
@@ -2697,9 +2698,9 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 	else if (uDHCPMessageOption == DHCP_MESSAGE_ACK)
 	{
 #ifdef DEBUG_PRINT
-		xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", uId, ((uDHCPRequestedIPAddress >> 24) & 0xFF), \ 
-                                                                          ((uDHCPRequestedIPAddress >> 16) & 0xFF), \
-                                                                          ((uDHCPRequestedIPAddress >> 8) & 0xFF),  \
+		xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", uId, ((uDHCPRequestedIPAddress >> 24) & 0xFF), 
+                                                                          ((uDHCPRequestedIPAddress >> 16) & 0xFF),
+                                                                          ((uDHCPRequestedIPAddress >> 8) & 0xFF),
                                                                           (uDHCPRequestedIPAddress & 0xFF));
 #endif
 
@@ -3173,9 +3174,10 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   u16 uChunkByteIndex;
   u32 uTemp = 0;
   u8 uRetVal;
+	u8 uIndex;
 
   /* State variables */
-  static u8 uCurrentProgrammingId;      /* the interface Id we are currently receiving sdram data on */
+  /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
   static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
 
 	sSDRAMProgramOverWishboneReqT *Command = (sSDRAMProgramOverWishboneReqT *) pCommand;
@@ -3199,7 +3201,23 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
   /* Chunk number 0 is special case, resets everything */
   if(Command->uChunkNum == 0x0){
-    xil_printf("chunk 0: about to clear sdram\n\r");
+
+    // Check which Ethernet interfaces are part of IGMP groups
+    // and send leave messages immediately
+    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
+    {
+      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
+      {
+        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
+        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
+        uCurrentIGMPMessage[uIndex] = 0x0;
+#ifdef DEBUG_PRINT
+        xil_printf("IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
+#endif
+      }
+    }
+
+    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram.\n\r", uId);
     uChunkIdCached = 0;
     ClearSdram();
 		SetOutputMode(0x1, 0x1);
@@ -3229,7 +3247,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     }
 
     if (Command->uChunkNum == Command->uChunkTotal){
-      xil_printf("chunk %d: about to end sdram write\n\r", Command->uChunkNum);
+      xil_printf("SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\n\r", uId, Command->uChunkNum);
 
       SetOutputMode(0x2, 0x1);
       FinishedWritingToSdram();
@@ -3248,7 +3266,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   } else if (Command->uChunkNum == uChunkIdCached){
     uRetVal = XST_SUCCESS;
 #ifdef DEBUG_PRINT
-    xil_printf("chunk %d: already received\n\r", Command->uChunkNum);
+    xil_printf("SDRAM PROGRAM[%02x] Chunk %d: already received\n\r", uId, Command->uChunkNum);
 #endif
   } else {
     uRetVal = XST_FAILURE;

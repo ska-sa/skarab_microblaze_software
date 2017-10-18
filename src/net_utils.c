@@ -26,37 +26,47 @@
 //  pDataPtr        IN    pointer to buffer with data to be "checksummed"
 //  uIndexStart     IN    starting index in the data buffer (zero indexed)
 //  uIndexEnd       IN    ending index in the data buffer
+//  pChecksumPtr    OUT   pointer to a buffer to store calculated checksum
 //
 //  Return
 //  ------
-//  0xffff or valid checksum  /*TODO FIXME 0xffff may also be a valid checksum!!!*/
+//  0 for success and -1 for error
 //=================================================================================
-u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd){
+int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksumPtr, u8 ByteSwap, u16 uChecksumStartValue){
   u16 uChkIndex;
   u16 uChkLength;
   u16 uChkTmp = 0;
   u32 uChecksumValue = 0;
   u32 uChecksumCarry = 0;
+  u8 Offset = 0;
 
   if (pDataPtr == NULL){
-    return 0xffff /* ? */;
+    return (-1);
   }
 
   /* range indexing error */
   if (uIndexStart > uIndexEnd){
-    return 0xffff;  /* ? */
+    return (-1);
   }
+
+  if (ByteSwap){
+    Offset = 1;
+  } else {
+    Offset = 0;
+  }
+
+  uChecksumValue = ( (u32) uChecksumStartValue) & 0x0000FFFF;
 
   uChkLength = uIndexEnd - uIndexStart + 1;
 
   for (uChkIndex = uIndexStart; uChkIndex < (uIndexStart + uChkLength); uChkIndex += 2){
-    uChkTmp = (u8) pDataPtr[uChkIndex];
+    uChkTmp = (u8) pDataPtr[uChkIndex + Offset];
     uChkTmp = uChkTmp << 8;
-    if (uChkIndex == (uChkLength - 1)){     //last iteration - only valid for (uChkLength%2 == 1)
+    if (uChkIndex == (uIndexStart + uChkLength - 1)){     //last iteration - only valid for (uChkLength%2 == 1)
       uChkTmp = uChkTmp + 0;
     }
     else{
-      uChkTmp = uChkTmp + (u8) pDataPtr[uChkIndex + 1];
+      uChkTmp = uChkTmp + (u8) pDataPtr[uChkIndex + 1 - Offset];
     }
 
     /* get 1's complement of data */
@@ -66,14 +76,15 @@ u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd){
     uChecksumValue = uChecksumValue + uChkTmp;
 
     /* get overflow */
-    uChecksumCarry = uChecksumValue >> 16;
+    uChecksumCarry = (uChecksumValue >> 16) & 0xffff;
 
     /* add to checksum */
     uChecksumValue = (0xffff & uChecksumValue) + uChecksumCarry;
-    /* FIXME: repeat if this operation also produces an overflow!! */
   }
 
-  return uChecksumValue;
+  *pChecksumPtr = uChecksumValue;
+
+  return 0;
 }
 
 
@@ -92,7 +103,7 @@ u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd){
 //  ------
 //  0 for success and -1 for error
 //=================================================================================
-u8 uIPV4_ntoa(char *stringIP, u32 uIP32){
+int uIPV4_ntoa(char *stringIP, u32 uIP32){
   u8 octet, digits, value, index;
   u8 i, j, k, x;
 

@@ -33,7 +33,7 @@
 #define u32 uint32_t
 #endif
 
-u16 uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd);
-u8 uIPV4_ntoa(char *stringIP, u32 uIP32);
+int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksumPtr, u8 ByteSwap, u16 uChecksumStartValue);
+int uIPV4_ntoa(char *stringIP, u32 uIP32);
 
 #endif /* _NET_UTILS_H_ */
