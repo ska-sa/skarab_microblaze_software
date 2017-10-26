@@ -14,6 +14,8 @@
 #include "register.h"
 /* Local function prototypes*/
 
+static char lookup[17] = "0123456789ABCDEF";
+
 /***********************LLDP API functions***************************/
 //=================================================================================
 //  uLLDPBuildPacket
@@ -181,8 +183,8 @@ int u8ToStr(u8 x, char *str, int d)
         int i = 0;
         while (x)
         {
-                str[i++] = (x%10) + '0';
-                x = x/10;
+                str[i++] = lookup[(x%16)];
+                x = x/16;
         }
 
         // If number of digits required is more, then
