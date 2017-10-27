@@ -87,7 +87,7 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 	u8 uIPBroadcast;
 	u8 uSubnetBroadcast;
 	u32 uDestinationIPAddress;
-	u16 uIndex;
+	/* u16 uIndex; */
 
 	if (uPacketLength < sizeof(struct sIPV4Header))
 	{
@@ -107,8 +107,10 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 
 		//xil_printf("VERS: %x TOS: %x LEN: %x ID: %x FLGS: %x TTL: %x PROT: %x CHK: %x SRC: %x %x DEST: %x %x\r\n", IPHeader->uVersion, IPHeader->uTypeOfService, IPHeader->uTotalLength, IPHeader->uIdentification, IPHeader->uFlagsFragment, IPHeader->uTimeToLive, IPHeader->uProtocol, IPHeader->uChecksum,  IPHeader->uSourceIPHigh, IPHeader->uSourceIPLow, IPHeader->uDestinationIPHigh, IPHeader->uDestinationIPLow );
 
+    /*  TODO FIXME uReceiveBuffer now a 2D array
 		for (uIndex = 0; uIndex < 256; uIndex++)
 			xil_printf("%x DATA: %x\r\n", uIndex, uReceiveBuffer[uIndex]);
+    */
 
 		return XST_FAILURE;
 	}
