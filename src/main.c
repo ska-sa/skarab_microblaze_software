@@ -334,7 +334,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 	if (uL2PktLen < sizeof(struct sEthernetHeader))
 		return XST_FAILURE;
 
-	pL2Ptr = (u8 *) (uReceiveBuffer);
+	pL2Ptr = (u8 *) &(uReceiveBuffer[uId][0]);
 	EthHdr = (struct sEthernetHeader *) pL2Ptr;
 
 	// Cache MAC source address for response
@@ -484,7 +484,7 @@ void ArpRequestHandler()
 	{
 	   	// Create an ARP request
 	    uCurrentArpRequestIPAddress = uEthernetSubnet[uCurrentArpEthernetInterface] | uCurrentArpRequest;
-	    ArpHandler(uCurrentArpEthernetInterface, ARP_REQUEST, (u8*) uReceiveBuffer, (u8*) uTransmitBuffer, & uResponseLength, uCurrentArpRequestIPAddress);
+	    ArpHandler(uCurrentArpEthernetInterface, ARP_REQUEST, (u8*) &(uReceiveBuffer[uCurrentArpEthernetInterface][0]), (u8*) uTransmitBuffer, & uResponseLength, uCurrentArpRequestIPAddress);
 	   	uResponseLength = (uResponseLength >> 2);
 	    TransmitHostPacket(uCurrentArpEthernetInterface, & uTransmitBuffer[0], uResponseLength);
 	}
@@ -1400,6 +1400,11 @@ int main()
      u16 uCountDumpStats_DHCP=0;
 #endif
 
+     /* Temp / Reused variables */
+     u32 uSize = 0;       /* used to pass around / hold a packet size */
+     u32 uIndex = 0;      /* used to index arrays / buffers */
+     u16 *pBuffer = NULL;  /* pointer to working buffer */ 
+
 	   Xil_ICacheEnable();
 	   Xil_DCacheEnable();
 
@@ -1546,7 +1551,7 @@ int main()
        uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
        uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
 
-       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) uReceiveBuffer, (512 * 4), (u8 *) uTransmitBuffer, (256 * 4), uTempMac);
+       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (512 * 4), (u8 *) uTransmitBuffer, (256 * 4), uTempMac);
        eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
        eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
        vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
@@ -1569,9 +1574,8 @@ int main()
 					{
 					   // Read packet into receive buffer
 					   //xil_printf("Rd pkt.\r\n");
-					   iStatus  = ReadHostPacket(uEthernetId, & uReceiveBuffer[0], uNumWords);
-             /* TODO remove the following inline data declarations */
-             u16 *buffer = (u16*) uReceiveBuffer;
+					   iStatus  = ReadHostPacket(uEthernetId, &(uReceiveBuffer[uEthernetId][0]), uNumWords);
+             pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
 
 					   if (iStatus == XST_SUCCESS)
 					   {
@@ -1587,12 +1591,12 @@ int main()
 					   } else {
 
                /* DHCP new */
-               /* TODO remove the following inline data declarations */
-               int size = uNumWords << 1;     /* 16bit words */
-               int i;
+               /* convert the number of 32bit words to a number of 16bit half-words */
+               uSize = uNumWords << 1;
 
-               for (i = 0; i < size; i++){
-                 buffer[i] = Xil_EndianSwap16(buffer[i]);
+               /* correct the endianess */
+               for (uIndex = 0; uIndex < uSize; uIndex++){
+                 pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
                }
 
                /* validate and set flag */
@@ -1601,7 +1605,8 @@ int main()
                  xil_printf("DHCP [%02x] valid packet received!\r\n", uEthernetId);
 #endif
                  uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
-                 uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
+                 //uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
+                 uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
                }
                /* DHCP new */
              }
@@ -1740,16 +1745,15 @@ int main()
       if(uFlagRunTask_LLDP){
         for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
           iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-
           if(iStatus == XST_SUCCESS){
-            u32 size = uResponsePacketLength >> 1; /* 16 bit words */
-            u16 * buffer = (u16*)uTransmitBuffer;
+            uSize = uResponsePacketLength >> 1; /* 16 bit words */
+            pBuffer = (u16 *) uTransmitBuffer;
 
-            for(u32 uIndex = 0; uIndex < size; uIndex++){
-              buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+            for(uIndex = 0; uIndex < uSize; uIndex++){
+              pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
             }
-            size = size >> 1; /* 32 bit words*/
-            iStatus = TransmitHostPacket(uEthernetId, (u32*) &buffer[0], size);
+            uSize = uSize >> 1; /* 32 bit words*/
+            iStatus = TransmitHostPacket(uEthernetId, (u32*) &pBuffer[0], uSize);
           }
         }
         uFlagRunTask_LLDP = 0;	
@@ -1814,28 +1818,36 @@ int main()
 
 
 static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
-  u8 uEthernetId;
+  u8 uLocalEthernetId;
   u8 uReturnValue;
-  u32 size;
-  u16 *buffer;
-  u32 uIndex;
+  u32 uLocalSize;
+  u16 *pLocalBuffer = NULL;
+  u32 uLocalIndex;
 
-  size = (u32) pDHCPObjectPtr->uDHCPMsgSize;    /* bytes */
-  buffer = (u16 *) pDHCPObjectPtr->pUserTxBufferPtr;
-
-  size = size >> 1;     /* 16bit words */
-
-  for (uIndex = 0; uIndex < size; uIndex++){
-    buffer[uIndex] = Xil_EndianSwap16(buffer[uIndex]);
+  if(pUserData == NULL){
+    return XST_FAILURE;
   }
 
-  uEthernetId = * ((u8 *) pUserData);
-  size = size >> 1;   /*  32-bit words */
-  uReturnValue = TransmitHostPacket(uEthernetId, (u32 *) buffer, size);
+  uLocalSize = (u32) pDHCPObjectPtr->uDHCPMsgSize;    /* bytes */
+  
+  pLocalBuffer = (u16 *) pDHCPObjectPtr->pUserTxBufferPtr;
+  if(pLocalBuffer == NULL){
+    return XST_FAILURE;
+  }
+
+  uLocalSize = uLocalSize >> 1;     /* 16bit words */
+
+  for (uLocalIndex = 0; uLocalIndex < uLocalSize; uLocalIndex++){
+    pLocalBuffer[uLocalIndex] = Xil_EndianSwap16(pLocalBuffer[uLocalIndex]);
+  }
+
+  uLocalEthernetId = * ((u8 *) pUserData);
+  uLocalSize = uLocalSize >> 1;   /*  32-bit words */
+  uReturnValue = TransmitHostPacket(uLocalEthernetId, (u32 *) pLocalBuffer, uLocalSize);
   if (uReturnValue == XST_SUCCESS){
-    xil_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\n\r", uEthernetId, pDHCPObjectPtr->uDHCPXidCached);
+    xil_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\n\r", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
   } else {
-    xil_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\n\r", uEthernetId, pDHCPObjectPtr->uDHCPXidCached);
+    xil_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\n\r", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
   }
 
   return uReturnValue;
@@ -1894,4 +1906,3 @@ static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserDa
   uFlagRunTask_LLDP = 1;
   return 0;
 }
-
