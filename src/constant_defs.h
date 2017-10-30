@@ -61,10 +61,12 @@
 volatile u32 uWriteBoardShadowRegs[NUM_REGISTERS];
 
 // Single transmit buffer
-volatile u32 uTransmitBuffer[256];
+#define TX_BUFFER_MAX 256
+volatile u32 uTransmitBuffer[TX_BUFFER_MAX];
 
 // Single receive buffer
-volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][512]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
+#define RX_BUFFER_MAX 512
+volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
 
 // Transmit and receive buffers for loopback testing of second interface
 volatile u32 uLoopbackTransmitBuffer[256];
