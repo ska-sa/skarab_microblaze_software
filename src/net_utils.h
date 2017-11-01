@@ -34,6 +34,9 @@
 #endif
 
 int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksumPtr, u8 ByteSwap, u16 uChecksumStartValue);
+int uIPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr);
+int uUDPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr);
+
 int uIPV4_ntoa(char *stringIP, u32 uIP32);
 
 #endif /* _NET_UTILS_H_ */
