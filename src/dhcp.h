@@ -20,6 +20,7 @@
 
 #include "eth.h"
 #include "ipv4.h"
+#include "udp.h"
 
 /* link custom return values */
 #define DHCP_RETURN_OK            XST_SUCCESS
@@ -46,19 +47,7 @@
 
 /* dhcp packet offsets */
 
-#define UDP_FRAME_BASE              (IP_FRAME_BASE + IP_FRAME_TOTAL_LEN) //34 
-#define UDP_SRC_PORT_OFFSET         0
-#define UDP_SRC_PORT_LEN            2
-#define UDP_DST_PORT_OFFSET         (UDP_SRC_PORT_OFFSET + UDP_SRC_PORT_LEN) //2
-#define UDP_DST_PORT_LEN            2
-#define UDP_ULEN_OFFSET             (UDP_DST_PORT_OFFSET + UDP_DST_PORT_LEN) //4
-#define UDP_ULEN_LEN                2
-#define UDP_CHKSM_OFFSET            (UDP_ULEN_OFFSET + UDP_ULEN_LEN) //6
-#define UDP_CHKSM_LEN               2
-
-#define UDP_FRAME_TOTAL_LEN         (UDP_CHKSM_OFFSET + UDP_CHKSM_LEN)  /* udp length = 8 */
-
-#define BOOTP_FRAME_BASE            (UDP_FRAME_BASE + UDP_FRAME_TOTAL_LEN) //42
+#define BOOTP_FRAME_BASE            (UDP_FRAME_BASE + UDP_HEADER_TOTAL_LEN) //42
 #define BOOTP_OPTYPE_OFFSET         0
 #define BOOTP_OPTYPE_LEN            1
 #define BOOTP_HWTYPE_OFFSET         (BOOTP_OPTYPE_OFFSET + BOOTP_OPTYPE_LEN) //1

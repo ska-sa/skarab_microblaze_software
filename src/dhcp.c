@@ -1,8 +1,8 @@
-/**---------------------------------------------------------------------------- 
+/**----------------------------------------------------------------------------
 *   FILE:       dhcp.c
 *   BRIEF:      Implementation of DHCP client functionality to obtain and
 *               renew IPv4 leases.
-*   
+*
 *   DATE:       MAY 2017
 *
 *   COMPANY:    SKA SA
@@ -223,15 +223,18 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
     }
   }
 
+#if 0 /* NOW HANDLED BY LOWER LAYER */
   /* is the port number correct for a bootp/dhcp reply */
   if (memcmp(pUserBufferPtr + uIPLen + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET, uBootpPort, 2) != 0){   /*port 68?*/
     return DHCP_RETURN_INVALID;
   }
+#endif
 
   if (pUserBufferPtr[uIPLen + BOOTP_FRAME_BASE + BOOTP_OPTYPE_OFFSET] != 0x02){                  /*bootp reply?*/
     return DHCP_RETURN_INVALID;
   }
 
+#if 0 /* NOW HANDLED BY LOWER LAYER */
   /* IP checksum validation*/
   RetVal = uChecksum16Calc(pUserBufferPtr, IP_FRAME_BASE, UDP_FRAME_BASE + uIPLen - 1, &uCheckTemp, 0, 0);
   if(RetVal){
@@ -275,6 +278,7 @@ u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
     xil_printf("DHCP: RX - UDP Checksum %04x - Invalid!\n\r", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
+#endif
 
   return DHCP_RETURN_OK;   /* valid reply */
 }
@@ -1093,7 +1097,7 @@ static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage 
   pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 0xff;
 
   /* calculate and fill in udp frame packet lengths */
-  uLength = UDP_FRAME_TOTAL_LEN + BOOTP_FRAME_TOTAL_LEN + uIndex;
+  uLength = UDP_HEADER_TOTAL_LEN + BOOTP_FRAME_TOTAL_LEN + uIndex;
   uUDPLength = uLength; /* save for pseudo header later */
   pBuffer[UDP_FRAME_BASE + UDP_ULEN_OFFSET    ] = (u8) ((uLength & 0xff00) >> 8);
   pBuffer[UDP_FRAME_BASE + UDP_ULEN_OFFSET + 1] = (u8) (uLength & 0xff);
