@@ -4,7 +4,11 @@
 #include "icmp.h"
 #include "net_utils.h"
 #include "constant_defs.h"
+#include "print.h"
 
+/* Can eliminate the following function since these variables will move up to the interface object layer */
+/* No states that need to be maintained - we respond immediately to a request */
+#if 0
 //=================================================================================
 //  uICMPInit
 //---------------------------------------------------------------------------------
@@ -50,6 +54,7 @@ u8 uICMPInit(struct sICMPObject *pICMPObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffer
 
   return ICMP_RETURN_OK;
 }
+#endif
 
 //=================================================================================
 //  uICMPMessageValidate
@@ -58,28 +63,28 @@ u8 uICMPInit(struct sICMPObject *pICMPObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffer
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pICMPObjectPtr  IN    handle to ICMP state object
+//  pIFObjectPtr  IN    handle to IF state object
 //
 //  Return
 //  ------
 //  ICMP_RETURN_OK or ICMP_RETURN_FAIL or ICMP_RETURN_INVALID
 //=================================================================================
-u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
+u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   u8 uIPLenAdjust;
   u8 *pUserBufferPtr;
   u16 uCheckTemp = 0;
   u16 uICMPTotalLength = 0;
   int RetVal = -1;
 
-  if (pICMPObjectPtr == NULL){
+  if (pIFObjectPtr == NULL){
     return ICMP_RETURN_FAIL;
   }
 
-  if (pICMPObjectPtr->uICMPMagic != ICMP_MAGIC){
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
     return ICMP_RETURN_FAIL;
   }
 
-  pUserBufferPtr = pICMPObjectPtr->pUserRxBufferPtr;
+  pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
 
   /* TODO: check for buffer overruns */
 
@@ -115,9 +120,7 @@ u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
   uICMPTotalLength |= (pUserBufferPtr[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
   uICMPTotalLength = uICMPTotalLength - 20 - uIPLenAdjust;
 
-#ifdef TRACE_PRINT
-  xil_printf("ICMP: Length = %d\n\r", uICMPTotalLength);
-#endif
+  trace_printf("ICMP: Length = %d\n\r", uICMPTotalLength);
 
   /* now check the ICMP checksum */
   RetVal = uChecksum16Calc(pUserBufferPtr, ICMP_FRAME_BASE, ICMP_FRAME_BASE + uICMPTotalLength - 1, &uCheckTemp, 0, 0);
@@ -126,7 +129,7 @@ u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\n\r", uCheckTemp);
+    error_printf("ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\n\r", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
 
@@ -147,7 +150,7 @@ u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
 //  ------
 //  ICMP_RETURN_OK or ICMP_RETURN_FAIL
 //=================================================================================
-u8 uICMPBuildReplyMessage(struct sICMPObject *pICMPObjectPtr){
+u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   u8 *pTxBuffer;
   u8 *pRxBuffer;
   u8  uPaddingLength = 0;
@@ -160,24 +163,24 @@ u8 uICMPBuildReplyMessage(struct sICMPObject *pICMPObjectPtr){
   u16 uChecksum;
   //int RetVal = (-1);
 
-  if (pICMPObjectPtr == NULL){
+  if (pIFObjectPtr == NULL){
     return ICMP_RETURN_FAIL;
   }
 
   /* has uICMPInit been called to initialize dependancies? */
-  if (pICMPObjectPtr->uICMPMagic != ICMP_MAGIC){
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
     return ICMP_RETURN_FAIL;
   }
 
   /* simplify ur life */
-  pTxBuffer = pICMPObjectPtr->pUserTxBufferPtr;
-  pRxBuffer = pICMPObjectPtr->pUserRxBufferPtr;
+  pTxBuffer = pIFObjectPtr->pUserTxBufferPtr;
+  pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
 
   if (pTxBuffer == NULL){
     return ICMP_RETURN_FAIL;
   }
 
-  uSize = pICMPObjectPtr->uUserTxBufferSize;
+  uSize = pIFObjectPtr->uUserTxBufferSize;
   uIPTotalLength = (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET] << 8) & 0xFF00;
   uIPTotalLength |= (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
 
@@ -265,7 +268,7 @@ u8 uICMPBuildReplyMessage(struct sICMPObject *pICMPObjectPtr){
   /* and with 0b111 since only interested in values of 0 to 7 */
   uPaddingLength = uPaddingLength & 0x7; 
 
-  pICMPObjectPtr->uICMPMsgSize = uIPTotalLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
+  pIFObjectPtr->uMsgSize = uIPTotalLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
 #ifdef TRACE_PRINT
   xil_printf("ICMP: RX IP Hdr Len %d\n\r", uIPRxHdrLength);
