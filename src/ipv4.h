@@ -13,6 +13,8 @@
 #ifndef _IPV4_H_
 #define _IPV4_H_
 
+#include "eth.h"
+
 #define IP_FRAME_BASE               (ETH_FRAME_BASE + ETH_FRAME_TOTAL_LEN)
 #define IP_V_HIL_OFFSET             0
 #define IP_V_HIL_LEN                1

@@ -18,8 +18,9 @@
 /* Xilinx lib includes */
 #include <xstatus.h>
 
-#include "eth.h"
-#include "ipv4.h"
+//#include "if.h"
+//#include "eth.h"
+//#include "ipv4.h"
 #include "udp.h"
 
 /* link custom return values */
@@ -170,12 +171,12 @@ typedef enum {statusCLR=0,
 /* sDHCPObject magic value */
 #define DHCP_MAGIC 0x1C0FFEE1
 
-struct sDHCPObject;
+struct sIFObject;
 
-typedef typeDHCPState (*dhcp_state_func_ptr)(struct sDHCPObject *pDHCPObjectPtr);
+typedef typeDHCPState (*dhcp_state_func_ptr)(struct sIFObject *pIFObjectPtr);
 
 /* callback type definition - user function form */
-typedef int (*tcallUserFunction)(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
+typedef int (*tcallUserFunction)(struct sIFObject *pIFObjectPtr, void *pUserData);
 
 #define SM_FALSE  0
 #define SM_TRUE   1
@@ -184,17 +185,9 @@ typedef int (*tcallUserFunction)(struct sDHCPObject *pDHCPObjectPtr, void *pUser
 struct sDHCPObject{
   u32 uDHCPMagic;
 
-  /* user provided buffer and callback */
-  /* Tx buffer - ie data the user will send over the network */
-  u8 *pUserTxBufferPtr;
-  u16 uUserTxBufferSize;
   tcallUserFunction callbackOnMsgBuilt;
-  u16 uDHCPMsgSize;
   void *pMsgDataPtr;
 
-  /* Rx buffer - ie data the user will receive over the network */
-  u8 *pUserRxBufferPtr;
-  u16 uUserRxBufferSize;
   /* set the flagDHCP_SM_GOT_MESSAGE flag when there's a message to process */
 
   /* DHCP configuration */
@@ -229,7 +222,6 @@ struct sDHCPObject{
 
   /* byte arrays */
   u8  arrDHCPNextHopMacCached[6];       /* holds the mac address of the next hop on link */
-  u8  arrDHCPEthMacCached[6];           /* holds local host's mac address */
   u8  arrDHCPAddrServerCached[4];       /* holds the lease issuing dhcp server's ip address */
 
   u32 uDHCPXidCached;
@@ -251,16 +243,16 @@ void xDHCPDestroyObjHandle(struct sDHCPObject *pDHCPObjectPtr);
 
 /* required - call this function first to initialize DHCP */
 /* NB - the referenced Rx and Tx buffer space must persist for as long as the sDHCPObject is valid */
-u8 uDHCPInit(struct sDHCPObject *pDHCPObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *uTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
+u8 uDHCPInit(struct sIFObject *pIFObjectPtr);
 
 /* required - invoke the DHCP state machine - typically called on a timer interrupt */
-u8 uDHCPStateMachine(struct sDHCPObject *pDHCPObjectPtr);
+u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr);
 
 /* configuration API / wrappers*/
 /* required -  */
-u8 uDHCPSetStateMachineEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable);
+u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable);
 
-void vDHCPStateMachineReset(struct sDHCPObject *pDHCPObjectPtr);
+u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr);
 
 #if 0
 /*TODO*/u8 uDHCPSetAutoRediscoverEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable);
@@ -268,10 +260,10 @@ void vDHCPStateMachineReset(struct sDHCPObject *pDHCPObjectPtr);
 
 /* The following two functions are usually used in conjunction with each other...*/
 /* first... check if the user rx buffer contains a valid DHCP packet */
-u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr);
+u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr);
 
 /* then... set flag once there's a valid message in the user Rx buffer */
-u8 uDHCPSetGotMsgFlag(struct sDHCPObject *pDHCPObjectPtr);
+u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr);
 
 /* u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr); */
 
@@ -283,16 +275,16 @@ u8 uDHCPSetGotMsgFlag(struct sDHCPObject *pDHCPObjectPtr);
 #endif
 
 /* set the host name to be used in message when requesting dhcp lease from server */
-u8 vDHCPSetHostName(struct sDHCPObject *pDHCPObjectPtr, const char *stringHostName);
+u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName);
 
 /* event-driven callbacks */
 
 /* register a callback to be invoked once the DHCP message successfully built */
   /* this callback will typically be aware of the user Tx buffer and handle the i/o for it */
-int eventDHCPOnMsgBuilt(struct sDHCPObject *pDHCPObjectPtr, tcallUserFunction callback, void *pDataPtr);
+int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr);
 
 /* register a callback to be invoked  once the DHCP lease has been acquired*/
   /* this callback will typically set the interface configurations - ip, subnet, etc. */
-int eventDHCPOnLeaseAcqd(struct sDHCPObject *pDHCPObjectPtr, tcallUserFunction callback, void *pDataPtr);
+int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr);
 
 #endif /* _DHCP_H_ */
