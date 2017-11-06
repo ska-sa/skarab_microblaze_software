@@ -24,8 +24,13 @@ struct sIFObject{
   u16 uUserRxBufferSize;
   u32 uNumWordsRead;  /* number of words read into the receive buffer */
 
-  u8 arrIFAddrIP[4];
   u8 arrIFAddrMac[6];
+
+  u8 arrIFAddrIP[4];
+  u8 stringIFAddrIP[16];
+
+  u8 arrIFAddrNetmask[4];
+  u8 stringIFAddrNetmask[16];
 
   u8 uIFEthernetId;
 
