@@ -95,6 +95,13 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
 
+  /* every 5 mins */
+  if (uPrintStatsCounter >= 3000){
+    uFlagRunTask_Diagnostics = 1;
+    uPrintStatsCounter = 0;
+   } else {
+    uPrintStatsCounter++;
+   }
 
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   //uFlagRunTask_LLDP = 1;
@@ -438,6 +445,19 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 #define BOOTP_CLIENT_PORT 0x44
 #define BOOTP_SERVER_PORT 0x43
 
+//=================================================================================
+//  uRecvPacketFilter
+//---------------------------------------------------------------------------------
+//  This method applies the packet filtering per layer.
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  PACKET_FILTER_{*type*}
+//=================================================================================
 u8 uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
   u16 uL2Type;    /* implemented: Ethernet Frame Type filtering => ARP, IPv4 */
   u8 uL3Type;    /* implemented: IPv4 Protocol Type filtering => ICMP, UDP */
@@ -1494,9 +1514,6 @@ int main()
 
      //struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
      u8 uTempMac[6];
-#ifdef DEBUG_PRINT
-     u16 uCountDumpStats_DHCP=0;
-#endif
 
      /* Temp / Reused variables */
      u32 uSize = 0;       /* used to pass around / hold a packet size */
@@ -1895,20 +1912,6 @@ int main()
         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
           uDHCPStateMachine(&(IFContext[uEthernetId]));
         }
-#if 0
-#ifdef DEBUG_PRINT
-        uCountDumpStats_DHCP++;
-        if (uCountDumpStats_DHCP == 3000){
-          uCountDumpStats_DHCP=0;
-          /* dump dhcp stats to terminal once in a while */
-          for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-            xil_printf("DHCP [%02x] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,
-                IFContext[uEthernetId].DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,
-                DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
-          }
-        }
-#endif
-#endif
       }
 
       //----------------------------------------------------------------------------//
@@ -2129,7 +2132,10 @@ int main()
                                             IFContext[uEthernetId].uTxIpIcmpReplyOk + IFContext[uEthernetId].uTxIpIgmpOk +
                                             IFContext[uEthernetId].uTxUdpDhcpOk + IFContext[uEthernetId].uTxUdpCtrlOk;
 
-          debug_printf("IF [%d]:\n\r", uEthernetId);
+          debug_printf("IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\n\r", uEthernetId,
+                                                                        uEthernetLinkUp[uEthernetId] == LINK_UP ? "UP" : "DOWN" /* TODO: remove this global variable */,
+                                                                        IFContext[uEthernetId].stringIFAddrIP,
+                                                                        IFContext[uEthernetId].stringIFAddrNetmask);
           debug_printf(" Rx Total:        %10d | Tx Total:     %10d\n\r", IFContext[uEthernetId].uRxTotal            , IFContext[uEthernetId].uTxTotal);
           debug_printf(" Rx  ETH Unknown: %10d | Tx  ARP\n\r",          IFContext[uEthernetId].uRxEthUnknown);
           debug_printf(" Rx  ARP:         %10d | Tx   Reply:   %10d\n\r", IFContext[uEthernetId].uRxEthArp           , IFContext[uEthernetId].uTxEthArpReplyOk);
@@ -2270,19 +2276,42 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
             (pDHCPObjectPtr->arrDHCPAddrSubnetMask[2] << 8 ) |
              pDHCPObjectPtr->arrDHCPAddrSubnetMask[3];
 
+  /* convert ip to string and cache for later use / printing */
+  if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrIP), ip) != 0){
+    error_printf("DHCP [%02x] Unable to convert IP %x to string.\n\r", id, ip);
+  } else {
+    pIFObjectPtr->stringIFAddrIP[15] = '\0';
+    info_printf("DHCP [%02x] Setting IP address to: %s\r\n", id, pIFObjectPtr->stringIFAddrIP);
+  }
+#if 0 
   xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", id, ((ip >> 24) & 0xFF),
       ((ip >> 16) & 0xFF),
       ((ip >> 8) & 0xFF),
       (ip & 0xFF));
+#endif
 
+  /* convert netmask to string and cache for later use / printing */
+  if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrNetmask), netmask) != 0){
+    error_printf("DHCP [%02x] Unable to convert Netmask %x to string.\n\r", id, netmask);
+  } else {
+    pIFObjectPtr->stringIFAddrNetmask[15] = '\0';
+    info_printf("DHCP [%02x] Setting Netmask address to: %s\r\n", id, pIFObjectPtr->stringIFAddrNetmask);
+  }
+
+#if 0
   xil_printf("DHCP [%02x] Setting netmask to: %u.%u.%u.%u\r\n", id, ((netmask >> 24) & 0xFF),
       ((netmask >> 16) & 0xFF),
       ((netmask >> 8) & 0xFF),
       (netmask & 0xFF));
+#endif
 
   uEthernetFabricIPAddress[id] = ip;
   /* TODO FIXME */
+
+  /* Cache the ip and netmask in the IF Object layer */
   memcpy(IFContext[id].arrIFAddrIP, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
+  memcpy(IFContext[id].arrIFAddrNetmask, pDHCPObjectPtr->arrDHCPAddrSubnetMask, 4);
+
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
   uEthernetSubnet[id] = (ip & netmask);
 
