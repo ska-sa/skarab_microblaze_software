@@ -100,7 +100,7 @@ volatile u8 uCurrentArpEthernetInterface;
 volatile u8 uUpdateArpRequests;
 volatile u8 uEnableArpRequests[NUM_ETHERNET_INTERFACES];
 volatile u8 uCurrentArpRequest;
-volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES];
+//volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES];
 volatile u8 uEthernetNeedsReset[NUM_ETHERNET_INTERFACES];
 
 volatile u32 uLLDPTimerCounter;
