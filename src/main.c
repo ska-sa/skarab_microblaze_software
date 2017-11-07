@@ -1525,6 +1525,7 @@ int main()
      u32 uIndex = 0;      /* used to index arrays / buffers */
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
+     u32 uTimeout = 0;
 
      u8 uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
@@ -1610,12 +1611,25 @@ int main()
 	   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
 	   UpdateGBEPHYConfiguration();
 
-	   xil_printf("Waiting for 1GBE SGMII to come out of reset...\r\n");
+	   xil_printf("Waiting for 1GBE SGMII to come out of reset");
 
+
+#define SGMII_1GBE_TIMEOUT 2000000  /* tweaked by experimentation -> about 3 - 4 seconds */
+     /* max value determined by watchdog timer */
+     /* try to contiune before watchdog timer overflows */
+     /* TODO: verify any later dependancies linked to this initialization */
+
+     uTimeout = 0;
 	   do
 	   {
 		   uReadReg = ReadBoardRegister(C_RD_BRD_CTL_STAT_0_ADDR);
-	   }while((uReadReg & 0x1) != 0x1);
+       if (uTimeout % 500000 == 0){
+         debug_printf(".");       /* this conditional and serial i/o adds a bit of overhead */
+       }
+       uTimeout++;
+	   }while(((uReadReg & 0x1) != 0x1) && (uTimeout < SGMII_1GBE_TIMEOUT));
+
+     debug_printf("%s\n\r", ((uReadReg & 0x1) != 0x1) ? "[FAILED]" : " [OK]");
 
 	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
 
