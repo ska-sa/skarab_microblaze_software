@@ -423,6 +423,22 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 
 }
 
+typedef enum {
+  /* these are enumerations for protocols we are expecting */
+  PACKET_FILTER_ARP,
+  PACKET_FILTER_ICMP,
+  PACKET_FILTER_DHCP,
+  PACKET_FILTER_CONTROL,
+  /* these are enumerations to handle unexpected packets or errors */
+  PACKET_FILTER_UNKNOWN,
+  PACKET_FILTER_ERROR,
+  PACKET_FILTER_DROP,
+  PACKET_FILTER_UNKNOWN_UDP,
+  PACKET_FILTER_UNKNOWN_IP,
+  PACKET_FILTER_UNKNOWN_ETH
+} typePacketFilter;
+
+#if 0
 #define PACKET_FILTER_UNKNOWN 0
 #define PACKET_FILTER_ERROR   1
 #define PACKET_FILTER_ARP     2
@@ -433,7 +449,8 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 #define PACKET_FILTER_DROP        252
 #define PACKET_FILTER_UNKNOWN_UDP 253
 #define PACKET_FILTER_UNKNOWN_IP  254
-#define PACKET_FILTER_UNKNOWN_ETH 255 
+#define PACKET_FILTER_UNKNOWN_ETH 255
+#endif
 
 #define ETHER_TYPE_ARP    0x0806
 #define ETHER_TYPE_IPV4   0x0800
@@ -456,9 +473,9 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 //
 //  Return
 //  ------
-//  PACKET_FILTER_{*type*}
+//  typePacketFilter
 //=================================================================================
-u8 uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
+typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
   u16 uL2Type;    /* implemented: Ethernet Frame Type filtering => ARP, IPv4 */
   u8 uL3Type;    /* implemented: IPv4 Protocol Type filtering => ICMP, UDP */
 
@@ -468,7 +485,7 @@ u8 uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
 
   u8 uIPHdrLenAdjust = 0;
 
-  u8 uReturnType = PACKET_FILTER_UNKNOWN;
+  typePacketFilter uReturnType = PACKET_FILTER_UNKNOWN;
 
   u8 *pRxBuffer = NULL;
 
@@ -640,7 +657,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   u32 uReg, uMask;
   u8 uId;
 
-  /* TODO: pIFObjectPtr sanity checks */
+  /* TODO: pIFObjectPtr sanity checks - is it necessary? */
 
   uId = pIFObjectPtr->uIFEthernetId;
 
@@ -1485,7 +1502,6 @@ void ReadAndPrintFPGADNA()
 	xil_printf("\r\n");
 }
 
-
 int main() 
 {
 	   int iStatus;
@@ -1527,7 +1543,7 @@ int main()
      u16 uChecksum = 0;
      u32 uTimeout = 0;
 
-     u8 uPacketType = PACKET_FILTER_UNKNOWN;
+     typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
 	   Xil_ICacheEnable();
