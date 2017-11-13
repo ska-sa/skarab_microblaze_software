@@ -48,15 +48,24 @@ MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul
 #common flags
 CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
 #optimization flags
+
 #CFLAGS += -Os
+#  OR
 CFLAGS += -O2
+
+#optimiztions: use with \-Wl,--gc-sections\ linker option below
+#CFLAGS += -ffunction-sections -fdata-sections
+
 #extra
-CFLAGS += $(MBFLAGS) -ffunction-sections -fdata-sections -MMD -MP $(INC)
+CFLAGS += $(MBFLAGS) -MMD -MP $(INC)
 
 #linker flags
 LDLIBS := -Wl,--start-group,$(LIBS),--end-group
 LDSCRIPT := $(SRCDIR)lscript.ld
-LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax -Wl,--gc-sections
+LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax
+
+#optimizations: use with \-ffunction-sections -fdata-sections\ above
+#LDFLAGS += -Wl,--gc-sections
 
 EXISTS := $(shell test -f Makefile.inc || echo 'NO')
 
