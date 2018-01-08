@@ -765,6 +765,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
 	u32 uWriteData;
 	u8 uPaddingIndex;
 
+  xil_printf("Wishbone write...\r\n");
 	if (uCommandLength < sizeof(sWriteWishboneReqT))
 		return XST_FAILURE;
 
@@ -813,6 +814,7 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
 	u32 uReadData;
 	u8 uPaddingIndex;
 
+  xil_printf("Wishbone read...\r\n");
 	if (uCommandLength < sizeof(sReadWishboneReqT))
 		return XST_FAILURE;
 
