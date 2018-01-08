@@ -130,6 +130,8 @@ int OneWireReset(u16 uOneWirePort)
 {
 	u32 uReg;
 
+  xil_printf("RST[");
+
 	//uReg = uPower << ONE_WIRE_CTL_POWER_OFST;
 	uReg = 0x0;
 	uReg = uReg | (uOneWirePort << ONE_WIRE_CTL_SEL_OFST);
@@ -151,13 +153,16 @@ int OneWireReset(u16 uOneWirePort)
 	{
 		uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_WIRE_ADDR);
 	}while ((uReg & ONE_WIRE_CTL_CYC_MSK) != 0);
-
+  /* TODO FIXME possibility of endless loop */
 
 	// Presence detect is low
-	if ((uReg & ONE_WIRE_CTL_DAT_MSK) == 0x0)
-		return XST_SUCCESS;
-	else
+  if ((uReg & ONE_WIRE_CTL_DAT_MSK) == 0x0){
+    xil_printf("D] ");
+    return XST_SUCCESS;
+  } else {
+    xil_printf("E] ");
 		return XST_FAILURE;
+  }
 
 }
 
@@ -269,6 +274,8 @@ void OneWireWrite(u16 uByte, u16 uOneWirePort)
 	u16 uBitCount;
 	u16 uSendByte = uByte;
 
+  xil_printf("W ");
+
 	for (uBitCount = 0; uBitCount < 8; uBitCount++)
 	{
 		// Data is sent LSB first
@@ -295,6 +302,8 @@ u16 OneWireRead(u16 uOneWirePort)
 {
 	u16 uByteRead = 0x0;
 	u16 uBitCount;
+
+  xil_printf("R ");
 
 	for (uBitCount = 0; uBitCount < 8; uBitCount++)
 	{
@@ -417,23 +426,28 @@ void OneWireSkip(u16 uOneWirePort)
 //=================================================================================
 int OneWireReadRom(u16 uRom[8], u16 uOneWirePort)
 {
+    int RetVal = XST_FAILURE;
     u16 uIndex;
 
-    if (OneWireReset(uOneWirePort) == XST_SUCCESS)
-    {
-    	OneWireWrite(ONE_WIRE_READ_ROM, uOneWirePort);           // Read ROM command
+    xil_printf("[1WIRE] Read ROM...");
 
-    	for (uIndex = 0; uIndex < 8; uIndex++)
-    		uRom[uIndex] = OneWireRead(uOneWirePort);
+    if (OneWireReset(uOneWirePort) == XST_SUCCESS){
+      OneWireWrite(ONE_WIRE_READ_ROM, uOneWirePort);           // Read ROM command
 
-    	// 05/06/2015 INCLUDE FINAL RESET IN RETURN STATUS
-    	return OneWireReset(uOneWirePort); // Just in case
+      for (uIndex = 0; uIndex < 8; uIndex++){
+        uRom[uIndex] = OneWireRead(uOneWirePort);
+      }
 
-    	//return XST_SUCCESS;
+      // 05/06/2015 INCLUDE FINAL RESET IN RETURN STATUS
+      RetVal = OneWireReset(uOneWirePort); // Just in case
+      xil_printf("%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
+      return RetVal;
+
+      //return XST_SUCCESS;
+    } else {
+      xil_printf(" [FAIL]\r\n");
+      return XST_FAILURE;
     }
-    else
-    	return XST_FAILURE;
-
 }
 
 
@@ -824,14 +838,18 @@ int DS2433WriteMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, 
 int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u16 uBufferSize, u16 uTA1, u16 uTA2, u16 uOneWirePort)
 {
 	u16 uIndex;
+  int RetVal = XST_FAILURE;
+
+  xil_printf("[1WIRE] Read Memory Page...");
 
 	if (OneWireReset(uOneWirePort) == XST_SUCCESS)
 	{
 
-		if (uSkipRomAddress == 1)
+		if (uSkipRomAddress == 1){
 			OneWireSkip(uOneWirePort);
-		else
+    } else {
 			OneWireSelect(uDeviceAddress, uOneWirePort);
+    }
 
 		OneWireWrite(ONE_WIRE_READ_MEMORY, uOneWirePort);
 		OneWireWrite(uTA1, uOneWirePort);
@@ -842,12 +860,13 @@ int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u
 		}
 
 		// GT 05/06/2015 INCLUDE FINAL RESET IN RETURN STATUS
-		return OneWireReset(uOneWirePort);
-
-		//return XST_SUCCESS;
-	}
-	else
+    RetVal = OneWireReset(uOneWirePort);
+    xil_printf("%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
+		return RetVal;
+	} else {
+    xil_printf(" [FAIL]\r\n");
 		return XST_FAILURE;
+  }
 }
 
 
