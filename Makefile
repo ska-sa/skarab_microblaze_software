@@ -49,9 +49,9 @@ MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul -mno-xl-soft-div
 CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
 #optimization flags
 
-CFLAGS += -Os
+#CFLAGS += -Os
 #  OR
-#CFLAGS += -O2
+CFLAGS += -O2
 
 #optimiztions: use with \-Wl,--gc-sections\ linker option below
 #CFLAGS += -ffunction-sections -fdata-sections
