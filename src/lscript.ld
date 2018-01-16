@@ -17,7 +17,8 @@ _HEAP_SIZE = DEFINED(_HEAP_SIZE) ? _HEAP_SIZE : 0x1000;
 
 MEMORY
 {
-   microblaze_0_local_memory_ilmb_bram_if_cntlr_microblaze_0_local_memory_dlmb_bram_if_cntlr : ORIGIN = 0x00000050, LENGTH = 0x0001FFB0
+   microblaze_0_local_memory_ilmb_bram_if_cntlr_microblaze_0_local_memory_dlmb_bram_if_cntlr : ORIGIN = 0x00000050, LENGTH = 0x3FFB0    /* 256K BRAM */
+   /* microblaze_0_local_memory_ilmb_bram_if_cntlr_microblaze_0_local_memory_dlmb_bram_if_cntlr : ORIGIN = 0x00000050, LENGTH = 0x0001FFB0 */ /* 128K BRAM */
 }
 
 /* Specify the default entry point to the program */
