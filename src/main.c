@@ -72,6 +72,16 @@ static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 
+//u32 __attribute__ ((section(".rodata.memtest"))) __attribute__ ((aligned (32))) uMemPlace = 0xAABBCCDD ;
+
+/* place this variable at a specific location in memory (in .rodata section). See linker script */
+//u32 __attribute__ ((section(".rodata.checksum"))) __attribute__ ((aligned (32))) uMemPlace;
+
+/* this variable holds the end address of the .text section. See linker script */
+extern u32 _text_section_end_;
+/* this variable holds the location at which the externally computed checksum was stored by linker. See linker script */
+extern u32 _location_checksum_;
+
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
@@ -1572,18 +1582,19 @@ int main()
 
      u32 *iPtr;
      u32 uMemTest = 0;
-     //iPtr = 0x50 + 0x0001FFB0 - 0xFFD8; /* read an instruction from text section NB aligned???*/
-     //xil_printf("\r\nI @ %p = %08x\r\n", iPtr, *iPtr);
 
      /* very crude program memory test */
-     for (iPtr = (u32 *)0x50; iPtr < (u32 *)0x14250; iPtr++){
+     for (iPtr = (u32 *)0x50; iPtr <= (u32 *) &_text_section_end_; iPtr++){
        /*print first, middle and last instruction*/
-       if ((iPtr == (u32 *)0x50) || (iPtr == (u32 *)0x1424c) || (iPtr == (u32 *)0xa150)){
+       /*if ((iPtr == (u32 *)0x50) || (iPtr == (u32 *)0x1424c) || (iPtr == (u32 *)0xa150)){
          xil_printf("\r\niPtr @ %p = %08x\r\n", iPtr, *iPtr);
-       }
+       }*/
         uMemTest = uMemTest + *(iPtr);
      }
-     xil_printf("\r\nMemTest = %08x\r\n", uMemTest);
+     always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
+     //always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
+     always_printf("[Memory Test] computed value                  : 0x%08x\r\n", uMemTest);
+     /* TODO pass / fail -> what to do upon failure? */
 
 	   //Xil_ICacheEnable();
 	   //Xil_DCacheEnable();
