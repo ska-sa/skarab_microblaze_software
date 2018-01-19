@@ -40,7 +40,6 @@
 #include "invalid_nack.h"
 #include "dhcp.h"
 #include "lldp.h"
-#include "icmp.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 
@@ -52,10 +51,7 @@ static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserDa
 static volatile u8 uFlagRunTask_DHCP = 0;
 static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
-static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
-
 static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
-static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 
 //=================================================================================
 //	TimerHandler
@@ -378,7 +374,23 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 
 			pL4Ptr = ExtractIPV4FieldsAndGetPayloadPointer(pL3Ptr, &uL4PktLen, (u32 *) &uResponseIPAddr, &uL3Proto, &uL3TOS);
 
-			if (uL3Proto == IP_PROTOCOL_UDP)
+			if ((uL3Proto == IP_PROTOCOL_ICMP)&&(uL3TOS == IP_PING_TOS))
+			{
+				iStatus = CheckICMPHeader(uL4PktLen, pL4Ptr);
+
+				if (iStatus == XST_SUCCESS)
+				{
+#ifdef DEBUG_PRINT
+					//xil_printf("ICMP packet received!\r\n");
+#endif
+					ICMPHandler(uId, pL4Ptr, uL4PktLen, (u8 *) uTransmitBuffer, uResponsePacketLengthBytes);
+					return XST_SUCCESS;
+
+				}
+				else
+					return XST_FAILURE;
+			}
+			else if (uL3Proto == IP_PROTOCOL_UDP)
 			{
 
 				//xil_printf("UDP packet received!\r\n");
@@ -403,14 +415,31 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 
 							return XST_SUCCESS;
 						}
-						else{
+						else
 							return XST_FAILURE;
-            }
 
 					}
-					else{
+/**** DHCP NOW handled by new DHCP code ****/
+#if 0
+					else if (uUdpDstPort == DHCP_CLIENT_UDP_PORT)
+					{
+						iStatus = CheckDHCPHeader(uId, uL5PktLen, pL5Ptr);
+
+						if (iStatus == XST_SUCCESS)
+						{
+#ifdef DEBUG_PRINT
+							xil_printf("DHCP [%02x] packet received!\r\n", uId);
+#endif
+							// iStatus = DHCPHandler(uId, pL5Ptr, uL5PktLen, (u8 *) uTransmitBuffer, uResponsePacketLengthBytes);
+
+							return iStatus;
+						}
+						else
+							return XST_FAILURE;
+					}
+#endif
+					else
 						return XST_FAILURE;
-          }
 
 				}
 				else
@@ -1522,13 +1551,11 @@ int main()
        uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
        uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
 
-       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4), uTempMac);
+       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (512 * 4), (u8 *) uTransmitBuffer, (256 * 4), uTempMac);
        eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
        eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
        vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
        /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
-
-       uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
      }
 
 	   while(1)
@@ -1580,12 +1607,8 @@ int main()
                  uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
                  //uFlagRunTask_DHCP = 1;   /* short-circuit the task logic and run DHCP task on next main loop iteration */
                  uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
-               } else if (uICMPMessageValidate(&ICMPContextState[uEthernetId]) == ICMP_RETURN_OK){
-#ifdef DEBUG_PRINT
-                 xil_printf("ICMP [%02x] valid packet received!\r\n", uEthernetId);
-#endif
-                 uFlagRunTask_ICMP_Reply[uEthernetId] = 1;
                }
+               /* DHCP new */
              }
 					}
 
@@ -1711,33 +1734,6 @@ int main()
           }
         }
 #endif
-      }
-
-      /* ...is there a ICMP ping request to reply to? */
-      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        if (uFlagRunTask_ICMP_Reply[uEthernetId]){
-          iStatus = uICMPBuildReplyMessage(&ICMPContextState[uEthernetId]);
-          if (iStatus != ICMP_RETURN_OK){
-#ifdef DEBUG_PRINT
-            xil_printf("ICMP[%d] Packet build error!\n\r", uEthernetId);
-#endif
-          } else {
-            /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-            uSize = (u32) ICMPContextState[uEthernetId].uICMPMsgSize;    /* bytes */
-            pBuffer = (u16 *) ICMPContextState[uEthernetId].pUserTxBufferPtr;
-            if (pBuffer != NULL){
-              uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
-              for (uIndex = 0; uIndex < uSize; uIndex++){
-                pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
-              }
-              uSize = uSize >> 1;   /*  now convert quantity to amount of 32-bit words */
-              if (TransmitHostPacket(uEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
-                xil_printf("ICMP [%d]: unable to send reply\n\r", 1);
-              }
-            }
-          }
-          uFlagRunTask_ICMP_Reply[uEthernetId] = 0;
-        }
       }
 
       /* ... time to do ARP requests? */

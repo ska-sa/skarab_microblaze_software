@@ -482,9 +482,9 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 	//	return XST_FAILURE;
 	//}
 
-	if (uNumWords > RX_BUFFER_MAX)
+	if (uNumWords > 512)
 	{
-		xil_printf("ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", RX_BUFFER_MAX, uNumWords);
+		xil_printf("ReadHostPacket: Packet size exceeds 512 words. SIZE: %x\r\n", uNumWords);
 		return XST_FAILURE;
 	}
 
