@@ -28,7 +28,6 @@
 #include "udp.h"
 #include "net_utils.h"
 #include "if.h"
-#include "print.h"
 
 /* Local function prototypes  */
 static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr);
@@ -60,57 +59,6 @@ static dhcp_state_func_ptr dhcp_state_table[] = {
   [RENEW]     = renew_dhcp_state,
   [REBIND]    = rebind_dhcp_state };
 
-/*********** Sanity Checks ***************/
-#ifdef DO_SANITY_CHECKS
-#define SANE_DHCP(IFobject) if (SanityCheckDHCP(IFobject)) { return DHCP_RETURN_FAIL; }
-#else
-#define SANE_DHCP(IFobject)
-#endif
-
-#ifdef DO_SANITY_CHECKS
-u8 SanityCheckDHCP(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    debug_printf("No interface state handle\r\n");
-    return -1;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    debug_printf("Inconsistent interface state magic value\r\n");
-    return -1;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  /* This next test is strictly speaking not necessary since this piece of memory is allocated when the IFObject struct is defined */
-  /* and the pointer to it should thus not be NULL. */
-  /* However, for possible future implementations where this could be decoupled and initialized seperately, keep the code here */
-  /* but comment out. */
-#if 0
-  if (pDHCPObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-#endif
-
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    debug_printf("Inconsistent DHCP state magic value\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    debug_printf("Interface transmit buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    debug_printf("Interface receive buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  return 0;
-}
-#endif
 
 /*********** DHCP API functions **********/
 
@@ -136,24 +84,15 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
   u8 uLoopIndex;
   struct sDHCPObject *pDHCPObjectPtr;
 
-#ifdef DO_SANITY_CHECKS
-  /* do not call SANE_DHCP macro function since magic values will not yet be set */
-  /* macro guard this check separately */
   if (pIFObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
-#endif
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
-  /* strictly this check not necessary - see comment above */
-#if 0
-#ifdef DO_SANITY_CHECKS
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
-#endif
-#endif
 
   pDHCPObjectPtr->tDHCPCurrentState = INIT;
   
@@ -231,9 +170,23 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
   //int RetVal = -1;
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
 
@@ -337,9 +290,23 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
 u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
   
@@ -363,9 +330,25 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
 u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   switch (uEnable){
     case SM_TRUE:
@@ -399,9 +382,25 @@ u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
 u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   /* stop the state machine */
   vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
@@ -429,9 +428,25 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
 u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   if (stringHostName == NULL){
     return DHCP_RETURN_FAIL;
@@ -493,9 +508,25 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
 int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr->callbackOnMsgBuilt = callback;
   pDHCPObjectPtr->pMsgDataPtr = pDataPtr;
@@ -522,9 +553,25 @@ int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callba
 int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr->callbackOnLeaseAcqd = callback;
   pDHCPObjectPtr->pLeaseDataPtr = pDataPtr;
@@ -552,10 +599,26 @@ int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callb
 u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
+  
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN) == statusCLR){
     return DHCP_RETURN_NOT_ENABLED;
   }
@@ -608,9 +671,6 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
 static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
-
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   /*initialize all statemachine parameters*/
@@ -645,9 +705,6 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
 //=================================================================================
 static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
-
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
@@ -684,9 +741,6 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
   typeDHCPMessage tDHCPMsgType;
   struct sDHCPObject *pDHCPObjectPtr;
-
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
@@ -725,9 +779,6 @@ static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
-
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
   if (pDHCPObjectPtr->uDHCPRandomWait <= 0){
     if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_DHCP_REQIP | 1<<flagDHCP_MSG_DHCP_SVRID | 1<<flagDHCP_MSG_DHCP_REQPARAM | 1<<flagDHCP_MSG_DHCP_VENDID))){
@@ -760,9 +811,6 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
   typeDHCPMessage tDHCPMsgType;
   struct sDHCPObject *pDHCPObjectPtr;
-
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
@@ -813,9 +861,6 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
 
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
-
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   /*  advance the DHCP state machine timer / counter  */
@@ -863,9 +908,6 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
   typeDHCPMessage tDHCPMsgType;
   struct sDHCPObject *pDHCPObjectPtr;
-
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
@@ -918,9 +960,6 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
 static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
   typeDHCPMessage tDHCPMsgType;
   struct sDHCPObject *pDHCPObjectPtr;
-
-  /* cannot currently do SANE_DHCP sanity checks here since this function returns next state */
-  /* could possibly return an error state and handle it */
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
@@ -996,12 +1035,33 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 
   struct sDHCPObject *pDHCPObjectPtr;
 
-  SANE_DHCP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
+  /* check if the object exists */
+  if (pDHCPObjectPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check if the object has been initialised */
+  /* has uDHCPInit been called to initialize dependancies? */
+  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
+    return DHCP_RETURN_FAIL;
+  }
+
   /* simplify ur life */
   pBuffer = pIFObjectPtr->pUserTxBufferPtr;
+
+  if (pBuffer == NULL){
+    return DHCP_RETURN_FAIL;
+  }
 
   uSize = pIFObjectPtr->uUserTxBufferSize;
 
@@ -1258,10 +1318,6 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
 
   struct sDHCPObject *pDHCPObjectPtr;
 
-  /* guard separately - can't call SANE_DHCP() since return value to upper layer */
-  /* API is different (message type). TODO: Could possibly return usual value (DHCP_RETURN_*) and write */
-  /* message type to an address passed into the function as an argument. */
-#ifdef DO_SANITY_CHECKS
   if (pIFObjectPtr == NULL){
     return DHCPERROR;
   }
@@ -1269,35 +1325,26 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
   if (pIFObjectPtr->uIFMagic != IF_MAGIC){
     return DHCPERROR;
   }
-#endif
 
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
-#if 0
-#ifdef DO_SANITY_CHECKS
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCPERROR;
   }
-#endif
-#endif
 
-#ifdef DO_SANITY_CHECKS
   /* check if the object has been initialised */
   /* has uDHCPInit been called to initialize dependancies? */
   if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
     return DHCPERROR;
   }
-#endif
 
   /* simplify your life */
   pBuffer = pIFObjectPtr->pUserRxBufferPtr;
 
-#ifdef DO_SANITY_CHECKS
   if (pBuffer == NULL){
     return DHCPERROR;
   }
-#endif
 
   /* adjust ip base value if ip length greater than 20 bytes */
   uIPLen = (((pBuffer[IP_FRAME_BASE] & 0x0F) * 4) - 20);

@@ -16,41 +16,6 @@
 #include "arp.h"
 #include "print.h"
 
-/*********** Sanity Checks ***************/
-#ifdef DO_SANITY_CHECKS
-#define SANE_ARP(IFobject) if (SanityCheckARP(IFobject)) { return ARP_RETURN_FAIL; }
-#else
-#define SANE_ARP(IFobject)
-#endif
-
-#ifdef DO_SANITY_CHECKS
-u8 SanityCheckARP(struct sIFObject *pIFObjectPtr){
-
-  if (pIFObjectPtr == NULL){
-    debug_printf("No interface state handle\r\n");
-    return -1;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    debug_printf("Inconsistent interface state magic value\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    debug_printf("Interface transmit buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    debug_printf("Interface receive buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  return 0;
-}
-#endif
-
-
 /* ARP Reply Processing */
 u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   u8 *pUserBufferPtr = NULL;
@@ -60,9 +25,18 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   const u8 uReplyOpcode[] = {0x00, 0x02};
   const u8 uRequestOpcode[] = {0x00, 0x01};
 
-  SANE_ARP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return ARP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return ARP_RETURN_FAIL;
+  }
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
+  if (pUserBufferPtr == NULL){
+    return ARP_RETURN_FAIL;
+  }
   
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
     debug_printf("ARP: Ethernet HW Type problem!\n\r");
@@ -122,10 +96,20 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   u16 uSize; 
   u8 uIndex;
 
-  SANE_ARP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return ARP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return ARP_RETURN_FAIL;
+  }
 
   pTxBuffer = pIFObjectPtr->pUserTxBufferPtr;
   pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
+
+  if ((pRxBuffer == NULL) || (pTxBuffer == NULL)){
+    return ARP_RETURN_FAIL;
+  }
 
   uSize = pIFObjectPtr->uUserTxBufferSize;
 

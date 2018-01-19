@@ -6,40 +6,6 @@
 #include "constant_defs.h"
 #include "print.h"
 
-/*********** Sanity Checks ***************/
-#ifdef DO_SANITY_CHECKS
-#define SANE_ICMP(IFobject) if (SanityCheckICMP(IFobject)) { return ICMP_RETURN_FAIL; }
-#else
-#define SANE_ICMP(IFobject)
-#endif
-
-#ifdef DO_SANITY_CHECKS
-u8 SanityCheckICMP(struct sIFObject *pIFObjectPtr){
-
-  if (pIFObjectPtr == NULL){
-    debug_printf("No interface state handle\r\n");
-    return -1;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    debug_printf("Inconsistent interface state magic value\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    debug_printf("Interface transmit buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    debug_printf("Interface receive buffer pointer undefined\r\n");
-    return -1;
-  }
-
-  return 0;
-}
-#endif
-
 /* Can eliminate the following function since these variables will move up to the interface object layer */
 /* No states that need to be maintained - we respond immediately to a request */
 #if 0
@@ -110,7 +76,13 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   u16 uICMPTotalLength = 0;
   int RetVal = -1;
 
-  SANE_ICMP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return ICMP_RETURN_FAIL;
+  }
+
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return ICMP_RETURN_FAIL;
+  }
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
 
@@ -191,11 +163,22 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   u16 uChecksum;
   //int RetVal = (-1);
 
-  SANE_ICMP(pIFObjectPtr);
+  if (pIFObjectPtr == NULL){
+    return ICMP_RETURN_FAIL;
+  }
+
+  /* has uICMPInit been called to initialize dependancies? */
+  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
+    return ICMP_RETURN_FAIL;
+  }
 
   /* simplify ur life */
   pTxBuffer = pIFObjectPtr->pUserTxBufferPtr;
   pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
+
+  if (pTxBuffer == NULL){
+    return ICMP_RETURN_FAIL;
+  }
 
   uSize = pIFObjectPtr->uUserTxBufferSize;
   uIPTotalLength = (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET] << 8) & 0xFF00;

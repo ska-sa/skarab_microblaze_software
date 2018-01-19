@@ -201,7 +201,6 @@ void OneWireWriteBit(u16 uBit,  u16 uOneWirePort)
 	{
 		uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_WIRE_ADDR);
 	}while ((uReg & ONE_WIRE_CTL_CYC_MSK) != 0);
-  /* TODO FIXME possibility of endless loop */
 
 }
 
@@ -244,7 +243,6 @@ u16 OneWireReadBit(u16 uOneWirePort)
 	{
 		uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_WIRE_ADDR);
 	}while ((uReg & ONE_WIRE_CTL_CYC_MSK) != 0);
-  /* TODO FIXME possibility of endless loop */
 
 	 // Return read bit
 	 return (uReg & ONE_WIRE_CTL_DAT_MSK);

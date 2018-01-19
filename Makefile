@@ -13,10 +13,7 @@ VERSION=$(shell git describe --dirty=-uncommitted-changes --always --tags --long
 #Additional build flags
 
 LDFLAGS +=
-
-#Compile in consistency checks?
-CPPFLAGS += -DDO_SANITY_CHECKS
-
+CPPFLAGS +=
 CFLAGS += -DGITVERSION=\"$(VERSION)\" -DGITVERSION_SIZE=$(shell echo -n $(VERSION) | wc -c)
 
 SRCDIR := src/
