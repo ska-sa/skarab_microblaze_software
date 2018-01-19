@@ -25,9 +25,6 @@
 #include "xintc.h"
 #include "xwdttb.h"
 
-#include "mb_interface.h"
-
-
 #include "register.h"
 #include "delay.h"
 #include "eth_mac.h"
@@ -54,13 +51,6 @@
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
 static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData);
-
-void DivByZeroException(void *Data);
-void IBusException(void *Data);
-void DBusException(void *Data);
-void StackViolationException(void *Data);
-void IllegalOpcodeException(void *Data);
-void UnalignedAccessException(void *Data);
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
@@ -187,7 +177,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   /* use macros for now to get rid of potential bugs and compiler warnings since
      the following code indexes the array above the array bounds if all possible
      40gbe i/f are not enabled */
-#if 0
+
 #if NUM_ETHERNET_INTERFACES > 1
     //if 40GbE link 1 is up enable link else disable link
 	if(IFContext[1].uIFLinkStatus == LINK_UP)
@@ -278,7 +268,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 	uFrontPanelLedsValue = u40GbE4_Link_Up <<7 | u40GbE4_Dhcp_En <<6 | u40GbE3_Link_Up <<5 | u40GbE3_Dhcp_En <<4 | u40GbE2_Link_Up<<3 | u40GbE2_Dhcp_En<<2 | u40GbE1_Link_Up<<1 | u40GbE1_Dhcp_En;
 	WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
-#endif
+
 /*  // Flash front panel LEDS until 1GBE has completed DHCP
 	if (uDHCPState[0] != DHCP_STATE_COMPLETE)
 	{
@@ -1370,53 +1360,40 @@ void InitialiseQSFPMezzanineLocation()
 		uMezzanineMask = 0x1 << uQSFPMezzanineLocation;
 		uOneWirePort = uQSFPMezzanineLocation + 0x1;
 
-    debug_printf("[MEZZ %d] ", uQSFPMezzanineLocation);
-
 		// Check if a mezzanine is preset
 		if ((uReg & uMezzanineMask) != 0x0)
 		{
-      debug_printf("PRESENT\r\n");
-
 			// Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board
 			iStatus = OneWireReadRom(uDeviceRom, uOneWirePort);
 
-      debug_printf("[MEZZ %d] MFR:", uQSFPMezzanineLocation); /* manufacturer */
-
 			if (iStatus == XST_SUCCESS)
 			{
-        debug_printf("Peralex\r\n");
-
-        // Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board
 				iStatus = DS2433ReadMem(uDeviceRom, 0x0, uReadBytes, 0x1, 0x0, 0x0, uOneWirePort);
 
-        debug_printf("[MEZZ %d] is ", uQSFPMezzanineLocation);
 				if ((iStatus == XST_SUCCESS)&&(uReadBytes[0] == 0x50)) // Check if read 'P'
 				{
-					debug_printf("a QSFP+ MEZZANINE\r\n", uQSFPMezzanineLocation);
+					xil_printf("Mezzanine %x is a QSFP+ MEZZANINE\r\n", uQSFPMezzanineLocation);
 					uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
 				}
 				else
 				{
-					debug_printf("not a QSFP+ MEZZANINE...[SKIP]\r\n", uQSFPMezzanineLocation);
 					uQSFPMezzanineLocation++;
 				}
 			}
 			else
 			{
-        debug_printf("unknown...[SKIP]\r\n");
 				uQSFPMezzanineLocation++;
 			}
 		}
 		else
 		{
-      debug_printf("NONE...[SKIP]\r\n");
 			uQSFPMezzanineLocation++;
 		}
 
 	}
 
 	if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)
-		error_printf("Failed to find a QSFP+ MEZZANINE!\r\n");
+		xil_printf("Failed to find a QSFP+ MEZZANINE!\r\n");
 }
 
 //=================================================================================
@@ -1565,28 +1542,12 @@ int main()
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
      u32 uTimeout = 0;
-     u32 loop = 0;
 
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
-     u32 *iPtr;
-     u32 uMemTest = 0;
-     //iPtr = 0x50 + 0x0001FFB0 - 0xFFD8; /* read an instruction from text section NB aligned???*/
-     //xil_printf("\r\nI @ %p = %08x\r\n", iPtr, *iPtr);
-
-     /* very crude program memory test */
-     for (iPtr = (u32 *)0x50; iPtr < (u32 *)0x14250; iPtr++){
-       /*print first, middle and last instruction*/
-       if ((iPtr == (u32 *)0x50) || (iPtr == (u32 *)0x1424c) || (iPtr == (u32 *)0xa150)){
-         xil_printf("\r\niPtr @ %p = %08x\r\n", iPtr, *iPtr);
-       }
-        uMemTest = uMemTest + *(iPtr);
-     }
-     xil_printf("\r\nMemTest = %08x\r\n", uMemTest);
-
-	   //Xil_ICacheEnable();
-	   //Xil_DCacheEnable();
+	   Xil_ICacheEnable();
+	   Xil_DCacheEnable();
 
 	   uFrontPanelTimerCounter = 0x0;
 	   uFrontPanelLeds = LED_OFF;
@@ -1611,19 +1572,11 @@ int main()
 	   }
 #endif
 
-#if 0
-     /* debug code to read MSR register - TODO: remove */
-     int k; 
-
-     asm ("mfs %0, rmsr" : "=d" (k));
-     xil_printf("MSR 0x%x\r\n", k);
-#endif
-
-	   xil_printf("\r\n---Entering main---\r\n");
-	   xil_printf("Embedded software version: %d.%d.%d\r\n", EMBEDDED_SOFTWARE_VERSION_MAJOR,
+	   xil_printf("\r\n---Entering main---\n\r");
+	   xil_printf("Embedded software version: %d.%d.%d\n\r", EMBEDDED_SOFTWARE_VERSION_MAJOR,
                                                            EMBEDDED_SOFTWARE_VERSION_MINOR,
                                                            EMBEDDED_SOFTWARE_VERSION_PATCH);
-	   xil_printf("Running ELF version: %s\r\n", VENDOR_ID);
+	   xil_printf("Running ELF version: %s\n\r", VENDOR_ID);
 
 #ifdef DEV_PLATFORM
 	   iStatus = I2CProgramSFPClkOsc();
@@ -1642,8 +1595,6 @@ int main()
 		   Delay(1000);
 #endif
 
-
-#if 0
 	   // Enable the watchdog timer
 	   xil_printf("Initialising the WDT.\r\n");
 
@@ -1670,76 +1621,18 @@ int main()
 	   }
 	   else
 		   xil_printf("Failed to initialise the WDT.\r\n");
-#endif
-
-//#if 0
-     XWdtTb_Config *WatchdogTimerConfig;
-
-
-     /* perhaps move this wdt init to a function to reduce all these nested conditionals -> can return upon failure rather */
-     /* Lookup the WDT configuration */
-     WatchdogTimerConfig = XWdtTb_LookupConfig(XPAR_WDTTB_0_DEVICE_ID);
-     if (WatchdogTimerConfig == NULL){
-        always_printf("[WDT] failed to find wdt config\r\n");
-     } else {
-       always_printf("[WDT] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-       always_printf("[WDT] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-       always_printf("[WDT] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
-
-       /* Initialize the AXI Timebase Watchdog Timer core */
-       iStatus = XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
-       if (iStatus == XST_DEVICE_IS_STARTED){
-         always_printf("[WDT] failed to initialize the wdt since it is already running\r\n");
-
-         /* check the WRS & WDS bits then restart */
-         /* must check this before next stop/re-configure cycle */
-         if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-           always_printf("[WDT] previous reset was a result of a watchdog timeout!\r\n");
-         }
-
-         iStatus = XWdtTb_Stop(&WatchdogTimer);
-         if (iStatus == XST_NO_FEATURE){
-           always_printf("[WDT] the watchdog timer cannot be stopped, possibly due to 'enable-once' setting\r\n");
-         } else if (iStatus == XST_SUCCESS){
-           always_printf("[WDT] watchdog stopped\r\n");
-           XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
-         }
-
-         //XWdtTb_RestartWdt(& WatchdogTimer);
-         XWdtTb_Start(&WatchdogTimer);
-         always_printf("[WDT] restart watchdog timer!\r\n");
-       } else {
-         if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-           always_printf("[WDT] previous reset was a result of a watchdog timeout!\r\n");
-         }
-         /* perform a wdt self-test to ensure the timebase is incrementing */
-         iStatus = XWdtTb_SelfTest(&WatchdogTimer);
-         if (iStatus != XST_SUCCESS){
-           always_printf("[WDT] self-test failed\n\r");
-         } else {
-           /* finally, start the watchdog. The timebase automatically reset*/
-           XWdtTb_Start(&WatchdogTimer);
-           always_printf("[WDT] starting the watchdog timer...\r\n");
-         }
-       }
-     }
-
-     /* read wdt registers after setup */
-     always_printf("[WDT] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TWCSR0_OFFSET));
-     always_printf("[WDT] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TBR_OFFSET));
-//#endif
-
 
 	   FinishedBootingFromSdram();
 
 	   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
 	   UpdateGBEPHYConfiguration();
 
-	  error_printf("[INIT] Waiting for 1GBE SGMII to come out of reset ");
+	   xil_printf("Waiting for 1GBE SGMII to come out of reset");
+
 
 #define SGMII_1GBE_TIMEOUT 2000000  /* tweaked by experimentation -> about 3 - 4 seconds */
      /* max value determined by watchdog timer */
-     /* try to continue before watchdog timer overflows */
+     /* try to contiune before watchdog timer overflows */
      /* TODO: verify any later dependancies linked to this initialization */
 
      uTimeout = 0;
@@ -1752,26 +1645,12 @@ int main()
        uTimeout++;
 	   }while(((uReadReg & 0x1) != 0x1) && (uTimeout < SGMII_1GBE_TIMEOUT));
 
-     /* if we haven't FAILED or TIMED OUT then we're OK */
-     error_printf("%s", ((uReadReg & 0x1) != 0x1) ? "[FAILED]" : uTimeout >= SGMII_1GBE_TIMEOUT ? "[TIMED OUT]" : "[OK]");
-     error_printf("\r\n"); /* for formatting */
+     debug_printf("%s\n\r", ((uReadReg & 0x1) != 0x1) ? "[FAILED]" : " [OK]");
 
-
-     error_printf("[INIT] Interrupts, exceptions and timers ");
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
 	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
-     microblaze_enable_exceptions();
-     error_printf("[DONE]\r\n");
 
-     error_printf("[INIT] Mezzanine locations\r\n");
 	   InitialiseQSFPMezzanineLocation();
 
-     error_printf("[INIT] Interface parameters\r\n");
 	   InitialiseEthernetInterfaceParameters();
 
      /* set bit#1 in C_WR_BRD_CTL_STAT_1_ADDR to 1 to connect 40gbe to user fabric */
@@ -1841,21 +1720,6 @@ int main()
 
      }
 
-#if 0
-     /* debug code to read MSR register - TODO: remove */
-     asm ("mfs %0, rmsr" : "=d" (k));
-     xil_printf("MSR 0x%x\r\n", k);
-
-     volatile int foo = 8;
-     volatile int bar = 0;
-     volatile int z;
-
-     z = 8 / 0;
-     z++;
-     xil_printf("PRINTING z: %d\n\r", z);
-#endif
-
-     //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
 	   while(1)
 	   {
 		   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)
@@ -2346,18 +2210,13 @@ int main()
 
       }
 
-      /* to test the watchdog timer - uncomment the following */
-      /***************/
-      //while(1);
-      /***************/
-
       // Pat the watchdog
       XWdtTb_RestartWdt(& WatchdogTimer);
      }
 
      xil_printf("---Exiting main---\n\r");
-     //Xil_DCacheDisable();
-     //Xil_ICacheDisable();
+     Xil_DCacheDisable();
+     Xil_ICacheDisable();
      return 0;
 }
 
@@ -2511,29 +2370,4 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
   EnableFabricInterface(id, 1);
   uFlagRunTask_LLDP = 1;
   return 0;
-}
-
-/* TODO: act upon these exceptions */
-void DivByZeroException(void *Data){
-  xil_printf("Divide by zero exception\n\r");
-}
-
-void IBusException(void *Data){
-  xil_printf("Instruction AXI bus exception\n\r");
-}
-
-void DBusException(void *Data){
-  xil_printf("Data AXI bus exception\n\r");
-}
-
-void StackViolationException(void *Data){
-  xil_printf("Stack violation exception\n\r");
-}
-
-void IllegalOpcodeException(void *Data){
-  xil_printf("Illegal opcode exception\n\r");
-}
-
-void UnalignedAccessException(void *Data){
-  xil_printf("Unaligned data access exception\n\r");
 }

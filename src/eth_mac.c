@@ -264,7 +264,6 @@ void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper
 {
 	u32 uAddressOffset = GetAddressOffset(uId);
 
-  //trace_printf("Program ARP cache...\r\n");
 	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
 	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*((2 * uIPAddressLower8Bits) + 1)), uMACAddressLower32Bits);
 
