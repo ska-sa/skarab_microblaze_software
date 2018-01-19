@@ -2352,8 +2352,6 @@ int main()
           }
         }
         if (uOKToReboot == 1){
-          /* just wait a little while to enable serial port to finish writing out */
-          Delay(100000); /* 100ms */
           IcapeControllerInSystemReconfiguration();
         }
 
