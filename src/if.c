@@ -58,16 +58,6 @@ u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffe
     /* FIXME: possible buffer overrun if user issues smaller array - rather use string logic */
   }
 
-  for (uLoopIndex = 0; uLoopIndex < 16; uLoopIndex++){
-    pIFObjectPtr->stringIFAddrIP[uLoopIndex] = '\0';
-    pIFObjectPtr->stringIFAddrNetmask[uLoopIndex] = '\0';
-  }
-
-  for (uLoopIndex = 0; uLoopIndex < 4; uLoopIndex++){
-    pIFObjectPtr->arrIFAddrIP[uLoopIndex] = 0;
-    pIFObjectPtr->arrIFAddrNetmask[uLoopIndex] = 0;
-  }
-
   if (uDHCPInit(pIFObjectPtr) != DHCP_RETURN_OK){
     return IF_RETURN_FAIL;
   }

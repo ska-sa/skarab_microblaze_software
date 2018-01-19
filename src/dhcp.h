@@ -94,7 +94,6 @@
 #define POLL_INTERVAL 100       /* polling interval, in msecs. ie interval at which state machine is invoked - user defined */
 #define DHCP_SM_WAIT  50        /* wait a prerequisite amount of time before starting dhcp. */
                                 /* -> times by POLL_INTERVAL to get milli-seconds value */
-                                /* NOTE: must be smaller than DHCP_SM_INTERVAL */
 
 /* 14 [eth] + 20 [ip] + 8 [udp] + 236 [bootp] + 312 [min dhcp option length - rfc 2131, pg. 10] */
 #define DHCP_MIN_BUFFER_SIZE  590  /*FIXME*/

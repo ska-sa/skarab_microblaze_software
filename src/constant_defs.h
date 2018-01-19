@@ -116,8 +116,6 @@ volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
 volatile u8 uIGMPSendMessage[NUM_ETHERNET_INTERFACES];
 volatile u8 uCurrentIGMPMessage[NUM_ETHERNET_INTERFACES];
 
-volatile u32 uPrintStatsCounter;
-
 volatile u8 uDoReboot;
 
 volatile u8 uQSFPMezzanineLocation;
