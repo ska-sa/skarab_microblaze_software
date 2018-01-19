@@ -197,7 +197,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   /* use macros for now to get rid of potential bugs and compiler warnings since
      the following code indexes the array above the array bounds if all possible
      40gbe i/f are not enabled */
-
+#if 0
 #if NUM_ETHERNET_INTERFACES > 1
     //if 40GbE link 1 is up enable link else disable link
 	if(IFContext[1].uIFLinkStatus == LINK_UP)
@@ -288,7 +288,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 	uFrontPanelLedsValue = u40GbE4_Link_Up <<7 | u40GbE4_Dhcp_En <<6 | u40GbE3_Link_Up <<5 | u40GbE3_Dhcp_En <<4 | u40GbE2_Link_Up<<3 | u40GbE2_Dhcp_En<<2 | u40GbE1_Link_Up<<1 | u40GbE1_Dhcp_En;
 	WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
-
+#endif
 /*  // Flash front panel LEDS until 1GBE has completed DHCP
 	if (uDHCPState[0] != DHCP_STATE_COMPLETE)
 	{
@@ -1580,8 +1580,6 @@ int main()
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
-     u32 uKeepAliveReg;
-
      u32 *iPtr;
      u32 uMemTest = 0;
 
@@ -2378,20 +2376,7 @@ int main()
       //while(1);
       /***************/
 
-      // Pat the watchdogs
-
-      /* Firmware watchdog */
-      /* Read register */
-      uKeepAliveReg = ReadBoardRegister(C_RD_UBLAZE_ALIVE_ADDR);
-
-      /* Set the bit in register */
-      uKeepAliveReg = uKeepAliveReg | 0x1;
-
-      /* Write back to the register */
-      WriteBoardRegister(C_WR_UBLAZE_ALIVE_ADDR, uKeepAliveReg);
-
-
-      /* Microblaze watchdog */
+      // Pat the watchdog
       XWdtTb_RestartWdt(& WatchdogTimer);
      }
 

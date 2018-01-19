@@ -187,18 +187,14 @@ volatile u16 uPreviousSequenceNumber;
 #define C_RD_USB_STAT_ADDR         0x14
 #define C_RD_FPGA_DNA_LOW_ADDR     0x1C
 #define C_RD_FPGA_DNA_HIGH_ADDR    0x20
-#define C_RD_XADC_STATUS_ADDR      0x24
-#define C_RD_XADC_LATCHED_ADDR     0x28
-#define C_RD_UBLAZE_ALIVE_ADDR     0x2C
 
 // WRITE REGISTERS
-#define C_WR_BRD_CTL_STAT_0_ADDR        0x4
-#define C_WR_LOOPBACK_ADDR              0x8
-#define C_WR_ETH_IF_CTL_ADDR            0xC
-#define C_WR_MEZZANINE_CTL_ADDR         0x10
-#define C_WR_FRONT_PANEL_STAT_LED_ADDR  0x14
-#define C_WR_BRD_CTL_STAT_1_ADDR        0x18
-#define C_WR_UBLAZE_ALIVE_ADDR          0x2C
+#define C_WR_BRD_CTL_STAT_0_ADDR   		0x4
+#define C_WR_LOOPBACK_ADDR         		0x8
+#define C_WR_ETH_IF_CTL_ADDR   			0xC
+#define C_WR_MEZZANINE_CTL_ADDR			0x10
+#define C_WR_FRONT_PANEL_STAT_LED_ADDR	0x14
+#define C_WR_BRD_CTL_STAT_1_ADDR   		0x18
 
 // DSP REGISTER ADDRESSES
 
