@@ -43,7 +43,7 @@ OBJ := $(SRC:.c=.o)
 #microblaze cpu specific
 MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul
 #common flags
-CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
+CFLAGS += -Wall -Wl,--no-relax 
 #optimization flags
 #CFLAGS += -Os
 CFLAGS += -O2

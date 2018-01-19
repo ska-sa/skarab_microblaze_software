@@ -388,8 +388,6 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 	u32 uIndex = 0x0;
 	u32 uAddressOffset = GetAddressOffset(uId);
 	//u32 uReg;
-  u8 uPaddingWords = 0;
-  u32 uPaddingIndex = 0;
 
 	// Must be a multiple of 64 bits
 	if ((uNumWords % 2) != 0x0)
@@ -397,11 +395,6 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uNumWords);
 		return XST_FAILURE;
 	}
-
-  if (uNumWords < 16){
-    uPaddingWords = (16 - uNumWords);
-    xil_printf("TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", (uPaddingWords * 4) /* bytes */ );
-  }
 
 	// Check that the transmit buffer is ready for a packet
 	do
@@ -425,16 +418,8 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
 	}
 
-  // Write padding words (zero) to FIFO
-  if (uPaddingWords != 0){
-    for (uPaddingIndex = uIndex; uPaddingIndex < (uNumWords + uPaddingWords); uPaddingIndex++)
-    {
-      Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uPaddingIndex, 0);
-    }
-  }
-
 	// Program the packet size into buffer level register to trigger start of packet transmission
-	SetHostTransmitBufferLevel(uId, uNumWords + uPaddingWords);
+	SetHostTransmitBufferLevel(uId, uNumWords);
 
 	// Wait for the packet to be transmitted
 	do
