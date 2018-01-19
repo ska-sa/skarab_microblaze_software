@@ -1583,10 +1583,6 @@ int main()
      u32 *iPtr;
      u32 uMemTest = 0;
 
-#ifdef TIME_PROFILE
-     u32 time1 = 0, time2 = 0;
-#endif
-
      /* very crude program memory test */
      for (iPtr = (u32 *)0x50; iPtr <= (u32 *) &_text_section_end_; iPtr++){
        /*print first, middle and last instruction*/
@@ -1902,9 +1898,7 @@ int main()
             if (iStatus != XST_SUCCESS){
               error_printf("Read Host Packet Error!\n\r");
             } else {
-#ifdef TIME_PROFILE
-              time1 = XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET);
-#endif
+
               trace_printf("Read %d words in host packet!\n\r", uNumWords);
               pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
 
@@ -2143,9 +2137,6 @@ int main()
 
           if (iStatus == XST_SUCCESS){
             // Send the response packet now
-#ifdef TIME_PROFILE
-            time2 = XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET);
-#endif
             uResponsePacketLength = (uResponsePacketLength >> 2);
             iStatus = TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
             if (iStatus != XST_SUCCESS){
@@ -2153,9 +2144,6 @@ int main()
             } else {
               IFContext[uEthernetId].uTxUdpCtrlOk++;
             }
-#ifdef TIME_PROFILE
-            xil_printf("time2 %08x - time1 %08x = %08x\r\n", time2, time1, time2 - time1);
-#endif
           }
 
           uFlagRunTask_CTRL[uEthernetId] = 0;
