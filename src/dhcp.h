@@ -18,9 +18,6 @@
 /* Xilinx lib includes */
 #include <xstatus.h>
 
-#include "eth.h"
-#include "ipv4.h"
-
 /* link custom return values */
 #define DHCP_RETURN_OK            XST_SUCCESS
 #define DHCP_RETURN_FAIL          XST_FAILURE
@@ -45,6 +42,39 @@
 #endif
 
 /* dhcp packet offsets */
+#define ETH_FRAME_BASE              0
+#define ETH_DST_OFFSET              0
+#define ETH_DST_LEN                 6
+#define ETH_SRC_OFFSET              (ETH_DST_OFFSET + ETH_DST_LEN)  //6
+#define ETH_SRC_LEN                 6
+#define ETH_FRAME_TYPE_OFFSET       (ETH_SRC_OFFSET + ETH_SRC_LEN)  //12
+#define ETH_FRAME_TYPE_LEN          2
+
+#define ETH_FRAME_TOTAL_LEN         (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN)  /* ethernet length = 14 */
+
+#define IP_FRAME_BASE               (ETH_FRAME_BASE + ETH_FRAME_TOTAL_LEN)
+#define IP_V_HIL_OFFSET             0
+#define IP_V_HIL_LEN                1
+#define IP_TOS_OFFSET               (IP_V_HIL_OFFSET + IP_V_HIL_LEN)  //1
+#define IP_TOS_LEN                  1
+#define IP_TLEN_OFFSET              (IP_TOS_OFFSET + IP_TOS_LEN)  //2
+#define IP_TLEN_LEN                 2
+#define IP_ID_OFFSET                (IP_TLEN_OFFSET + IP_TLEN_LEN) //4
+#define IP_ID_LEN                   2
+#define IP_FLAG_FRAG_OFFSET         (IP_ID_OFFSET + IP_ID_LEN) //6
+#define IP_FLAG_FRAG_LEN            2
+#define IP_TTL_OFFSET               (IP_FLAG_FRAG_OFFSET + IP_FLAG_FRAG_LEN) //8 
+#define IP_TTL_LEN                  1 
+#define IP_PROT_OFFSET              (IP_TTL_OFFSET + IP_TTL_LEN) //9
+#define IP_PROT_LEN                 1 
+#define IP_CHKSM_OFFSET             (IP_PROT_OFFSET + IP_PROT_LEN) //10
+#define IP_CHKSM_LEN                2
+#define IP_SRC_OFFSET               (IP_CHKSM_OFFSET + IP_CHKSM_LEN)//12
+#define IP_SRC_LEN                  4
+#define IP_DST_OFFSET               (IP_SRC_OFFSET + IP_SRC_LEN)//16
+#define IP_DST_LEN                  4
+
+#define IP_FRAME_TOTAL_LEN          (IP_DST_OFFSET + IP_DST_LEN)  /* ip length = 20 */
 
 #define UDP_FRAME_BASE              (IP_FRAME_BASE + IP_FRAME_TOTAL_LEN) //34 
 #define UDP_SRC_PORT_OFFSET         0
