@@ -13,12 +13,8 @@
 *------------------------------------------------------------------------------*/
 
 #include <xil_types.h>
-#include <xenv_standalone.h>
 
 #include "net_utils.h"
-#include "eth.h"
-#include "ipv4.h"
-#include "dhcp.h"
 
 //=================================================================================
 //  uChecksum16Calc
@@ -91,67 +87,6 @@ int uChecksum16Calc(u8 *pDataPtr, u16 uIndexStart, u16 uIndexEnd, u16 *pChecksum
   return 0;
 }
 
-//***********************************************************************************
-/* TODO: function description */
-//***********************************************************************************
-
-int uUDPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr){
-  u8 uPseudoHdr[12] = {0};
-  u8 uIPLenAdjust = 0;
-  u16 uCheckTemp = 0;
-  u16 uUDPLength = 0;
-
-  uIPLenAdjust = (((pDataPtr[IP_FRAME_BASE] & 0x0F) * 4) - 20);
-  if (uIPLenAdjust > 40){
-    return (-1);
-  }
-
-  /* build the pseudo IP header for UDP checksum calculation */
-  memcpy(&(uPseudoHdr[0]), pDataPtr + IP_FRAME_BASE + IP_SRC_OFFSET, 4);
-  memcpy(&(uPseudoHdr[4]), pDataPtr + IP_FRAME_BASE + IP_DST_OFFSET, 4);
-  uPseudoHdr[8] = 0;
-  uPseudoHdr[9] = pDataPtr[IP_FRAME_BASE + IP_PROT_OFFSET];
-  memcpy(&(uPseudoHdr[10]), pDataPtr + uIPLenAdjust + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
-
-  if(uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0)){
-    return (-1);
-  }
-
-  uUDPLength = (pDataPtr[uIPLenAdjust + UDP_FRAME_BASE + UDP_ULEN_OFFSET] << 8) & 0xFF00;
-  uUDPLength |= ((pDataPtr[uIPLenAdjust + UDP_FRAME_BASE + UDP_ULEN_OFFSET + 1] ) & 0x00FF);
-
-  /* UDP checksum validation*/
-  if(uChecksum16Calc(pDataPtr, uIPLenAdjust + UDP_FRAME_BASE, uIPLenAdjust + UDP_FRAME_BASE + uUDPLength - 1, &uCheckTemp, 0, uCheckTemp)){
-    return (-1);
-  }
-
-  *pChecksumPtr = uCheckTemp;
-
-  return 0;
-
-}
-
-//***********************************************************************************
-/* TODO: function description */
-//***********************************************************************************
-
-int uIPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr){
-  u8 uIPLenAdjust = 0;
-  u16 uCheckTemp = 0;
-
-  uIPLenAdjust = (((pDataPtr[IP_FRAME_BASE] & 0x0F) * 4) - 20);
-  if (uIPLenAdjust > 40){
-    return (-1);
-  }
-
-  if(uChecksum16Calc(pDataPtr, IP_FRAME_BASE, UDP_FRAME_BASE + uIPLenAdjust - 1, &uCheckTemp, 0, 0)){
-    return (-1);
-  }
-
-  *pChecksumPtr = uCheckTemp;
-
-  return 0;
-}
 
 //=================================================================================
 //  uIPV4_ntoa

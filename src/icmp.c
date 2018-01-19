@@ -97,7 +97,6 @@ u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
     return ICMP_RETURN_INVALID;
   }
 
-#if 0 /* NOW HANDLED BY LOWER LAYER */
   /* IP checksum validation*/
   RetVal = uChecksum16Calc(pUserBufferPtr, IP_FRAME_BASE, IP_FRAME_BASE + IP_FRAME_TOTAL_LEN + uIPLenAdjust - 1, &uCheckTemp, 0, 0);
   if(RetVal){
@@ -108,7 +107,6 @@ u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr){
     xil_printf("ICMP: ECHO REQ - IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
-#endif
 
   /* ICMP total length = IP payload length = IP total length - IP Header length */
   uICMPTotalLength = (pUserBufferPtr[IP_FRAME_BASE + IP_TLEN_OFFSET] << 8) & 0xFF00;

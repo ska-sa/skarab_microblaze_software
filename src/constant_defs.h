@@ -48,13 +48,8 @@
 #ifndef HOSTNAME
 #define HOSTNAME                   "skarab"
 #endif
-
-//uncomment relevant print output level
-//macro logic in print.h
-//#define ERROR_PRINT
-//#define WARN_PRINT
-//#define INFO_PRINT
 #define DEBUG_PRINT
+//uncomment if you want to see more debug output
 //#define TRACE_PRINT
 
 //#define DO_40GBE_LOOPBACK_TEST
