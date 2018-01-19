@@ -180,7 +180,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #if NUM_ETHERNET_INTERFACES > 1
     //if 40GbE link 1 is up enable link else disable link
-	if(IFContext[1].uIFLinkStatus == LINK_UP)
+	if(uEthernetLinkUp[1] == LINK_UP)
 	{
 		u40GbE1_Link_Up = 0x01;
 		//if 40GbE DHCP is complete then set true else false
@@ -202,7 +202,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #if NUM_ETHERNET_INTERFACES > 2
     //if 40GbE link 2 is up enable link else disable link
-	if(IFContext[2].uIFLinkStatus == LINK_UP)
+	if(uEthernetLinkUp[2] == LINK_UP)
 	{
 		u40GbE2_Link_Up = 0x01;
 		//if 40GbE DHCP is complete then set true else false
@@ -224,7 +224,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #if NUM_ETHERNET_INTERFACES > 3
     //if 40GbE link 3 is up enable link else disable link
-	if(IFContext[3].uIFLinkStatus == LINK_UP)
+	if(uEthernetLinkUp[3] == LINK_UP)
 	{
 		u40GbE3_Link_Up = 0x01;
 		//if 40GbE DHCP is complete then set true else false
@@ -246,7 +246,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #if NUM_ETHERNET_INTERFACES > 4
     //if 40GbE link 4 is up enable link else disable link
-	if(IFContext[4].uIFLinkStatus == LINK_UP)
+	if(uEthernetLinkUp[4] == LINK_UP)
 	{
 		u40GbE4_Link_Up = 0x01;
 		//if 40GbE DHCP is complete then set true else false
@@ -628,28 +628,23 @@ void ArpRequestHandler()
 //	checked for received messages if it is not up. When the Ethernet link comes up,
 //	the ARP packet requests are enabled to populate the ARP cache.
 //
-//	Parameter	      Dir   Description
-//	---------       ---   -----------
-//	pIFObjectPtr		IN    handle to IF State Object
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	uId			IN		ID of selected Ethernet interface
 //
 //	Return
 //	------
 //	None
 //=================================================================================
-void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
+void UpdateEthernetLinkUpStatus(u8 uId){
   u32 uReg, uMask;
-  u8 uId;
-
-  /* TODO: pIFObjectPtr sanity checks */
-
-  uId = pIFObjectPtr->uIFEthernetId;
 
   uReg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
   uMask = 1 << uId;
 
   if ((uReg & uMask) != LINK_DOWN){
     // Check if the link was previously down
-    if (pIFObjectPtr->uIFLinkStatus == LINK_DOWN){
+    if (uEthernetLinkUp[uId] == LINK_DOWN){
       xil_printf("LINK %x HAS COME UP!\r\n",uId);
  
       if (uId == 0){  /* 1gbe i/f */
@@ -667,10 +662,10 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
       }
     }
 
-    pIFObjectPtr->uIFLinkStatus = LINK_UP;
+    uEthernetLinkUp[uId] = LINK_UP;
   } else {
     // Check if the link was previously up
-    if (pIFObjectPtr->uIFLinkStatus == LINK_UP){
+    if (uEthernetLinkUp[uId] == LINK_UP){
       xil_printf("LINK %x HAS GONE DOWN!\r\n", uId);
 
       if (uId == 0){  /* 1gbe i/f */
@@ -692,7 +687,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
       }
     }
 
-    pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
+    uEthernetLinkUp[uId] = LINK_DOWN;
     uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
@@ -1141,7 +1136,7 @@ void InitialiseEthernetInterfaceParameters()
 	for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++)
 	{
 		uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
-		//uEthernetLinkUp[uId] = LINK_DOWN;
+		uEthernetLinkUp[uId] = LINK_DOWN;
 		uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
 		uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
 		uEthernetSubnet[uId] = ETHERNET_FABRIC_SUBNET;
@@ -1697,9 +1692,9 @@ int main()
 
 		   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
 		   {
-			   UpdateEthernetLinkUpStatus(&(IFContext[uEthernetId]));
+			   UpdateEthernetLinkUpStatus(uEthernetId);
 
-			   if (IFContext[uEthernetId].uIFLinkStatus == LINK_UP)
+			   if (uEthernetLinkUp[uEthernetId] == LINK_UP)
          {
 					uNumWords = GetHostReceiveBufferLevel(uEthernetId);
 					if (uNumWords != 0)
@@ -2138,7 +2133,7 @@ int main()
                                             IFContext[uEthernetId].uTxUdpDhcpOk + IFContext[uEthernetId].uTxUdpCtrlOk;
 
           debug_printf("IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\n\r", uEthernetId,
-                                                                        IFContext[uEthernetId].uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
+                                                                        uEthernetLinkUp[uEthernetId] == LINK_UP ? "UP" : "DOWN" /* TODO: remove this global variable */,
                                                                         IFContext[uEthernetId].stringIFAddrIP,
                                                                         IFContext[uEthernetId].stringIFAddrNetmask);
           debug_printf(" Rx Total:        %10d | Tx Total:     %10d\n\r", IFContext[uEthernetId].uRxTotal            , IFContext[uEthernetId].uTxTotal);
@@ -2236,10 +2231,10 @@ static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
   uReturnValue = TransmitHostPacket(uLocalEthernetId, (u32 *) pLocalBuffer, uLocalSize);
   if (uReturnValue == XST_SUCCESS){
     info_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\n\r", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
-    pIFObjectPtr->uTxUdpDhcpOk++;
+    IFContext[uLocalEthernetId].uTxUdpDhcpOk++;
   } else {
     error_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\n\r", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
-    pIFObjectPtr->uTxUdpDhcpErr++;
+    IFContext[uLocalEthernetId].uTxUdpDhcpErr++;
   }
 
   return uReturnValue;
@@ -2311,10 +2306,11 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 #endif
 
   uEthernetFabricIPAddress[id] = ip;
+  /* TODO FIXME */
 
   /* Cache the ip and netmask in the IF Object layer */
-  memcpy(pIFObjectPtr->arrIFAddrIP, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
-  memcpy(pIFObjectPtr->arrIFAddrNetmask, pDHCPObjectPtr->arrDHCPAddrSubnetMask, 4);
+  memcpy(IFContext[id].arrIFAddrIP, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
+  memcpy(IFContext[id].arrIFAddrNetmask, pDHCPObjectPtr->arrDHCPAddrSubnetMask, 4);
 
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
   uEthernetSubnet[id] = (ip & netmask);

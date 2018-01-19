@@ -73,8 +73,6 @@ u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffe
   }
 
   pIFObjectPtr->uIFEthernetId = uEthernetId;
-  pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
-
   pIFObjectPtr->uMsgSize = 0;
   pIFObjectPtr->uNumWordsRead = 0;
 
