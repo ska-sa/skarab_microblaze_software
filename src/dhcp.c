@@ -23,24 +23,20 @@
 
 /* local includes */
 #include "dhcp.h"
-#include "eth.h"
-#include "ipv4.h"
-#include "udp.h"
 #include "net_utils.h"
-#include "if.h"
 
 /* Local function prototypes  */
-static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr);
-static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr);
+static typeDHCPState init_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState randomize_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState select_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState wait_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState request_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState bound_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState renew_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
+static typeDHCPState rebind_dhcp_state(struct sDHCPObject *pDHCPObjectPtr);
 
-static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags);
-static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr);
+static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags);
+static typeDHCPMessage tDHCPProcessMsg(struct sDHCPObject *pDHCPObjectPtr);
 
 static u32 uDHCPRandomNumber(u32 uSeed);
 
@@ -70,29 +66,54 @@ static dhcp_state_func_ptr dhcp_state_table[] = {
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  pRxBufferPtr    IN    ptr to user supplied rx buffer which will contain rx dhcp packet
 //  uRxBufferSize   IN    size of the user specified rx buffer
 //  pTxBufferPtr    OUT   ptr to user supplied tx buffer where dhcp message will be "built up"
 //  uRxBufferSize   IN    size of the user specified tx buffer
+//  arrUserMacAddr  IN    ptr to byte array containing the 6 octets of the hardware mac address
 //
 //  Return
 //  ------
 // DHCP_RETURN_OK or DHCP_RETURN_FAIL 
 //=================================================================================
-u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
+u8 uDHCPInit(struct sDHCPObject *pDHCPObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr){
   u8 uLoopIndex;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
+
+  if (pRxBufferPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (pTxBufferPtr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if ( arrUserMacAddr == NULL){
+    return DHCP_RETURN_FAIL;
+  }
+
+  /* check that user supplied a reasonable amount of buffer space */
+  if (uRxBufferSize < DHCP_MIN_BUFFER_SIZE){
+    return DHCP_RETURN_FAIL;
+  }
+
+  if (uTxBufferSize < DHCP_MIN_BUFFER_SIZE){
+    return DHCP_RETURN_FAIL;
+  }
+
+  pDHCPObjectPtr->pUserRxBufferPtr = pRxBufferPtr;
+  pDHCPObjectPtr->uUserRxBufferSize = uRxBufferSize;
+
+  pDHCPObjectPtr->pUserTxBufferPtr = pRxBufferPtr;
+  pDHCPObjectPtr->uUserTxBufferSize = uTxBufferSize;
+
+  memset(pTxBufferPtr, 0x0, (size_t) uTxBufferSize);
+
+  pDHCPObjectPtr->uDHCPMsgSize = 0;
 
   pDHCPObjectPtr->tDHCPCurrentState = INIT;
   
@@ -118,6 +139,8 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
 
   for (uLoopIndex = 0; uLoopIndex < 6; uLoopIndex++){
     pDHCPObjectPtr->arrDHCPNextHopMacCached[uLoopIndex] = 0xff;
+    /* FIXME: possible buffer overrun if user issues smaller array - rather use string logic */
+    pDHCPObjectPtr->arrDHCPEthMacCached[uLoopIndex] = arrUserMacAddr[uLoopIndex];
   }
 
   for (uLoopIndex = 0; uLoopIndex < 4; uLoopIndex++){
@@ -152,33 +175,22 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL or DHCP_RETURN_INVALID
 //=================================================================================
-u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
-  //u8 uBootpPort[] = {0x00, 0x44};
+u8 uDHCPMessageValidate(struct sDHCPObject *pDHCPObjectPtr){
+  u8 uBootpPort[] = {0x00, 0x44};
   u8 arrDHCPCookie[] = {0x63, 0x82, 0x53, 0x63};
   u8 uIPLen;
   u8 uIndex;
   u8 *pUserBufferPtr;
-  //u16 uCheckTemp = 0;
-  //u8 uPseudoHdr[12] = {0};
-  //u16 uUDPLength = 0;
-  //int RetVal = -1;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+  u16 uCheckTemp = 0;
+  u8 uPseudoHdr[12] = {0};
+  u16 uUDPLength = 0;
+  int RetVal = -1;
 
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -188,7 +200,7 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
     return DHCP_RETURN_FAIL;
   }
 
-  pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
+  pUserBufferPtr = pDHCPObjectPtr->pUserRxBufferPtr;
 
   /* TODO: check for buffer overruns */
 
@@ -281,33 +293,18 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+u8 uDHCPSetGotMsgFlag(struct sDHCPObject *pDHCPObjectPtr){
+  /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
-
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
+  
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
   
   return DHCP_RETURN_OK;
@@ -320,26 +317,14 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  uEnable         IN    set to SM_TRUE or SM_FALSE
 //
 //  Return
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+u8 uDHCPSetStateMachineEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable){
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -373,41 +358,22 @@ u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+void vDHCPStateMachineReset(struct sDHCPObject *pDHCPObjectPtr){
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  /* check if the object has been initialised */
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    return DHCP_RETURN_FAIL;
+    return;
   }
 
   /* stop the state machine */
   vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
   /* reset internal state */
   pDHCPObjectPtr->tDHCPCurrentState = INIT;
-
-  return DHCP_RETURN_OK;
 }
 
 //=================================================================================
@@ -417,7 +383,7 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  stringHostName  IN    pointer to host name string. Limited to HOST_NAME_MAX_SIZE.
 //
 //  Return
@@ -425,37 +391,21 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
 /* this function only copies a max of HOST_NAME_MAX_SIZE characters */
-u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+u8 vDHCPSetHostName(struct sDHCPObject *pDHCPObjectPtr, const char *stringHostName){
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
-
   /* check if the object has been initialised */
   if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
     return DHCP_RETURN_FAIL;
   }
-
   if (stringHostName == NULL){
     return DHCP_RETURN_FAIL;
   }
-
   if (!strncpy((char *) pDHCPObjectPtr->arrDHCPHostName, stringHostName, HOST_NAME_MAX_SIZE)){
     return DHCP_RETURN_FAIL;
   }
-
   pDHCPObjectPtr->arrDHCPHostName[HOST_NAME_MAX_SIZE - 1] = '\0'; /* terminate safely */
   vDHCPAuxSetFlag( (u8 *) &(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_MSG_REQ_HOST_NAME);
 
@@ -497,7 +447,7 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  callback        IN    function pointer of type defined form tcallUserFunction
 //  pDataPtr        IN    pointer to a data object to be passed to the callback
 //
@@ -505,19 +455,7 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+int eventDHCPOnMsgBuilt(struct sDHCPObject *pDHCPObjectPtr, tcallUserFunction callback, void *pDataPtr){
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -542,7 +480,7 @@ int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callba
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  callback        IN    function pointer of type defined form tcallUserFunction
 //  pDataPtr        IN    pointer to a data object to be passed to the callback
 //
@@ -550,19 +488,7 @@ int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callba
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+int eventDHCPOnLeaseAcqd(struct sDHCPObject *pDHCPObjectPtr, tcallUserFunction callback, void *pDataPtr){
   /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
@@ -590,35 +516,22 @@ int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callb
 //
 //  Parameter	      Dir     Description
 //  ---------	      ---	    -----------
-//  pIFObjectPtr    IN      handle to IF state object
+//  pDHCPObjectPtr  IN      handle to DHCP state object
 //
 //  Return
 //  ------
 //  DHCP_RETURN_OK, DHCP_RETURN_FAIL or DHCP_RETURN_NOT_ENABLED
 //=================================================================================
-u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  /* check if the object exists */
+u8 uDHCPStateMachine(struct sDHCPObject *pDHCPObjectPtr){
+  
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
 
-  /* check if the object has been initialised */
   if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
     return DHCP_RETURN_FAIL;
   }
-  
+
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN) == statusCLR){
     return DHCP_RETURN_NOT_ENABLED;
   }
@@ -648,7 +561,7 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
   }
 
   /* do the work */
-  pDHCPObjectPtr->tDHCPCurrentState = dhcp_state_table[pDHCPObjectPtr->tDHCPCurrentState](pIFObjectPtr);
+  pDHCPObjectPtr->tDHCPCurrentState = dhcp_state_table[pDHCPObjectPtr->tDHCPCurrentState](pDHCPObjectPtr);
 
   return DHCP_RETURN_OK;
 }
@@ -662,16 +575,13 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  RANDOMIZE (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+static typeDHCPState init_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
 
   /*initialize all statemachine parameters*/
   vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
@@ -697,21 +607,18 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  RANDOMIZE or SELECT (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+static typeDHCPState randomize_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
 
   if (pDHCPObjectPtr->uDHCPRandomWait <= 0){
     pDHCPObjectPtr->uDHCPRetries++;
 
-    if (uDHCPBuildMessage(pIFObjectPtr, DHCPDISCOVER, (1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+    if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPDISCOVER, (1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
       /* on failure */
       pDHCPObjectPtr->uDHCPErrors++;
     } else {
@@ -732,22 +639,19 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  SELECT or WAIT (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
+static typeDHCPState select_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   typeDHCPMessage tDHCPMsgType;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE) == statusSET){
     vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
 
-    tDHCPMsgType = tDHCPProcessMsg(pIFObjectPtr);
+    tDHCPMsgType = tDHCPProcessMsg(pDHCPObjectPtr);
     /* expecting a DHCP OFFER message */
     if (tDHCPMsgType == DHCPOFFER){
       pDHCPObjectPtr->uDHCPRx++;
@@ -770,18 +674,16 @@ static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  WAIT or REQUEST (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
+static typeDHCPState wait_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
 
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
   if (pDHCPObjectPtr->uDHCPRandomWait <= 0){
-    if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_DHCP_REQIP | 1<<flagDHCP_MSG_DHCP_SVRID | 1<<flagDHCP_MSG_DHCP_REQPARAM | 1<<flagDHCP_MSG_DHCP_VENDID))){
+    if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_DHCP_REQIP | 1<<flagDHCP_MSG_DHCP_SVRID | 1<<flagDHCP_MSG_DHCP_REQPARAM | 1<<flagDHCP_MSG_DHCP_VENDID))){
       pDHCPObjectPtr->uDHCPErrors++;
     } else {
       pDHCPObjectPtr->uDHCPTx++;
@@ -802,22 +704,19 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  REQUEST or BOUND (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
+static typeDHCPState request_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   typeDHCPMessage tDHCPMsgType;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE) == statusSET){
     vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
 
-    tDHCPMsgType = tDHCPProcessMsg(pIFObjectPtr);
+    tDHCPMsgType = tDHCPProcessMsg(pDHCPObjectPtr);
     if (tDHCPMsgType == DHCPACK){
       pDHCPObjectPtr->uDHCPRx++;
 
@@ -832,7 +731,7 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
 
       /* invoke a callback once the lease is acquired */
       if (pDHCPObjectPtr->callbackOnLeaseAcqd != NULL){
-        (*(pDHCPObjectPtr->callbackOnLeaseAcqd))(pIFObjectPtr, pDHCPObjectPtr->pLeaseDataPtr);
+        (*(pDHCPObjectPtr->callbackOnLeaseAcqd))(pDHCPObjectPtr, pDHCPObjectPtr->pLeaseDataPtr);
       }
 
       return BOUND;
@@ -852,17 +751,13 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  BOUND or RENEW (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
+static typeDHCPState bound_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   /*  advance the DHCP state machine timer / counter  */
   pDHCPObjectPtr->uDHCPInternalTimer++;
 
@@ -870,7 +765,7 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
     /* time to renew our lease */
     if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_SHORT_CIRCUIT_RENEW) == statusCLR){
       /* if the renew step is not short-circuited (see note in dhcp.h), send the renew DHCPREQUEST */
-      if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_UNICAST | 1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+      if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_UNICAST | 1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
         pDHCPObjectPtr->uDHCPErrors++;
       } else {
         pDHCPObjectPtr->uDHCPTx++;
@@ -899,17 +794,14 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  BOUND or RENEW or REBIND (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
+static typeDHCPState renew_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   typeDHCPMessage tDHCPMsgType;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   /*  advance the DHCP state machine timer / counter  */
   pDHCPObjectPtr->uDHCPInternalTimer++;
@@ -917,7 +809,7 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE) == statusSET){
     vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
     
-    tDHCPMsgType = tDHCPProcessMsg(pIFObjectPtr);
+    tDHCPMsgType = tDHCPProcessMsg(pDHCPObjectPtr);
     /* expecting a DHCP ACK message */
     if (tDHCPMsgType == DHCPACK){
       pDHCPObjectPtr->uDHCPInternalTimer = 0;
@@ -930,7 +822,7 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
 
   if ((pDHCPObjectPtr->uDHCPInternalTimer * POLL_INTERVAL) >= (pDHCPObjectPtr->uDHCPT2 * 1000)){
     /*  time to rebind */
-    if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+    if (uDHCPBuildMessage(pDHCPObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_BOOTP_CIPADDR | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
       pDHCPObjectPtr->uDHCPErrors++;
     } else {
       pDHCPObjectPtr->uDHCPTx++;
@@ -951,24 +843,21 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  BOUND or RANDOMIZE or REBIND (enumerated typeDHCPState, the next state to be entered)
 //=================================================================================
-static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
+static typeDHCPState rebind_dhcp_state(struct sDHCPObject *pDHCPObjectPtr){
   typeDHCPMessage tDHCPMsgType;
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   /*  advance the DHCP state machine timer / counter  */
   pDHCPObjectPtr->uDHCPInternalTimer++;
 
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE) == statusSET){
     vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
-    tDHCPMsgType = tDHCPProcessMsg(pIFObjectPtr);
+    tDHCPMsgType = tDHCPProcessMsg(pDHCPObjectPtr);
     if (tDHCPMsgType == DHCPACK){
       pDHCPObjectPtr->uDHCPRx++;
       /* reset the timer and stay bound */
@@ -1008,7 +897,7 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //  tDHCPMsgType    IN    DHCP message type (ennumerated type)
 //  tDHCPMsgFlags   IN    flags to set various message parameters (enumerated type)
 //
@@ -1016,7 +905,7 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  ------
 //  DHCP_RETURN_OK or DHCP_RETURN_FAIL
 //=================================================================================
-static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags){
+static u8 uDHCPBuildMessage(struct sDHCPObject *pDHCPObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags){
   /* TODO: separate out the udp,ip,eth layers and then use encapusalted layer style to build packets */
   u8 *pBuffer;
   u8  uPaddingLength = 0;
@@ -1033,37 +922,23 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   u16 uCheckTemp = 0;
   u16 uUDPLength = 0;
 
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCP_RETURN_FAIL;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCP_RETURN_FAIL;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCP_RETURN_FAIL;
   }
 
-  /* check if the object has been initialised */
   /* has uDHCPInit been called to initialize dependancies? */
   if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
     return DHCP_RETURN_FAIL;
   }
 
   /* simplify ur life */
-  pBuffer = pIFObjectPtr->pUserTxBufferPtr;
+  pBuffer = pDHCPObjectPtr->pUserTxBufferPtr;
 
   if (pBuffer == NULL){
     return DHCP_RETURN_FAIL;
   }
 
-  uSize = pIFObjectPtr->uUserTxBufferSize;
+  uSize = pDHCPObjectPtr->uUserTxBufferSize;
 
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
   memset(pBuffer, 0, uSize);
@@ -1078,7 +953,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   } 
 
   /* fill in our hardware mac address */
-  memcpy(pBuffer + ETH_SRC_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
+  memcpy(pBuffer + ETH_SRC_OFFSET, pDHCPObjectPtr->arrDHCPEthMacCached, 6);
 
   /* ethernet frame type */
   pBuffer[ETH_FRAME_TYPE_OFFSET] = 0x08;
@@ -1110,10 +985,10 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   pBuffer[BOOTP_FRAME_BASE + BOOTP_HWLEN_OFFSET] = 0x06;
 
   if (tDHCPAuxTestFlag( (u8 *) &(tDHCPMsgFlags), flagDHCP_MSG_DHCP_NEW_XID) == statusSET){
-    uTempXid = ((pIFObjectPtr->arrIFAddrMac[2] & 0x0f) << 28) + \
-               ((pIFObjectPtr->arrIFAddrMac[3] & 0x0f) << 24) + \
-               ((pIFObjectPtr->arrIFAddrMac[4] & 0x0f) << 20) + \
-               ((pIFObjectPtr->arrIFAddrMac[5] & 0x0f) << 16);
+    uTempXid = ((pDHCPObjectPtr->arrDHCPEthMacCached[2] & 0x0f) << 28) + \
+               ((pDHCPObjectPtr->arrDHCPEthMacCached[3] & 0x0f) << 24) + \
+               ((pDHCPObjectPtr->arrDHCPEthMacCached[4] & 0x0f) << 20) + \
+               ((pDHCPObjectPtr->arrDHCPEthMacCached[5] & 0x0f) << 16);
     uTempXid = uTempXid & 0xffff0000;
     pDHCPObjectPtr->uDHCPXidCached = uDHCPRandomNumber(uTempXid); /* seed with serial number and i/f id */
   }
@@ -1139,7 +1014,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     memcpy(pBuffer + BOOTP_FRAME_BASE + BOOTP_CIPADDR_OFFSET, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
   }
 
-  memcpy(pBuffer + BOOTP_FRAME_BASE + BOOTP_CHWADDR_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
+  memcpy(pBuffer + BOOTP_FRAME_BASE + BOOTP_CHWADDR_OFFSET, pDHCPObjectPtr->arrDHCPEthMacCached, 6);
 
   /*****  end of the fixed part of the message, now on to the variable length DHCP options part, extension to bootp  *****/
 
@@ -1164,7 +1039,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 61;
   pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 7;
   pBuffer[DHCP_OPTIONS_BASE + uIndex++] = 1;
-  memcpy(pBuffer + DHCP_OPTIONS_BASE + uIndex, pIFObjectPtr->arrIFAddrMac, 6);
+  memcpy(pBuffer + DHCP_OPTIONS_BASE + uIndex, pDHCPObjectPtr->arrDHCPEthMacCached, 6);
   uIndex += 6;
 
   /* DHCP hostname support - enabled by API function */
@@ -1279,13 +1154,13 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   /* and with 0b111 since only interested in values of 0 to 7 */
   uPaddingLength = uPaddingLength & 0x7; 
 
-  pIFObjectPtr->uMsgSize = uLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
+  pDHCPObjectPtr->uDHCPMsgSize = uLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
   /* TODO: set a message ready flag */
 
   /* invoke a callback once the message successfully */
   if (pDHCPObjectPtr->callbackOnMsgBuilt != NULL){
-    (*(pDHCPObjectPtr->callbackOnMsgBuilt))(pIFObjectPtr, pDHCPObjectPtr->pMsgDataPtr);
+    (*(pDHCPObjectPtr->callbackOnMsgBuilt))(pDHCPObjectPtr, pDHCPObjectPtr->pMsgDataPtr);
   }
 
   return DHCP_RETURN_OK;
@@ -1299,13 +1174,13 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
-//  pIFObjectPtr    IN    handle to IF state object
+//  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
 //  ------
 //  typeDHCPMessage (enumerated type)
 //=================================================================================
-static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
+static typeDHCPMessage tDHCPProcessMsg(struct sDHCPObject *pDHCPObjectPtr){
   u16 uOptionIndex = 0;
   u16 uOptionEnd = 0;
   u8 uOption = 0;
@@ -1316,31 +1191,12 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
   u32 uDHCPTmpXid = 0;
   typeDHCPMessage tDHCPMsgType = DHCPERROR;
 
-  struct sDHCPObject *pDHCPObjectPtr;
-
-  if (pIFObjectPtr == NULL){
-    return DHCPERROR;
-  }
-
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return DHCPERROR;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  /* check if the object exists */
   if (pDHCPObjectPtr == NULL){
     return DHCPERROR;
   }
 
-  /* check if the object has been initialised */
-  /* has uDHCPInit been called to initialize dependancies? */
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    return DHCPERROR;
-  }
-
   /* simplify your life */
-  pBuffer = pIFObjectPtr->pUserRxBufferPtr;
+  pBuffer = pDHCPObjectPtr->pUserRxBufferPtr;
 
   if (pBuffer == NULL){
     return DHCPERROR;

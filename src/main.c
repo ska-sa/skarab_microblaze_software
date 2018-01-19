@@ -49,8 +49,8 @@
 #define DHCP_BOUND_COUNTER_VALUE  600
 
 /* local function prototypes */
-static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
-static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData);
+static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
+static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData);
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
@@ -62,8 +62,8 @@ static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 
-//static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
-//static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
+static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
+static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
 
 //=================================================================================
@@ -630,14 +630,14 @@ void UpdateEthernetLinkUpStatus(u8 uId){
       if (uId == 0){  /* 1gbe i/f */
         /* do not enable dhcp in loopback mode */
 #ifndef DO_1GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]);
-        uDHCPSetStateMachineEnable(&IFContext[uId], SM_TRUE);
+        vDHCPStateMachineReset(&DHCPContextState[uId]);
+        uDHCPSetStateMachineEnable(&DHCPContextState[uId], SM_TRUE);
 #endif
       } else {    /* for all other i/f's i.e. the 40gbe i/f's */
         /* do not enable dhcp in loopback mode */
 #ifndef DO_40GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]);
-        uDHCPSetStateMachineEnable(&IFContext[uId], SM_TRUE);
+        vDHCPStateMachineReset(&DHCPContextState[uId]);
+        uDHCPSetStateMachineEnable(&DHCPContextState[uId], SM_TRUE);
 #endif
       }
     }
@@ -651,7 +651,7 @@ void UpdateEthernetLinkUpStatus(u8 uId){
       if (uId == 0){  /* 1gbe i/f */
         /* do not set in loopback mode */
 #ifndef DO_1GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]); /* this will reset and disable dhcp state machine */
+        vDHCPStateMachineReset(&DHCPContextState[uId]); /* this will reset and disable dhcp state machine */
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
@@ -659,7 +659,7 @@ void UpdateEthernetLinkUpStatus(u8 uId){
       } else {
         /* do not set in loopback mode */
 #ifndef DO_40GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]); /* this will reset and disable dhcp state machine */
+        vDHCPStateMachineReset(&DHCPContextState[uId]); /* this will reset and disable dhcp state machine */
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
@@ -1493,6 +1493,7 @@ int main()
 #endif
 
      //struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
+     u8 arrEthId[NUM_ETHERNET_INTERFACES];
      u8 uTempMac[6];
 #ifdef DEBUG_PRINT
      u16 uCountDumpStats_DHCP=0;
@@ -1644,27 +1645,67 @@ int main()
      uTempHostNameString[12] = '-';
 
      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+       arrEthId[uEthernetId] = uEthernetId;
        
        /* 6th octet of mac should equal id anyway */
        uTempMac[5] = uEthernetFabricMacLow[uEthernetId] & 0xff;
-
-       iStatus = uInterfaceInit(&(IFContext[uEthernetId]), (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4), uTempMac, uEthernetId);
-       if (iStatus != IF_RETURN_OK){
-         always_printf("IF   [%02x] Init error!\n\r", uEthernetId);
-       }
-
        /* fill in interface number in host name and terminate string */
        uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
        uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
        uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
 
-       eventDHCPOnMsgBuilt(&IFContext[uEthernetId], &vSendDHCPMsg, NULL);
-       eventDHCPOnLeaseAcqd(&IFContext[uEthernetId], &vSetInterfaceConfig, NULL);
-       vDHCPSetHostName(&IFContext[uEthernetId], (char *) &uTempHostNameString);
+       uDHCPInit(&DHCPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4), uTempMac);
+       eventDHCPOnMsgBuilt(&DHCPContextState[uEthernetId], &vSendDHCPMsg, &arrEthId[uEthernetId]);
+       eventDHCPOnLeaseAcqd(&DHCPContextState[uEthernetId], &vSetInterfaceConfig, &arrEthId[uEthernetId]);
+       vDHCPSetHostName(&DHCPContextState[uEthernetId], (char *) &uTempHostNameString);
        /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
 
-       //uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
+       uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
 
+       /* TODO: Interface API functions */
+       IFContext[uEthernetId].pUserTxBufferPtr = (u8 *) uTransmitBuffer;
+       IFContext[uEthernetId].uUserTxBufferSize = TX_BUFFER_MAX * 4; /* bytes */
+       IFContext[uEthernetId].pUserRxBufferPtr = (u8 *) &(uReceiveBuffer[uEthernetId][0]);
+       IFContext[uEthernetId].uUserRxBufferSize = RX_BUFFER_MAX * 4; /* bytes */
+       memcpy(IFContext[uEthernetId].arrIFAddrMac, uTempMac, 6);
+       IFContext[uEthernetId].uMsgSize = 0;
+       IFContext[uEthernetId].uNumWordsRead = 0;
+       IFContext[uEthernetId].uIFMagic = IF_MAGIC;
+
+       IFContext[uEthernetId].uRxTotal = 0;
+       IFContext[uEthernetId].uRxEthArp = 0;
+       IFContext[uEthernetId].uRxArpReply = 0;
+       IFContext[uEthernetId].uRxArpRequest = 0;
+       IFContext[uEthernetId].uRxArpConflict = 0;
+       IFContext[uEthernetId].uRxArpInvalid = 0;
+       IFContext[uEthernetId].uRxEthIp = 0;
+       IFContext[uEthernetId].uRxIpChecksumErrors = 0;
+       IFContext[uEthernetId].uRxIpIcmp = 0;
+       IFContext[uEthernetId].uRxIcmpInvalid = 0;
+       IFContext[uEthernetId].uRxIpUdp = 0;
+       IFContext[uEthernetId].uRxUdpChecksumErrors = 0;
+       IFContext[uEthernetId].uRxUdpCtrl = 0;
+       IFContext[uEthernetId].uRxUdpDhcp = 0;
+       IFContext[uEthernetId].uRxDhcpInvalid = 0;
+       IFContext[uEthernetId].uRxUdpUnknown = 0;
+       IFContext[uEthernetId].uRxIpUnknown = 0;
+       IFContext[uEthernetId].uRxEthUnknown = 0;
+
+       IFContext[uEthernetId].uTxTotal = 0;
+       IFContext[uEthernetId].uTxEthArpRequestOk = 0;
+       IFContext[uEthernetId].uTxEthArpReplyOk = 0;
+       IFContext[uEthernetId].uTxEthArpErr = 0;
+       IFContext[uEthernetId].uTxEthLldpOk = 0;
+       IFContext[uEthernetId].uTxEthLldpErr = 0;
+       IFContext[uEthernetId].uTxIpIcmpReplyOk = 0;
+       IFContext[uEthernetId].uTxIpIcmpReplyErr = 0;
+       IFContext[uEthernetId].uTxIpIgmpOk = 0;
+       IFContext[uEthernetId].uTxIpIgmpErr = 0;
+       IFContext[uEthernetId].uTxUdpDhcpOk = 0;
+       IFContext[uEthernetId].uTxUdpDhcpErr = 0;
+       IFContext[uEthernetId].uTxUdpCtrlOk = 0;
+       IFContext[uEthernetId].uTxUdpCtrlAck = 0;  /*TODO*/
+       IFContext[uEthernetId].uTxUdpCtrlNack = 0; /*TODO*/
 
      }
 
@@ -1730,8 +1771,6 @@ int main()
                   /* else no break statement - fall through */
 
                 case PACKET_FILTER_ICMP:
-                  /* ip layer checks */
-                  /* FIXME: TODO check ip destination address */
                   /* verify ip header checksum */
                   if(uIPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                     if(uChecksum != 0xffff){
@@ -1764,10 +1803,10 @@ int main()
               if (uValidate){
                 switch(uPacketType){
                   case PACKET_FILTER_DHCP:
-                    if (uDHCPMessageValidate(&(IFContext[uEthernetId])) == DHCP_RETURN_OK){
+                    if (uDHCPMessageValidate(&DHCPContextState[uEthernetId]) == DHCP_RETURN_OK){
                       debug_printf("DHCP [%02x] valid packet received!\r\n", uEthernetId);
-                      uDHCPSetGotMsgFlag(&(IFContext[uEthernetId]));
-                      uDHCPStateMachine(&(IFContext[uEthernetId]));   /* run the DHCP state machine immediately */
+                      uDHCPSetGotMsgFlag(&DHCPContextState[uEthernetId]);
+                      uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
                     } else {
                       IFContext[uEthernetId].uRxDhcpInvalid++;
                       /* quiet the debug output here a bit since there will be lots of dhcp bcast traffic at startup */
@@ -1785,7 +1824,7 @@ int main()
                     break;
 
                   case PACKET_FILTER_ICMP:
-                    if (uICMPMessageValidate(&IFContext[uEthernetId]) == ICMP_RETURN_OK){
+                    if (uICMPMessageValidate(&ICMPContextState[uEthernetId]) == ICMP_RETURN_OK){
                       debug_printf("ICMP [%02x] valid packet received!\r\n", uEthernetId);
                       uFlagRunTask_ICMP_Reply[uEthernetId] = 1;
                     } else {
@@ -1807,8 +1846,8 @@ int main()
                     } else if (iStatus == ARP_RETURN_CONFLICT){
                       error_printf("ARP  [%02x] network address conflict!\r\n", uEthernetId);
                       IFContext[uEthernetId].uRxArpConflict++;
-                      vDHCPStateMachineReset(&(IFContext[uEthernetId]));
-                      uDHCPSetStateMachineEnable(&(IFContext[uEthernetId]), SM_TRUE);
+                      vDHCPStateMachineReset(&DHCPContextState[uEthernetId]);
+                      uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], SM_TRUE);
                       //uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
                       uFlagRunTask_DHCP = 1;
                     } else if (iStatus == ARP_RETURN_INVALID){
@@ -1893,9 +1932,8 @@ int main()
        if (uFlagRunTask_DHCP){
         uFlagRunTask_DHCP = 0;     /* reset task flag */
         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          uDHCPStateMachine(&(IFContext[uEthernetId]));
+          uDHCPStateMachine(&DHCPContextState[uEthernetId]);
         }
-#if 0
 #ifdef DEBUG_PRINT
         uCountDumpStats_DHCP++;
         if (uCountDumpStats_DHCP == 3000){
@@ -1903,11 +1941,10 @@ int main()
           /* dump dhcp stats to terminal once in a while */
           for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
             xil_printf("DHCP [%02x] stats-> rx: %d, tx: %d, err: %d, invalid: %d, retry: %d\r\n", uEthernetId, DHCPContextState[uEthernetId].uDHCPRx,
-                IFContext[uEthernetId].DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,
+                DHCPContextState[uEthernetId].uDHCPTx, DHCPContextState[uEthernetId].uDHCPErrors,
                 DHCPContextState[uEthernetId].uDHCPInvalid, DHCPContextState[uEthernetId].uDHCPRetries);
           }
         }
-#endif
 #endif
       }
 
@@ -1971,13 +2008,13 @@ int main()
       //----------------------------------------------------------------------------//
       for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         if (uFlagRunTask_ICMP_Reply[uEthernetId]){
-          iStatus = uICMPBuildReplyMessage(&IFContext[uEthernetId]);
+          iStatus = uICMPBuildReplyMessage(&ICMPContextState[uEthernetId]);
           if (iStatus != ICMP_RETURN_OK){
             debug_printf("ICMP [%02x] Packet build error!\n\r", uEthernetId);
           } else {
             /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-            uSize = (u32) IFContext[uEthernetId].uMsgSize;    /* bytes */
-            pBuffer = (u16 *) IFContext[uEthernetId].pUserTxBufferPtr;
+            uSize = (u32) ICMPContextState[uEthernetId].uICMPMsgSize;    /* bytes */
+            pBuffer = (u16 *) ICMPContextState[uEthernetId].pUserTxBufferPtr;
             if (pBuffer != NULL){
               uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
               for (uIndex = 0; uIndex < uSize; uIndex++){
@@ -2097,7 +2134,7 @@ int main()
         uDHCPBoundTimeout = 0;
         for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
           /* TODO: create API function to get state */
-          if (IFContext[uEthernetId].DHCPContextState.tDHCPCurrentState < BOUND){
+          if (DHCPContextState[uEthernetId].tDHCPCurrentState < BOUND){
             if (uDHCPBoundCount[uEthernetId] < DHCP_BOUND_COUNTER_VALUE){ /*  prevent overflows */
               uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
             }
@@ -2125,30 +2162,46 @@ int main()
       if (uFlagRunTask_Diagnostics){
         uFlagRunTask_Diagnostics = 0;
         for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          debug_printf("IF [%d]:\n\r", uEthernetId);
+          debug_printf(" Rx Total:        %d\n\r", IFContext[uEthernetId].uRxTotal);
+          debug_printf(" Rx  ETH Unknown: %d\n\r", IFContext[uEthernetId].uRxEthUnknown);
+          debug_printf(" Rx  ARP:         %d\n\r", IFContext[uEthernetId].uRxEthArp);
+          debug_printf(" Rx   Reply:      %d\n\r", IFContext[uEthernetId].uRxArpReply);
+          debug_printf(" Rx   Request:    %d\n\r", IFContext[uEthernetId].uRxArpRequest);
+          debug_printf(" Rx   Conflict:   %d\n\r", IFContext[uEthernetId].uRxArpConflict);
+          debug_printf(" Rx   Invalid:    %d\n\r", IFContext[uEthernetId].uRxArpInvalid);
+          debug_printf(" Rx  IP:          %d\n\r", IFContext[uEthernetId].uRxEthIp);
+          debug_printf(" Rx   Chksm Err:  %d\n\r", IFContext[uEthernetId].uRxIpChecksumErrors);
+          debug_printf(" Rx   Unknown:    %d\n\r", IFContext[uEthernetId].uRxIpUnknown);
+          debug_printf(" Rx   ICMP:       %d\n\r", IFContext[uEthernetId].uRxIpIcmp);
+          debug_printf(" Rx    Invalid:   %d\n\r", IFContext[uEthernetId].uRxIcmpInvalid);
+          debug_printf(" Rx   UDP:        %d\n\r", IFContext[uEthernetId].uRxIpUdp);
+          debug_printf(" Rx    Unknown:   %d\n\r", IFContext[uEthernetId].uRxUdpUnknown);
+          debug_printf(" Rx    CTRL:      %d\n\r", IFContext[uEthernetId].uRxUdpCtrl);
+          debug_printf(" Rx    DHCP:      %d\n\r", IFContext[uEthernetId].uRxUdpDhcp);
+          debug_printf(" Rx     Invalid:  %d\n\r", IFContext[uEthernetId].uRxDhcpInvalid);
           IFContext[uEthernetId].uTxTotal = IFContext[uEthernetId].uTxEthArpReplyOk + IFContext[uEthernetId].uTxEthArpRequestOk + IFContext[uEthernetId].uTxEthLldpOk +
                                             IFContext[uEthernetId].uTxIpIcmpReplyOk + IFContext[uEthernetId].uTxIpIgmpOk +
                                             IFContext[uEthernetId].uTxUdpDhcpOk + IFContext[uEthernetId].uTxUdpCtrlOk;
-
-          debug_printf("IF [%d]:\n\r", uEthernetId);
-          debug_printf(" Rx Total:        %10d | Tx Total:     %10d\n\r", IFContext[uEthernetId].uRxTotal            , IFContext[uEthernetId].uTxTotal);
-          debug_printf(" Rx  ETH Unknown: %10d | Tx  ARP\n\r",          IFContext[uEthernetId].uRxEthUnknown);
-          debug_printf(" Rx  ARP:         %10d | Tx   Reply:   %10d\n\r", IFContext[uEthernetId].uRxEthArp           , IFContext[uEthernetId].uTxEthArpReplyOk);
-          debug_printf(" Rx   Reply:      %10d | Tx   Request: %10d\n\r", IFContext[uEthernetId].uRxArpReply         , IFContext[uEthernetId].uTxEthArpRequestOk);
-          debug_printf(" Rx   Request:    %10d | Tx   Err:     %10d\n\r", IFContext[uEthernetId].uRxArpRequest       , IFContext[uEthernetId].uTxEthArpErr);
-          debug_printf(" Rx   Conflict:   %10d | Tx  LLDP\n\r",          IFContext[uEthernetId].uRxArpConflict);
-          debug_printf(" Rx   Invalid:    %10d | Tx   Ok:      %10d\n\r", IFContext[uEthernetId].uRxArpInvalid       , IFContext[uEthernetId].uTxEthLldpOk);
-          debug_printf(" Rx  IP:          %10d | Tx   Err:     %10d\n\r", IFContext[uEthernetId].uRxEthIp            , IFContext[uEthernetId].uTxEthLldpErr);
-          debug_printf(" Rx   Chksm Err:  %10d | Tx  ICMP\n\r",          IFContext[uEthernetId].uRxIpChecksumErrors);
-          debug_printf(" Rx   Unknown:    %10d | Tx   Reply:   %10d\n\r", IFContext[uEthernetId].uRxIpUnknown        , IFContext[uEthernetId].uTxIpIcmpReplyOk);
-          debug_printf(" Rx   ICMP:       %10d | Tx   Err:     %10d\n\r", IFContext[uEthernetId].uRxIpIcmp           , IFContext[uEthernetId].uTxIpIcmpReplyErr);
-          debug_printf(" Rx    Invalid:   %10d | Tx  IGMP\n\r",          IFContext[uEthernetId].uRxIcmpInvalid);
-          debug_printf(" Rx   UDP:        %10d | Tx   Ok:      %10d\n\r", IFContext[uEthernetId].uRxIpUdp            , IFContext[uEthernetId].uTxIpIgmpOk);
-          debug_printf(" Rx    Unknown:   %10d | Tx   Err:     %10d\n\r", IFContext[uEthernetId].uRxUdpUnknown       , IFContext[uEthernetId].uTxIpIgmpErr);
-          debug_printf(" Rx    CTRL:      %10d | Tx  DHCP\n\r",          IFContext[uEthernetId].uRxUdpCtrl);
-          debug_printf(" Rx    DHCP:      %10d | Tx   Ok:      %10d\n\r", IFContext[uEthernetId].uRxUdpDhcp          , IFContext[uEthernetId].uTxUdpDhcpOk);
-          debug_printf(" Rx     Invalid:  %10d | Tx   Err:     %10d\n\r", IFContext[uEthernetId].uRxDhcpInvalid      ,  IFContext[uEthernetId].uTxUdpDhcpErr);
-          debug_printf("                             | Tx  CTRL\n\r");
-          debug_printf("                             | Tx   Ok:      %10d\n\r", IFContext[uEthernetId].uTxUdpCtrlOk);
+          debug_printf(" Tx Total:        %d\n\r", IFContext[uEthernetId].uTxTotal);
+          debug_printf(" Tx  ARP\n\r");
+          debug_printf(" Tx   Reply:      %d\n\r", IFContext[uEthernetId].uTxEthArpReplyOk);
+          debug_printf(" Tx   Request:    %d\n\r", IFContext[uEthernetId].uTxEthArpRequestOk);
+          debug_printf(" Tx   Err:        %d\n\r", IFContext[uEthernetId].uTxEthArpErr);
+          debug_printf(" Tx  LLDP\n\r");
+          debug_printf(" Tx   Ok:         %d\n\r", IFContext[uEthernetId].uTxEthLldpOk);
+          debug_printf(" Tx   Err:        %d\n\r", IFContext[uEthernetId].uTxEthLldpErr);
+          debug_printf(" Tx  ICMP\n\r");
+          debug_printf(" Tx   Reply:      %d\n\r", IFContext[uEthernetId].uTxIpIcmpReplyOk);
+          debug_printf(" Tx   Err:        %d\n\r", IFContext[uEthernetId].uTxIpIcmpReplyErr);
+          debug_printf(" Tx  IGMP\n\r");
+          debug_printf(" Tx   Ok:         %d\n\r", IFContext[uEthernetId].uTxIpIgmpOk);
+          debug_printf(" Tx   Err:        %d\n\r", IFContext[uEthernetId].uTxIpIgmpErr);
+          debug_printf(" Tx  DHCP\n\r");
+          debug_printf(" Tx   Ok:         %d\n\r", IFContext[uEthernetId].uTxUdpDhcpOk);
+          debug_printf(" Tx   Err:        %d\n\r", IFContext[uEthernetId].uTxUdpDhcpErr);
+          debug_printf(" Tx  CTRL\n\r");
+          debug_printf(" Tx   Ok:         %d\n\r", IFContext[uEthernetId].uTxUdpCtrlOk);
         }
       }
 
@@ -2180,35 +2233,20 @@ int main()
 }
 
 
-static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
+static int vSendDHCPMsg(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   u8 uLocalEthernetId;
   u8 uReturnValue;
   u32 uLocalSize;
   u16 *pLocalBuffer = NULL;
   u32 uLocalIndex;
-  struct sDHCPObject *pDHCPObjectPtr;
 
-  if (pIFObjectPtr == NULL){
-    return -1;
+  if(pUserData == NULL){
+    return XST_FAILURE;
   }
 
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return -1;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  if (pDHCPObjectPtr == NULL){
-    return -1;
-  }
-
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    return -1;
-  }
+  uLocalSize = (u32) pDHCPObjectPtr->uDHCPMsgSize;    /* bytes */
   
-  uLocalSize = (u32) pIFObjectPtr->uMsgSize;    /* bytes */
-  
-  pLocalBuffer = (u16 *) pIFObjectPtr->pUserTxBufferPtr;
+  pLocalBuffer = (u16 *) pDHCPObjectPtr->pUserTxBufferPtr;
   if(pLocalBuffer == NULL){
     return XST_FAILURE;
   }
@@ -2219,8 +2257,7 @@ static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
     pLocalBuffer[uLocalIndex] = Xil_EndianSwap16(pLocalBuffer[uLocalIndex]);
   }
 
-  uLocalEthernetId = pIFObjectPtr->uIFEthernetId;
-
+  uLocalEthernetId = * ((u8 *) pUserData);
   uLocalSize = uLocalSize >> 1;   /*  32-bit words */
   uReturnValue = TransmitHostPacket(uLocalEthernetId, (u32 *) pLocalBuffer, uLocalSize);
   if (uReturnValue == XST_SUCCESS){
@@ -2235,31 +2272,12 @@ static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
 }
 
 
-static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
+static int vSetInterfaceConfig(struct sDHCPObject *pDHCPObjectPtr, void *pUserData){
   u32 ip = 0;
   u32 netmask = 0;
   u8 id;
-  struct sDHCPObject *pDHCPObjectPtr;
-  
-  if (pIFObjectPtr == NULL){
-    return -1;
-  }
 
-  if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    return -1;
-  }
-
-  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
-
-  if (pDHCPObjectPtr == NULL){
-    return -1;
-  }
-
-  if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    return -1;
-  }
-
-  id = pIFObjectPtr->uIFEthernetId;
+  id = * ((u8 *) pUserData);
   ip = (pDHCPObjectPtr->arrDHCPAddrYIPCached[0] << 24) |
        (pDHCPObjectPtr->arrDHCPAddrYIPCached[1] << 16) |
        (pDHCPObjectPtr->arrDHCPAddrYIPCached[2] << 8 ) |

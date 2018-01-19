@@ -16,9 +16,8 @@
 /* Xilinx lib includes */
 #include <xstatus.h>
 
-//#include "eth.h"
+#include "eth.h"
 #include "ipv4.h"
-#include "if.h"
 
 /* link custom return values */
 #define ICMP_RETURN_OK            XST_SUCCESS
@@ -54,9 +53,6 @@
 
 #define ICMP_MAGIC  0xBADC0C0A
 
-/* Can eliminate the following function since these variables will move up to the interface object layer */
-/* No states that need to be maintained - we respond immediately to a request */
-#if 0
 struct sICMPObject{
   u32 uICMPMagic;
 
@@ -72,11 +68,7 @@ struct sICMPObject{
 };
 
 u8 uICMPInit(struct sICMPObject *pICMPObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize);
-#endif
-
-struct sIFObject;
-
-u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr);
-u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr);
+u8 uICMPMessageValidate(struct sICMPObject *pICMPObjectPtr);
+u8 uICMPBuildReplyMessage(struct sICMPObject *pICMPObjectPtr);
 
 #endif

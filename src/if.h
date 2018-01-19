@@ -1,15 +1,7 @@
 #ifndef _IF_H_
 #define _IF_H_
 
-#include "dhcp.h"
-
 #define IF_MAGIC 0xAABBCCDD
-
-#define IF_RETURN_OK    (0)
-#define IF_RETURN_FAIL  (1)
-
-#define IF_RX_MIN_BUFFER_SIZE 1500   /*mtu*/
-#define IF_TX_MIN_BUFFER_SIZE 1024
 
 struct sIFObject{
   u32 uIFMagic;
@@ -17,20 +9,15 @@ struct sIFObject{
   /* Tx buffer - ie data the user will send over the network */
   u8 *pUserTxBufferPtr;
   u16 uUserTxBufferSize;
-  u16 uMsgSize;   /* transmit message size built in the transmit buffer */
-
   /* Rx buffer - ie data the user will receive over the network */
   u8 *pUserRxBufferPtr;
   u16 uUserRxBufferSize;
-  u32 uNumWordsRead;  /* number of words read into the receive buffer */
+
+  u16 uMsgSize;
+  u32 uNumWordsRead;
 
   u8 arrIFAddrIP[4];
   u8 arrIFAddrMac[6];
-
-  u8 uIFEthernetId;
-
-  struct sDHCPObject DHCPContextState;    /* holds the dhcp states for this interface */
-//  struct sICMPObject ICMPContextState;    /* holds the icmp states for this interface */
 
   /* RX Packet Counters */
   u32 uRxTotal; /* total packets received */
@@ -81,5 +68,4 @@ struct sIFObject{
   u32 uTxUdpCtrlNack;
 };
 
-u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr, u8 uEthernetId);
 #endif
