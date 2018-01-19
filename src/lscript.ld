@@ -49,8 +49,6 @@ SECTIONS
    *(.text)
    *(.text.*)
    *(.gnu.linkonce.t.*)
-   . = ALIGN(4);  /* this is probably not necessary since text section should be 32-bit word aligned anyway */
-   _text_section_end_ = ABSOLUTE(.) - 4; /* subtract 4 since this is a byte value and we're interested in 32-bit aligned address */
 } > microblaze_0_local_memory_ilmb_bram_if_cntlr_microblaze_0_local_memory_dlmb_bram_if_cntlr
 
 .init : {
@@ -88,9 +86,6 @@ SECTIONS
    *(.rodata)
    *(.rodata.*)
    *(.gnu.linkonce.r.*)
-   _location_checksum_ = ABSOLUTE(.); /* store the address of the checksum in symbol table  */
-   LONG(CRC_VALUE);
-   /*KEEP(*(.rodata.checksum))   /* place "subsection" at the end of .rodata section */
    __rodata_end = .;
 } > microblaze_0_local_memory_ilmb_bram_if_cntlr_microblaze_0_local_memory_dlmb_bram_if_cntlr
 

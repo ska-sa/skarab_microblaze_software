@@ -62,8 +62,7 @@ CFLAGS += $(MBFLAGS) -MMD -MP $(INC)
 #linker flags
 LDLIBS := -Wl,--start-group,$(LIBS),--end-group
 LDSCRIPT := $(SRCDIR)lscript.ld
-LDSYM := -Wl,--defsym,CRC_VALUE=0
-LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax $(LDSYM)
+LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax
 
 #optimizations: use with \-ffunction-sections -fdata-sections\ above
 #LDFLAGS += -Wl,--gc-sections
