@@ -55,7 +55,6 @@
 //#define WARN_PRINT
 //#define INFO_PRINT
 #define DEBUG_PRINT
-/* trace level will lower performance significantly */
 //#define TRACE_PRINT
 
 //#define DO_40GBE_LOOPBACK_TEST

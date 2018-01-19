@@ -34,9 +34,6 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   }
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
-  if (pUserBufferPtr == NULL){
-    return ARP_RETURN_FAIL;
-  }
   
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
     debug_printf("ARP: Ethernet HW Type problem!\n\r");

@@ -377,7 +377,7 @@ int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPoi
 	uChecksum += IPHeader->uDestinationIPHigh + IPHeader->uDestinationIPLow;
 
 	uUdpLength = UDPHeader->uTotalLength;
-	uChecksum = CalculateIPChecksum(uChecksum, (uUdpLength / 2), (u16 *) pUdpHeaderPointer);
+	uChecksum = CalculateIPChecksum(uChecksum, ((uUdpLength + 1) / 2), (u16 *) pUdpHeaderPointer);
 
 	if (uChecksum != 0xFFFFu)
 	{
