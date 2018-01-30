@@ -48,6 +48,7 @@
 #include "print.h"
 #include "if.h"
 #include "arp.h"
+#include "memtest.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 
@@ -1575,20 +1576,33 @@ int main()
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
      u32 uTimeout = 0;
-     u32 loop = 0;
+     //u32 loop = 0;
 
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
      u32 uKeepAliveReg;
 
-     u32 *iPtr;
+     //u32 *iPtr;
      u32 uMemTest = 0;
 
 #ifdef TIME_PROFILE
      u32 time1 = 0, time2 = 0;
 #endif
 
+     /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
+              but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
+              and add another one to prevent off-by-one error*/
+     if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
+       always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
+       always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
+       always_printf("[Memory Test] computed value              : 0x%08x\r\n", uMemTest);
+     } else {
+       always_printf("[Memory Test] Error - could not execute\r\n");
+     }
+
+
+#if 0
      /* very crude program memory test */
      for (iPtr = (u32 *)0x50; iPtr <= (u32 *) &_text_section_end_; iPtr++){
        /*print first, middle and last instruction*/
@@ -1598,9 +1612,10 @@ int main()
         uMemTest = uMemTest + *(iPtr);
      }
      always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
-     //always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
+     always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
      always_printf("[Memory Test] computed value                  : 0x%08x\r\n", uMemTest);
      /* TODO pass / fail -> what to do upon failure? */
+#endif 
 
 	   //Xil_ICacheEnable();
 	   //Xil_DCacheEnable();
