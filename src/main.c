@@ -73,6 +73,8 @@ static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 
+static volatile u8 uTimeoutCounter = 255;
+
 //u32 __attribute__ ((section(".rodata.memtest"))) __attribute__ ((aligned (32))) uMemPlace = 0xAABBCCDD ;
 
 /* place this variable at a specific location in memory (in .rodata section). See linker script */
@@ -112,6 +114,10 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 	u8 u40GbE2_Link_Up = 0;
 	u8 u40GbE3_Link_Up = 0;
 	u8 u40GbE4_Link_Up = 0;
+
+  if (uTimeoutCounter != 0){
+    uTimeoutCounter--;
+  }
 
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
@@ -184,7 +190,14 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		}
 	}
 	// Allow 3 seconds for QSFP+ to be ready
-	else if (uQSFPStateCounter == 0x1E)
+	//else if (uQSFPStateCounter == 0x1E)
+  /* TODO: FIXME is there a better way to check for QSFP+ readiness?
+                 This current mechanism is dependent on the init time
+                 of main() and any changes / reordering of initialization
+                 (e.g. initializing timers earlier) may result in this value
+                 having to change. This may result in error messages if the
+                 time allowed is too short */
+	else if (uQSFPStateCounter == 0x3C)
 	{
 		if (uQSFPState == QSFP_STATE_STARTING_APPLICATION_MODE)
 		{
@@ -1762,6 +1775,16 @@ int main()
 //#endif
 
 
+     error_printf("[INIT] Interrupts, exceptions and timers ");
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
+	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
+     microblaze_enable_exceptions();
+     error_printf("[DONE]\r\n");
 	   FinishedBootingFromSdram();
 
 	   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
@@ -1774,34 +1797,42 @@ int main()
      /* try to continue before watchdog timer overflows */
      /* TODO: verify any later dependancies linked to this initialization */
 
-     uTimeout = 0;
+     uTimeoutCounter = 20;
 	   do
 	   {
 		   uReadReg = ReadBoardRegister(C_RD_BRD_CTL_STAT_0_ADDR);
-       if (uTimeout % 500000 == 0){
-         debug_printf(".");       /* this conditional and serial i/o adds a bit of overhead */
-       }
-       uTimeout++;
-	   }while(((uReadReg & 0x1) != 0x1) && (uTimeout < SGMII_1GBE_TIMEOUT));
+	   }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
 
-     /* if we haven't FAILED or TIMED OUT then we're OK */
-     error_printf("%s", ((uReadReg & 0x1) != 0x1) ? "[FAILED]" : uTimeout >= SGMII_1GBE_TIMEOUT ? "[TIMED OUT]" : "[OK]");
+     /* if we haven't TIMED OUT then we're OK */
+     error_printf("%s", uTimeoutCounter == 0 ? "[TIMED OUT]" : "[OK]");
      error_printf("\r\n"); /* for formatting */
-
-
-     error_printf("[INIT] Interrupts, exceptions and timers ");
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
-	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
-     microblaze_enable_exceptions();
-     error_printf("[DONE]\r\n");
 
      error_printf("[INIT] Mezzanine locations\r\n");
 	   InitialiseQSFPMezzanineLocation();
+
+     error_printf("[INIT] Waiting for HMC to complete init...");
+     
+     uTimeoutCounter = 20;
+
+	   do
+	   {
+		   uReadReg = ReadBoardRegister(0x700c0) & ReadBoardRegister(0x7005c) & ReadBoardRegister(0x70058);
+	   }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
+
+     if (uTimeoutCounter == 0){
+       error_printf("\r\n[INIT] status: HMC0 = %d | HMC1 = %d | HMC2 = %d\r\n", ReadBoardRegister(0x700c0) & 0x1,
+                                                                            ReadBoardRegister(0x7005c) & 0x1,
+                                                                            ReadBoardRegister(0x70058) & 0x1);
+       error_printf("[INIT] HMC did not init...invoking reconfigure of FPGA\r\n");
+       SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+       ResetSdramReadAddress();
+       AboutToBootFromSdram();
+       Delay(100000);
+       IcapeControllerInSystemReconfiguration();
+     } else {
+       /* if we haven't TIMED OUT then we're OK */
+       error_printf("[OK]\r\n");
+     }  
 
      error_printf("[INIT] Interface parameters\r\n");
 	   InitialiseEthernetInterfaceParameters();
