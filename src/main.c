@@ -197,7 +197,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
                  (e.g. initializing timers earlier) may result in this value
                  having to change. This may result in error messages if the
                  time allowed is too short */
-	else if (uQSFPStateCounter == 0x3C)
+	else if (uQSFPStateCounter == 100)
 	{
 		if (uQSFPState == QSFP_STATE_STARTING_APPLICATION_MODE)
 		{
@@ -1387,7 +1387,7 @@ void InitialiseQSFPMezzanineLocation()
 	uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
 	WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-	uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_ADDR);
+	uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
 
 	while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4))
 	{
@@ -1588,8 +1588,9 @@ int main()
      u32 uIndex = 0;      /* used to index arrays / buffers */
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
-     u32 uTimeout = 0;
+     //u32 uTimeout = 0;
      //u32 loop = 0;
+     u32 uHMCBitMask;
 
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
@@ -1812,18 +1813,59 @@ int main()
 
      error_printf("[INIT] Waiting for HMC to complete init...");
      
-     uTimeoutCounter = 20;
+     /*
+        - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
+        - each byte represents the status of a Mezz slot
 
+        31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
+        +-------+--------+--------+--------+
+        | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
+        +-------+--------+--------+--------+
+
+        bit 7 & 6 => reserved
+        bit 5     => HMC post ok
+        bit 4     => HMC init ok
+        bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
+        bit 0     => Present
+
+     */
+
+#define HMC_INIT_TIMEOUT    100    /* x 100ms */
+#define BYTE_MASK_HMC_INIT  0x35  /* b00110101 */
+
+     uHMCBitMask = 0;
+
+     /* dynamically build the bit mask for the hmc cards which are present */
+     uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+     for (uIndex = 0; uIndex < 4; uIndex++){
+       if ((uReadReg & (0xF << (uIndex*8))) == (5 << (uIndex*8))){
+         uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
+       }
+     }
+
+     uTimeoutCounter = HMC_INIT_TIMEOUT;
+
+     /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
 	   do
 	   {
-		   uReadReg = ReadBoardRegister(0x700c0) & ReadBoardRegister(0x7005c) & ReadBoardRegister(0x70058);
-	   }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
+        uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+        /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
+        if ((uTimeoutCounter % 10) == 0){    /* every second */
+          XWdtTb_RestartWdt(& WatchdogTimer);
+        }
+
+		   //uReadReg = ReadBoardRegister(0x700c0) & ReadBoardRegister(0x7005c) & ReadBoardRegister(0x70058);
+	   //}while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
+	   }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
 
      if (uTimeoutCounter == 0){
+       error_printf("\r\n[INIT] status register: %d\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
+#if 0
        error_printf("\r\n[INIT] status: HMC0 = %d | HMC1 = %d | HMC2 = %d\r\n", ReadBoardRegister(0x700c0) & 0x1,
                                                                             ReadBoardRegister(0x7005c) & 0x1,
                                                                             ReadBoardRegister(0x70058) & 0x1);
-       error_printf("[INIT] HMC did not init...invoking reconfigure of FPGA\r\n");
+#endif
+       error_printf("[INIT] HMC did not init within %dms...invoking reconfigure of FPGA\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
        SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
        ResetSdramReadAddress();
        AboutToBootFromSdram();
@@ -1831,7 +1873,7 @@ int main()
        IcapeControllerInSystemReconfiguration();
      } else {
        /* if we haven't TIMED OUT then we're OK */
-       error_printf("[OK]\r\n");
+       error_printf("within %dms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
      }  
 
      error_printf("[INIT] Interface parameters\r\n");
