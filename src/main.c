@@ -48,6 +48,7 @@
 #include "print.h"
 #include "if.h"
 #include "arp.h"
+#include "memtest.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 
@@ -71,6 +72,8 @@ static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
+
+static volatile u8 uTimeoutCounter = 255;
 
 //u32 __attribute__ ((section(".rodata.memtest"))) __attribute__ ((aligned (32))) uMemPlace = 0xAABBCCDD ;
 
@@ -111,6 +114,10 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 	u8 u40GbE2_Link_Up = 0;
 	u8 u40GbE3_Link_Up = 0;
 	u8 u40GbE4_Link_Up = 0;
+
+  if (uTimeoutCounter != 0){
+    uTimeoutCounter--;
+  }
 
 	// Every 100 ms, send another ARP request
 	uUpdateArpRequests = ARP_REQUEST_UPDATE;
@@ -183,7 +190,14 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 		}
 	}
 	// Allow 3 seconds for QSFP+ to be ready
-	else if (uQSFPStateCounter == 0x1E)
+	//else if (uQSFPStateCounter == 0x1E)
+  /* TODO: FIXME is there a better way to check for QSFP+ readiness?
+                 This current mechanism is dependent on the init time
+                 of main() and any changes / reordering of initialization
+                 (e.g. initializing timers earlier) may result in this value
+                 having to change. This may result in error messages if the
+                 time allowed is too short */
+	else if (uQSFPStateCounter == 100)
 	{
 		if (uQSFPState == QSFP_STATE_STARTING_APPLICATION_MODE)
 		{
@@ -1373,7 +1387,7 @@ void InitialiseQSFPMezzanineLocation()
 	uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
 	WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-	uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_ADDR);
+	uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
 
 	while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4))
 	{
@@ -1574,21 +1588,35 @@ int main()
      u32 uIndex = 0;      /* used to index arrays / buffers */
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
-     u32 uTimeout = 0;
-     u32 loop = 0;
+     //u32 uTimeout = 0;
+     //u32 loop = 0;
+     u32 uHMCBitMask;
 
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
      u32 uKeepAliveReg;
 
-     u32 *iPtr;
+     //u32 *iPtr;
      u32 uMemTest = 0;
 
 #ifdef TIME_PROFILE
      u32 time1 = 0, time2 = 0;
 #endif
 
+     /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
+              but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
+              and add another one to prevent off-by-one error*/
+     if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
+       always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
+       always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
+       always_printf("[Memory Test] computed value              : 0x%08x\r\n", uMemTest);
+     } else {
+       always_printf("[Memory Test] Error - could not execute\r\n");
+     }
+
+
+#if 0
      /* very crude program memory test */
      for (iPtr = (u32 *)0x50; iPtr <= (u32 *) &_text_section_end_; iPtr++){
        /*print first, middle and last instruction*/
@@ -1598,9 +1626,10 @@ int main()
         uMemTest = uMemTest + *(iPtr);
      }
      always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
-     //always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
+     always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
      always_printf("[Memory Test] computed value                  : 0x%08x\r\n", uMemTest);
      /* TODO pass / fail -> what to do upon failure? */
+#endif 
 
 	   //Xil_ICacheEnable();
 	   //Xil_DCacheEnable();
@@ -1747,6 +1776,16 @@ int main()
 //#endif
 
 
+     error_printf("[INIT] Interrupts, exceptions and timers ");
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
+     microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
+	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
+     microblaze_enable_exceptions();
+     error_printf("[DONE]\r\n");
 	   FinishedBootingFromSdram();
 
 	   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
@@ -1759,34 +1798,83 @@ int main()
      /* try to continue before watchdog timer overflows */
      /* TODO: verify any later dependancies linked to this initialization */
 
-     uTimeout = 0;
+     uTimeoutCounter = 20;
 	   do
 	   {
 		   uReadReg = ReadBoardRegister(C_RD_BRD_CTL_STAT_0_ADDR);
-       if (uTimeout % 500000 == 0){
-         debug_printf(".");       /* this conditional and serial i/o adds a bit of overhead */
-       }
-       uTimeout++;
-	   }while(((uReadReg & 0x1) != 0x1) && (uTimeout < SGMII_1GBE_TIMEOUT));
+	   }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
 
-     /* if we haven't FAILED or TIMED OUT then we're OK */
-     error_printf("%s", ((uReadReg & 0x1) != 0x1) ? "[FAILED]" : uTimeout >= SGMII_1GBE_TIMEOUT ? "[TIMED OUT]" : "[OK]");
+     /* if we haven't TIMED OUT then we're OK */
+     error_printf("%s", uTimeoutCounter == 0 ? "[TIMED OUT]" : "[OK]");
      error_printf("\r\n"); /* for formatting */
-
-
-     error_printf("[INIT] Interrupts, exceptions and timers ");
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
-     microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
-	   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
-     microblaze_enable_exceptions();
-     error_printf("[DONE]\r\n");
 
      error_printf("[INIT] Mezzanine locations\r\n");
 	   InitialiseQSFPMezzanineLocation();
+
+     error_printf("[INIT] Waiting for HMC to complete init...");
+     
+     /*
+        - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
+        - each byte represents the status of a Mezz slot
+
+        31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
+        +-------+--------+--------+--------+
+        | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
+        +-------+--------+--------+--------+
+
+        bit 7 & 6 => reserved
+        bit 5     => HMC post ok
+        bit 4     => HMC init ok
+        bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
+        bit 0     => Present
+
+     */
+
+#define HMC_INIT_TIMEOUT    100    /* x 100ms */
+#define BYTE_MASK_HMC_INIT  0x35  /* b00110101 */
+
+     uHMCBitMask = 0;
+
+     /* dynamically build the bit mask for the hmc cards which are present */
+     uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+     for (uIndex = 0; uIndex < 4; uIndex++){
+       if ((uReadReg & (0xF << (uIndex*8))) == (5 << (uIndex*8))){
+         uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
+       }
+     }
+
+     uTimeoutCounter = HMC_INIT_TIMEOUT;
+
+     /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
+	   do
+	   {
+        uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+        /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
+        if ((uTimeoutCounter % 10) == 0){    /* every second */
+          XWdtTb_RestartWdt(& WatchdogTimer);
+        }
+
+		   //uReadReg = ReadBoardRegister(0x700c0) & ReadBoardRegister(0x7005c) & ReadBoardRegister(0x70058);
+	   //}while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
+	   }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
+
+     if (uTimeoutCounter == 0){
+       error_printf("\r\n[INIT] status register: %d\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
+#if 0
+       error_printf("\r\n[INIT] status: HMC0 = %d | HMC1 = %d | HMC2 = %d\r\n", ReadBoardRegister(0x700c0) & 0x1,
+                                                                            ReadBoardRegister(0x7005c) & 0x1,
+                                                                            ReadBoardRegister(0x70058) & 0x1);
+#endif
+       error_printf("[INIT] HMC did not init within %dms...invoking reconfigure of FPGA\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
+       SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+       ResetSdramReadAddress();
+       AboutToBootFromSdram();
+       Delay(100000);
+       IcapeControllerInSystemReconfiguration();
+     } else {
+       /* if we haven't TIMED OUT then we're OK */
+       error_printf("within %dms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
+     }  
 
      error_printf("[INIT] Interface parameters\r\n");
 	   InitialiseEthernetInterfaceParameters();

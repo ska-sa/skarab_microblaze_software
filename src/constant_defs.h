@@ -179,17 +179,18 @@ volatile u16 uPreviousSequenceNumber;
 
 // BOARD REGISTER OFFSET
 // READ REGISTERS
-#define C_RD_VERSION_ADDR          0x0
-#define C_RD_BRD_CTL_STAT_0_ADDR   0x4
-#define C_RD_LOOPBACK_ADDR         0x8
-#define C_RD_ETH_IF_LINK_UP_ADDR   0xC
-#define C_RD_MEZZANINE_STAT_ADDR   0x10
-#define C_RD_USB_STAT_ADDR         0x14
-#define C_RD_FPGA_DNA_LOW_ADDR     0x1C
-#define C_RD_FPGA_DNA_HIGH_ADDR    0x20
-#define C_RD_XADC_STATUS_ADDR      0x24
-#define C_RD_XADC_LATCHED_ADDR     0x28
-#define C_RD_UBLAZE_ALIVE_ADDR     0x2C
+#define C_RD_VERSION_ADDR            0x0
+#define C_RD_BRD_CTL_STAT_0_ADDR     0x4
+#define C_RD_LOOPBACK_ADDR           0x8
+#define C_RD_ETH_IF_LINK_UP_ADDR     0xC
+#define C_RD_MEZZANINE_STAT_0_ADDR   0x10
+#define C_RD_USB_STAT_ADDR           0x14
+#define C_RD_FPGA_DNA_LOW_ADDR       0x1C
+#define C_RD_FPGA_DNA_HIGH_ADDR      0x20
+#define C_RD_XADC_STATUS_ADDR        0x24
+#define C_RD_XADC_LATCHED_ADDR       0x28
+#define C_RD_UBLAZE_ALIVE_ADDR       0x2C
+#define C_RD_MEZZANINE_STAT_1_ADDR   0x30
 
 // WRITE REGISTERS
 #define C_WR_BRD_CTL_STAT_0_ADDR        0x4
