@@ -1811,7 +1811,7 @@ int main()
      error_printf("[INIT] Mezzanine locations\r\n");
 	   InitialiseQSFPMezzanineLocation();
 
-     error_printf("[INIT] Waiting for HMC to complete init...");
+     error_printf("[INIT] Waiting for HMC(s) to complete init...\r\n");
      
      /*
         - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
@@ -1832,13 +1832,15 @@ int main()
 
 #define HMC_INIT_TIMEOUT    100    /* x 100ms */
 #define BYTE_MASK_HMC_INIT  0x35  /* b00110101 */
+#define BYTE_MASK_HMC_PRESENT  5  /* bxxxx0101 - look for this bit signature to determine HMC presence */
 
      uHMCBitMask = 0;
 
      /* dynamically build the bit mask for the hmc cards which are present */
      uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
      for (uIndex = 0; uIndex < 4; uIndex++){
-       if ((uReadReg & (0xF << (uIndex*8))) == (5 << (uIndex*8))){
+       if ((uReadReg & (0xF << (uIndex*8))) == (BYTE_MASK_HMC_PRESENT << (uIndex*8))){
+         debug_printf("[HMC] MEZZ %d has an HMC present\r\n", uIndex);
          uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
        }
      }
@@ -1853,19 +1855,12 @@ int main()
         if ((uTimeoutCounter % 10) == 0){    /* every second */
           XWdtTb_RestartWdt(& WatchdogTimer);
         }
+     }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
 
-		   //uReadReg = ReadBoardRegister(0x700c0) & ReadBoardRegister(0x7005c) & ReadBoardRegister(0x70058);
-	   //}while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
-	   }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
+     always_printf("[INIT] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
      if (uTimeoutCounter == 0){
-       error_printf("\r\n[INIT] status register: %d\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
-#if 0
-       error_printf("\r\n[INIT] status: HMC0 = %d | HMC1 = %d | HMC2 = %d\r\n", ReadBoardRegister(0x700c0) & 0x1,
-                                                                            ReadBoardRegister(0x7005c) & 0x1,
-                                                                            ReadBoardRegister(0x70058) & 0x1);
-#endif
-       error_printf("[INIT] HMC did not init within %dms...invoking reconfigure of FPGA\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
+       error_printf("[HMC] all HMCs did not init within %d ms...invoking reconfigure of FPGA\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
        SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
        ResetSdramReadAddress();
        AboutToBootFromSdram();
@@ -1873,7 +1868,7 @@ int main()
        IcapeControllerInSystemReconfiguration();
      } else {
        /* if we haven't TIMED OUT then we're OK */
-       error_printf("within %dms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
+       always_printf("[HMC] all HMCs initialized within %d ms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
      }  
 
      error_printf("[INIT] Interface parameters\r\n");
