@@ -43,6 +43,7 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr);
 static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHCPMsgType, typeDHCPMessageFlags tDHCPMsgFlags);
 static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr);
 
+static u8 uDHCPWait(struct sIFObject *pIFObjectPtr);
 static u32 uDHCPRandomNumber(u32 uSeed);
 
 static void vDHCPAuxClearFlag(u8 *pFlagRegister, typeDHCPRegisterFlags tBitPosition);
@@ -625,7 +626,8 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
 
   //FIXME pDHCPObjectPtr->uDHCPRandomWait = (u32) (uDHCPRandomNumber(0) % 40 + 10);
   //pDHCPObjectPtr->uDHCPRandomWait = 0;
-  pDHCPObjectPtr->uDHCPRandomWait = DHCP_SM_WAIT; /* wait a prerequisite amount of time before dhcp'ing */
+  pDHCPObjectPtr->uDHCPRandomWait = DHCP_SM_WAIT + (u32) uDHCPWait(pIFObjectPtr); /* wait a prerequisite amount of time before dhcp'ing */
+  debug_printf("DHCP [%02x] Waiting %d ms before issuing DHCP discover.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL));
 
   return RANDOMIZE;
 }
@@ -1384,6 +1386,40 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
 }
 
 /**********  Some auxiliary functions **********/
+
+//=================================================================================
+//  uDHCPWait
+//---------------------------------------------------------------------------------
+//  This method "hashes" the MAC address to generate a waiting time between 0 and 30 counts.
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  The number of counts to wait
+//=================================================================================
+static u8 uDHCPWait(struct sIFObject *pIFObjectPtr){
+  u16 uWaitCount = 0;
+  u8 uIndex;
+
+  /** very simple division hashing **/
+
+  /* sum the octets of the mac address */
+  for (uIndex = 0; uIndex < 6; uIndex++){
+    uWaitCount += pIFObjectPtr->arrIFAddrMac[uIndex];
+  }
+
+  /* add the 5th octet to sum and multiply by sum */
+  /* 5th octet chosen since it changes most frequently across SKARABs */
+  uWaitCount = uWaitCount * (uWaitCount + pIFObjectPtr->arrIFAddrMac[4]);
+
+  /* modulo operation by largest prime under 30 */
+  uWaitCount = uWaitCount % 29;
+
+  return uWaitCount;
+}
 
 //=================================================================================
 //  uDHCPRandomNumber
