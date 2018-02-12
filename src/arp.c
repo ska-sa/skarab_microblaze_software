@@ -65,40 +65,40 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
   
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
-    debug_printf("ARP: Ethernet HW Type problem!\n\r");
+    debug_printf("ARP: Ethernet HW Type problem!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_PROTO_TYPE_OFFSET, uIPProtocolType, 2) != 0){
-    debug_printf("ARP: IPv4 Protocol Type problem!\n\r");
+    debug_printf("ARP: IPv4 Protocol Type problem!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* NOTE: expecting IP over Ethernet ARP messages, thus hard code following lengths */
   /* ethernet length */
   if (pUserBufferPtr[ARP_FRAME_BASE + ARP_HW_ADDR_LENGTH_OFFSET] != 6){
-    debug_printf("ARP: HW Addr length problem!!\n\r");
+    debug_printf("ARP: HW Addr length problem!!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* ipv4 length */
   if (pUserBufferPtr[ARP_FRAME_BASE + ARP_PROTO_ADDR_LENGTH_OFFSET] != 4){
-    debug_printf("ARP: Proto Addr length problem!!\n\r");
+    debug_printf("ARP: Proto Addr length problem!!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* are we the intended target of this arp packet? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_TGT_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4) != 0 ){
-    trace_printf("ARP: ignore!\n\r");
+    trace_printf("ARP: ignore!\r\n");
     return ARP_RETURN_IGNORE;
   }
 
   /* is this an ARP reply? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_OPCODE_OFFSET, uReplyOpcode, 2) == 0){
-    trace_printf("ARP: reply!\n\r");
+    trace_printf("ARP: reply!\r\n");
     /* check for ip conflict between sender and us */
     if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4) == 0){
-      trace_printf("ARP: address conflict!\n\r");
+      trace_printf("ARP: address conflict!\r\n");
       return ARP_RETURN_CONFLICT;
     }
     return ARP_RETURN_REPLY;
@@ -106,7 +106,7 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
 
   /* is this an ARP request? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_OPCODE_OFFSET, uRequestOpcode, 2) == 0){
-    trace_printf("ARP: request!\n\r");
+    trace_printf("ARP: request!\r\n");
     return ARP_RETURN_REQUEST;
   }
 
@@ -142,7 +142,7 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
     memset(pTxBuffer + ETH_DST_OFFSET, 0xff, 6);   /* broadcast */
   } else {
     /* unrecognized type */
-    trace_printf("ARP: invalid message type!\n\r");
+    trace_printf("ARP: invalid message type!\r\n");
     return ARP_RETURN_FAIL;
   }
 
@@ -189,11 +189,11 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   /* in our case, arp packets are fixed length (14 + 28 = 42) */
   pIFObjectPtr->uMsgSize = ETH_FRAME_TOTAL_LEN + ARP_FRAME_TOTAL_LEN + 24;
 
-  trace_printf("ARP  packet:\n\r");
+  trace_printf("ARP  packet:\r\n");
   for (uIndex = 0; uIndex < pIFObjectPtr->uMsgSize; uIndex++){
     trace_printf("%02x ", pTxBuffer[uIndex]);
   }
-  trace_printf("\n\r");
+  trace_printf("\r\n");
 
   return ARP_RETURN_OK;
 }

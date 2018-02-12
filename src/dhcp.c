@@ -278,7 +278,7 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("DHCP: RX - IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
+    xil_printf("DHCP: RX - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
 
@@ -311,7 +311,7 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("DHCP: RX - UDP Checksum %04x - Invalid!\n\r", uCheckTemp);
+    xil_printf("DHCP: RX - UDP Checksum %04x - Invalid!\r\n", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
 #endif
@@ -1189,11 +1189,11 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
 #ifdef TRACE_PRINT
-  xil_printf("DHCP: UDP pseudo header: \n\r");
+  xil_printf("DHCP: UDP pseudo header: \r\n");
   for (int i=0; i< 12; i++){
     xil_printf(" %02x", uPseudoHdr[i]);
   }
-  xil_printf("\n\r");
+  xil_printf("\r\n");
 #endif
 
   RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0);
@@ -1208,7 +1208,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   }
 
 #ifdef TRACE_PRINT
-  xil_printf("DHCP: UDP checksum value = %04x\n\r", uCheckTemp);
+  xil_printf("DHCP: UDP checksum value = %04x\r\n", uCheckTemp);
 #endif
 
   pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET    ] = (u8) ((uCheckTemp & 0xff00) >> 8);
