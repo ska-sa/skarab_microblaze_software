@@ -173,6 +173,7 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPCachedClkTick = 0;
   pDHCPObjectPtr->uDHCPExternalTimerTick = 0;
   pDHCPObjectPtr->uDHCPRandomWait = 0;
+  pDHCPObjectPtr->uDHCPRandomWaitCached = (u32) uDHCPWait(pIFObjectPtr);
 
   pDHCPObjectPtr->uDHCPT1 = 0;
   pDHCPObjectPtr->uDHCPT2 = 0;
@@ -448,6 +449,31 @@ u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName){
   return DHCP_RETURN_OK;
 }
 
+//=================================================================================
+//  uDHCPSetWaitOnInitFlag
+//---------------------------------------------------------------------------------
+//  This method sets a flag to delay the start of dhcp by a fixed offset.
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  DHCP_RETURN_OK or DHCP_RETURN_FAIL
+//=================================================================================
+u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr){
+  struct sDHCPObject *pDHCPObjectPtr;
+
+  SANE_DHCP(pIFObjectPtr);
+
+  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_INIT_WAIT_EN);
+
+  return DHCP_RETURN_OK;
+}
+
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus
@@ -568,7 +594,14 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
   if (pDHCPObjectPtr->tDHCPCurrentState < BOUND){
     /* after <t> seconds, if still not bound, reset state machine */
     if (pDHCPObjectPtr->uDHCPTimeout >= DHCP_SM_INTERVAL){
-      pDHCPObjectPtr->tDHCPCurrentState = INIT;
+      pDHCPObjectPtr->uDHCPTimeout = 0;   /* reset timeout counter  */
+      /* pDHCPObjectPtr->tDHCPCurrentState = INIT; */         /* go to RANDOMIZE state rather
+                                                                 in order to send another
+                                                                 DHCP_DISCOVER immediately */
+      /* pDHCPObjectPtr->uDHCPRandomWait = 0; */              /* set to zero -> don't wait in RANDOMIZE state */
+
+      pDHCPObjectPtr->uDHCPRandomWait = pDHCPObjectPtr->uDHCPRandomWaitCached; /* wait a prerequisite amount of time before dhcp'ing */
+      pDHCPObjectPtr->tDHCPCurrentState = RANDOMIZE;
       /* check if we must stop trying eventually...else keep trying */
       /* if we've retried <n> times, quit trying */
       if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
@@ -624,9 +657,13 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPTimeout = 0;
 
-  //FIXME pDHCPObjectPtr->uDHCPRandomWait = (u32) (uDHCPRandomNumber(0) % 40 + 10);
-  //pDHCPObjectPtr->uDHCPRandomWait = 0;
-  pDHCPObjectPtr->uDHCPRandomWait = DHCP_SM_WAIT + (u32) uDHCPWait(pIFObjectPtr); /* wait a prerequisite amount of time before dhcp'ing */
+  pDHCPObjectPtr->uDHCPRandomWait = pDHCPObjectPtr->uDHCPRandomWaitCached;     /* wait a prerequisite amount of time before dhcp'ing. This is done
+                                                                                 in order to spread requests when systems are started at the same time. */
+
+  if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_INIT_WAIT_EN) == statusSET){
+    pDHCPObjectPtr->uDHCPRandomWait += DHCP_SM_WAIT; /* add an extra fixed offset to the dhcp init waiting time */
+  }
+
   debug_printf("DHCP [%02x] Waiting %d ms before issuing DHCP discover.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL));
 
   return RANDOMIZE;
@@ -838,6 +875,7 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
       /* reset flags and counters */
       vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
       pDHCPObjectPtr->uDHCPInternalTimer = 0;
+      pDHCPObjectPtr->uDHCPTimeout = 0;   /* reset timeout counter  */
       pDHCPObjectPtr->uDHCPRandomWait = 0;
       pDHCPObjectPtr->uDHCPRetries = 0;
       return RANDOMIZE;
@@ -1390,7 +1428,7 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
 //=================================================================================
 //  uDHCPWait
 //---------------------------------------------------------------------------------
-//  This method "hashes" the MAC address to generate a waiting time between 0 and 30 counts.
+//  This method "hashes" the MAC address to generate a waiting time between 1 and 30 counts.
 //
 //  Parameter	      Dir   Description
 //  ---------	      ---	  -----------
@@ -1416,7 +1454,7 @@ static u8 uDHCPWait(struct sIFObject *pIFObjectPtr){
   uWaitCount = uWaitCount * (uWaitCount + pIFObjectPtr->arrIFAddrMac[4]);
 
   /* modulo operation by largest prime under 30 */
-  uWaitCount = uWaitCount % 29;
+  uWaitCount = (uWaitCount % 29) + 1;
 
   return uWaitCount;
 }

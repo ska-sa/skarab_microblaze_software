@@ -1934,6 +1934,14 @@ int main()
        eventDHCPOnMsgBuilt(&IFContext[uEthernetId], &vSendDHCPMsg, NULL);
        eventDHCPOnLeaseAcqd(&IFContext[uEthernetId], &vSetInterfaceConfig, NULL);
        vDHCPSetHostName(&IFContext[uEthernetId], (char *) &uTempHostNameString);
+
+       /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
+          We thus want to delay the start of dhcp till these transitions have settled.
+          The delay is determined by the DHCP_SM_WAIT macro. */
+       if (uEthernetId == 0){
+         uDHCPSetWaitOnInitFlag(&(IFContext[uEthernetId]));
+       }
+
        /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
 
        //uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
