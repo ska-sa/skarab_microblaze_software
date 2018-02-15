@@ -31,7 +31,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	sInvalidOpcodeRespT *Response = (sInvalidOpcodeRespT *) uResponsePacketPtr;
 	u8 uPaddingIndex;
 
-	xil_printf("Creating Response Packet for NACK. . .\n\r");
+	xil_printf("Creating Response Packet for NACK. . .\r\n");
 	// Create response packet
 	Response->Header.uCommandType = NACK_OPCODE_RESP;
 	Response->Header.uSequenceNumber = 0xFFFF;
@@ -47,7 +47,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 		Response->uPadding[uPaddingIndex] = 0;
 	
 
-	xil_printf("Created Response for NACK!!!!!\n\r");
+	xil_printf("Created Response for NACK!!!!!\r\n");
 
 	*uResponseLength = sizeof(sInvalidOpcodeRespT);
 

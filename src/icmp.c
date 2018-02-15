@@ -138,7 +138,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("ICMP: ECHO REQ - IP Hdr Checksum %04x - Invalid!\n\r", uCheckTemp);
+    xil_printf("ICMP: ECHO REQ - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
 #endif
@@ -148,7 +148,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   uICMPTotalLength |= (pUserBufferPtr[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
   uICMPTotalLength = uICMPTotalLength - 20 - uIPLenAdjust;
 
-  trace_printf("ICMP: Length = %d\n\r", uICMPTotalLength);
+  trace_printf("ICMP: Length = %d\r\n", uICMPTotalLength);
 
   /* now check the ICMP checksum */
   RetVal = uChecksum16Calc(pUserBufferPtr, ICMP_FRAME_BASE, ICMP_FRAME_BASE + uICMPTotalLength - 1, &uCheckTemp, 0, 0);
@@ -157,7 +157,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    error_printf("ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\n\r", uCheckTemp);
+    error_printf("ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\r\n", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
 
@@ -202,7 +202,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   uIPTotalLength |= (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
 
 #ifdef TRACE_PRINT
-  xil_printf("ICMP: RX IP Total Len %d\n\r", uIPTotalLength);
+  xil_printf("ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
 #endif
 
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
@@ -240,13 +240,13 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   uIPTotalLength |= (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
 
 #ifdef TRACE_PRINT
-  xil_printf("ICMP: RX IP Total Len %d\n\r", uIPTotalLength);
+  xil_printf("ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
 #endif
 
   uIPRxHdrLength = (pRxBuffer[IP_FRAME_BASE] & 0x0F) * 4;
 
 #ifdef TRACE_PRINT
-  xil_printf("ICMP: RX IP Hdr Len %d\n\r", uIPRxHdrLength);
+  xil_printf("ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
 #endif
 
   /* adjust ip base value if ip length greater than 20 bytes */
@@ -255,7 +255,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   uICMPTotalLength = uIPTotalLength - uIPRxHdrLength;
 
 #ifdef TRACE_PRINT
-  xil_printf("ICMP: ICMP Total Len %d\n\r", uICMPTotalLength);
+  xil_printf("ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
 #endif
 
   for (uIndex = 0; uIndex < (uICMPTotalLength - 4); uIndex++){  /* ICMP header length = 4 */
@@ -288,15 +288,15 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   pIFObjectPtr->uMsgSize = uIPTotalLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
 #ifdef TRACE_PRINT
-  xil_printf("ICMP: RX IP Hdr Len %d\n\r", uIPRxHdrLength);
-  xil_printf("ICMP: RX IP Total Len %d\n\r", uIPTotalLength);
-  xil_printf("ICMP: ICMP Total Len %d\n\r", uICMPTotalLength);
+  xil_printf("ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
+  xil_printf("ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
+  xil_printf("ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
 
-  xil_printf("ICMP: packet\n\r");
+  xil_printf("ICMP: packet\r\n");
   for (uIndex=ICMP_FRAME_BASE; uIndex < ICMP_FRAME_BASE + uICMPTotalLength; uIndex++){
     xil_printf(" %02x", pTxBuffer[uIndex]);
   }
-  xil_printf("\n\r");
+  xil_printf("\r\n");
 #endif
 
   return ICMP_RETURN_OK;

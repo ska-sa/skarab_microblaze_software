@@ -150,7 +150,8 @@ typedef enum {flagDHCP_SM_AUTO_REDISCOVER=0,
                                                      appended. This may cause issues resulting in the lease not being successfully renewed.
                                                      This flag bypasses the renew step altogether, and allows the client to re-discover
                                                      the lease. */
-              flagDHCP_RESERVED_2,
+              flagDHCP_SM_INIT_WAIT_EN,           /* this flag determines if the state machine must wait a
+                                                     fixed amount of time (DHCP_SM_WAIT) at init before running */
               flagDHCP_RESERVED_1
 } typeDHCPRegisterFlags;
 
@@ -216,6 +217,7 @@ struct sDHCPObject{
   u32 uDHCPCachedClkTick;
   u32 uDHCPExternalTimerTick;
   u32 uDHCPRandomWait;
+  u32 uDHCPRandomWaitCached;
 
   u32 uDHCPT1;
   u32 uDHCPT2;
@@ -254,6 +256,9 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr);
 u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable);
 
 u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr);
+
+/* delay the start of dhcp - see DHCP_SM_WAIT macro above */
+u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr);
 
 #if 0
 /*TODO*/u8 uDHCPSetAutoRediscoverEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable);

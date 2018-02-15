@@ -501,14 +501,14 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 		else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
 			return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
-			xil_printf("Invalid Opcode Detected!\n\r");
+			xil_printf("Invalid Opcode Detected!\r\n");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 			//return XST_FAILURE;
 		}
 			
 	}
 	else
-		xil_printf("Invalid Opcode Detected: Out of Range!\n\r");
+		xil_printf("Invalid Opcode Detected: Out of Range!\r\n");
 		return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		//return XST_FAILURE;
 
@@ -3220,7 +3220,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
       }
     }
 
-    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram.\n\r", uId);
+    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram.\r\n", uId);
     uChunkIdCached = 0;
     ClearSdram();
 		SetOutputMode(0x1, 0x1);
@@ -3233,7 +3233,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
   } else if (Command->uChunkNum == (uChunkIdCached + 1)){
 #ifdef DEBUG_PRINT
-    /* xil_printf("chunk %d: about to write to sdram\n\r", Command->uChunkNum); */  /* this adds lots of overhead */
+    /* xil_printf("chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */
 #endif
     for (uChunkByteIndex = 0; uChunkByteIndex < CHUNK_SIZE; uChunkByteIndex = uChunkByteIndex + 2){
       uTemp = (Command->uBitstreamChunk[uChunkByteIndex] << 16 & 0xFFFF0000) | (Command->uBitstreamChunk[uChunkByteIndex + 1] & 0x0000FFFF);
@@ -3250,7 +3250,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     }
 
     if (Command->uChunkNum == Command->uChunkTotal){
-      xil_printf("SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\n\r", uId, Command->uChunkNum);
+      xil_printf("SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\r\n", uId, Command->uChunkNum);
 
       SetOutputMode(0x2, 0x1);
       FinishedWritingToSdram();
@@ -3269,7 +3269,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   } else if (Command->uChunkNum == uChunkIdCached){
     uRetVal = XST_SUCCESS;
 #ifdef DEBUG_PRINT
-    xil_printf("SDRAM PROGRAM[%02x] Chunk %d: already received\n\r", uId, Command->uChunkNum);
+    xil_printf("SDRAM PROGRAM[%02x] Chunk %d: already received\r\n", uId, Command->uChunkNum);
 #endif
   } else {
     uRetVal = XST_FAILURE;
