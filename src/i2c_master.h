@@ -114,10 +114,22 @@
 #define SPEED_400kHz	0x1
 
 // Clock prescaler ratios for 156.25MHz Wishbone clock
-#define SPEED_100kHz_CLOCK_PRESCALER	0x138	// 312
-#define SPEED_400kHz_CLOCK_PRESCALER	0x4E	// 78
+#define SPEED_100kHz_CLOCK_PRESCALER_156M25 0x138 // 312
+#define SPEED_400kHz_CLOCK_PRESCALER_156M25 0x4E  // 78
 
-#define I2C_TIMEOUT		10000
+// Clock prescaler ratios for 39.0625MHz Wishbone clock
+#define SPEED_100kHz_CLOCK_PRESCALER_36M0625 78
+#define SPEED_400kHz_CLOCK_PRESCALER_36M0625 19
+
+// Clock prescaler ratios for Wishbone clock (select one of the above)
+#define SPEED_100kHz_CLOCK_PRESCALER    SPEED_100kHz_CLOCK_PRESCALER_36M0625
+#define SPEED_400kHz_CLOCK_PRESCALER    SPEED_400kHz_CLOCK_PRESCALER_36M0625
+
+#define I2C_TIMEOUT_156M25  10000
+#define I2C_TIMEOUT_36M0625 2500
+
+// Timeout value for I2C operations (select one of the above)
+#define I2C_TIMEOUT   I2C_TIMEOUT_36M0625
 
 u32 GetI2CAddressOffset(u16 uId);
 void InitI2C(u16 uId, u16 uSpeed);
