@@ -281,7 +281,16 @@ void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
 	// read temperature
-	PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+	if ((TempSensorPage == MEZZANINE_0_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_1_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_2_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_3_TEMP_ADC_PAGE))
+	{
+		// read mezzanine temperatures
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+	}
+	else
+	{
+		// read other temperatures
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+	}
 }
 //=================================================================================
 //	ReadVoltageMonTemperature
@@ -353,9 +362,10 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 		u16 temperature;
 		int i;
 
-		unsigned TempSensorPages[6] = {INLET_TEMP_SENSOR_PAGE, OUTLET_TEMP_SENSOR_PAGE, FPGA_TEMP_DIODE_ADC_PAGE,
+		unsigned TempSensorPages[10] = {INLET_TEMP_SENSOR_PAGE, OUTLET_TEMP_SENSOR_PAGE, FPGA_TEMP_DIODE_ADC_PAGE,
 									   FAN_CONT_TEMP_SENSOR_PAGE, VOLTAGE_MON_TEMP_SENSOR_PAGE,
-									   CURRENT_MON_TEMP_SENSOR_PAGE};
+									   CURRENT_MON_TEMP_SENSOR_PAGE, MEZZANINE_0_TEMP_ADC_PAGE, MEZZANINE_1_TEMP_ADC_PAGE,
+									   MEZZANINE_2_TEMP_ADC_PAGE, MEZZANINE_3_TEMP_ADC_PAGE };
 
 
 		for (i = 0; i<6; i++){
@@ -377,6 +387,8 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 			Response->uSensorData[i+10] = temperature; // offset of 10 to account for previous sensor data
 		}
+
+		// adding two new sensors will shift all the sensor data around!!!
 
 		/*
 		// INLET TEMPERATURE SENSOR
@@ -528,9 +540,9 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
 
 			Voltage = (ReadBytes[0] + (ReadBytes[1] << 8));
 			VoltageScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+16] = Voltage;
-			Response->uSensorData[(i*3)+17] = VoltageScaleFactor;
-			Response->uSensorData[(i*3)+18] = VoltagePages[i];
+			Response->uSensorData[(i*3)+18] = Voltage;
+			Response->uSensorData[(i*3)+19] = VoltageScaleFactor;
+			Response->uSensorData[(i*3)+20] = VoltagePages[i];
 		}
 
 		/*// 12V2 Voltage
@@ -724,9 +736,9 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
 
 			Current = (ReadBytes[0] + (ReadBytes[1] << 8));
 			ScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+55] = Current;
-			Response->uSensorData[(i*3)+56] = ScaleFactor;
-			Response->uSensorData[(i*3)+57] = CurrentPages[i];
+			Response->uSensorData[(i*3)+57] = Current;
+			Response->uSensorData[(i*3)+58] = ScaleFactor;
+			Response->uSensorData[(i*3)+59] = CurrentPages[i];
 		}
 		/*
 		// 12V2 Current
