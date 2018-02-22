@@ -8,7 +8,10 @@
 -include Makefile.inc
 
 #version info
-VERSION=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+GIT_BRANCH=$(shell git rev-parse --verify -q --abbrev-ref HEAD 2>/dev/null || echo unknown)
+GIT_DESCRIBE=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+
+VERSION=$(GIT_DESCRIBE)-$(GIT_BRANCH)
 
 #Additional build flags
 
