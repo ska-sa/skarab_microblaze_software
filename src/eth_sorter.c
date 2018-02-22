@@ -155,6 +155,7 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 	return XST_SUCCESS;
 }
 
+#if 0
 //=================================================================================
 //	CheckICMPHeader
 //--------------------------------------------------------------------------------
@@ -301,6 +302,7 @@ void ICMPHandler(u8 uId, u8 *pReceivedICMPPacket, u32 uReceivedLength, u8 *pTran
 	* uResponseLength = uTempResponseLength;
 
 }
+#endif
 
 //=================================================================================
 //	ExtractIPV4FieldsAndGetPayloadPointer
@@ -2160,6 +2162,7 @@ void ArpHandler(u8 uId, u8 uType, u8 *pReceivedArp, u8 *pTransmitBuffer, u32 * u
 
 }
 
+#if 0
 //=================================================================================
 //	CreateDHCPDiscoverPacketOptions
 //--------------------------------------------------------------------------------
@@ -2759,6 +2762,7 @@ int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTrans
 		return XST_FAILURE;
 
 }
+#endif
 
 //=================================================================================
 //	CreateIGMPPacket
