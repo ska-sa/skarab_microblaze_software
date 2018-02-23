@@ -420,6 +420,27 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 		ReadCurrentMonTemperature(ReadBytes, false);
 		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 		Response->uSensorData[15] = temperature;
+
+		// MEZZANINE SITE 0 TEMPERATURE SENSOR
+		ReadVoltageMonTemperature(ReadBytes, true);
+		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+		Response->uSensorData[16] = temperature;
+
+		// MEZZANINE SITE 1 TEMPERATURE SENSOR
+		ReadCurrentMonTemperature(ReadBytes, false);
+		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+		Response->uSensorData[17] = temperature;
+
+		// MEZZANINE SITE 2 TEMPERATURE SENSOR
+		ReadVoltageMonTemperature(ReadBytes, true);
+		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+		Response->uSensorData[18] = temperature;
+
+		// MEZZANINE SITE 3 TEMPERATURE SENSOR
+		ReadCurrentMonTemperature(ReadBytes, false);
+		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+		Response->uSensorData[19] = temperature;
+
 		*/
 
 }
@@ -540,9 +561,9 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
 
 			Voltage = (ReadBytes[0] + (ReadBytes[1] << 8));
 			VoltageScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+18] = Voltage;
-			Response->uSensorData[(i*3)+19] = VoltageScaleFactor;
-			Response->uSensorData[(i*3)+20] = VoltagePages[i];
+			Response->uSensorData[(i*3)+20] = Voltage;
+			Response->uSensorData[(i*3)+21] = VoltageScaleFactor;
+			Response->uSensorData[(i*3)+22] = VoltagePages[i];
 		}
 
 		/*// 12V2 Voltage
@@ -736,9 +757,9 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
 
 			Current = (ReadBytes[0] + (ReadBytes[1] << 8));
 			ScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+57] = Current;
-			Response->uSensorData[(i*3)+58] = ScaleFactor;
-			Response->uSensorData[(i*3)+59] = CurrentPages[i];
+			Response->uSensorData[(i*3)+59] = Current;
+			Response->uSensorData[(i*3)+60] = ScaleFactor;
+			Response->uSensorData[(i*3)+61] = CurrentPages[i];
 		}
 		/*
 		// 12V2 Current
