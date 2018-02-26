@@ -71,7 +71,12 @@ volatile u32 uWriteBoardShadowRegs[NUM_REGISTERS];
 volatile u32 uTransmitBuffer[TX_BUFFER_MAX];
 
 // Single receive buffer
-#define RX_BUFFER_MAX 512
+//#define RX_BUFFER_MAX 512
+#define RX_BUFFER_MAX 2254  /* Allow for jumbo packets i.e. MTU 9000.
+                               Assuming MTU means maximum L3 packet size in bytes,
+                               we require 9000 plus extra 14 bytes for eth header
+                               (preamble and FCS handled in FW).
+                               2254 x 32bit words = 9016 bytes */
 volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
 
 // Transmit and receive buffers for loopback testing of second interface
@@ -160,11 +165,19 @@ volatile u16 uPreviousSequenceNumber;
 #define I2C_3_ADDR					0x00038000
 #define I2C_4_ADDR					0x00040000
 #define ONE_GBE_MAC_ADDR			0x00048000
-#define FORTY_GBE_MAC_0_ADDR		0x00050000
-#define FORTY_GBE_MAC_1_ADDR		0x00058000
-#define FORTY_GBE_MAC_2_ADDR		0x00060000
-#define FORTY_GBE_MAC_3_ADDR		0x00068000
-#define DSP_REGISTER_ADDR			0x00070000
+#if 0
+#define FORTY_GBE_MAC_0_ADDR    0x00050000
+#define FORTY_GBE_MAC_1_ADDR    0x00058000
+#define FORTY_GBE_MAC_2_ADDR    0x00060000
+#define FORTY_GBE_MAC_3_ADDR    0x00068000
+#define DSP_REGISTER_ADDR     0x00070000
+#endif
+/* adjusted wishbone slave address map */
+#define FORTY_GBE_MAC_0_ADDR    0x00054000
+#define FORTY_GBE_MAC_1_ADDR    0x00060000
+#define FORTY_GBE_MAC_2_ADDR    0x0006C000
+#define FORTY_GBE_MAC_3_ADDR    0x00078000
+#define DSP_REGISTER_ADDR       0x00084000
 
 /*#define DUAL_PORT_RAM_ADDR			0x00000
 #define BOARD_REGISTER_ADDR			0x08000

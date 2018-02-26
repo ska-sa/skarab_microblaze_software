@@ -20,6 +20,7 @@
 * ------------------------------------------------------------------------------*/
 
 #include "eth_mac.h"
+#include "print.h"
 
 //=================================================================================
 //	GetAddressOffset
@@ -318,7 +319,10 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 
 	uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
-	return (2 * (uReg & 0xFF));
+  debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
+
+	//return (2 * (uReg & 0xFF));
+	return (2 * (uReg & 0x7FF));    /* value stored in lower 11-bits of this wishbone register */
 
 }
 
@@ -418,6 +422,8 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		return XST_FAILURE;
   }
 
+  debug_printf("[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
+
 	// Program transmit packet words into FIFO
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
 	{
@@ -450,6 +456,8 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		xil_printf("TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uHostTransmitBufferLevel);
 		return XST_FAILURE;
   }
+
+  debug_printf("[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
 
 	return XST_SUCCESS;
 
@@ -489,12 +497,16 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 		return XST_FAILURE;
 	}
 
+  debug_printf("[RECV %02x] About to read %d 32-bit words from the cpu receive buffer\r\n", uId, uNumWords);
+
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
 	{
 		puReceivePacket[uIndex] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
 		//uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
 		//puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 	}
+
+  debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
 
 	// Acknowledge reading the packet from the FIFO
 	AckHostPacketReceive(uId);
