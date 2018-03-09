@@ -731,6 +731,9 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+
+        /* legacy dhcp states */
+        uDHCPState[uId] = DHCP_STATE_IDLE;
 #endif
       } else {
         /* do not set in loopback mode */
@@ -739,6 +742,9 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+
+        /* legacy dhcp states */
+        uDHCPState[uId] = DHCP_STATE_IDLE;
 #endif
       }
     }
