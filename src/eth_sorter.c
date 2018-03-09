@@ -20,6 +20,8 @@
 
 #include "eth_sorter.h"
 #include "net_utils.h"
+#include "dhcp.h"
+#include "one_wire.h"
 
 //=================================================================================
 //	CalculateIPChecksum
@@ -435,7 +437,7 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength, struct sIFObject *pIFObj)
 {
 	int iStatus;
 	sCommandHeaderT *Command = (sCommandHeaderT *) pCommand;
@@ -502,6 +504,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(BigWriteWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
 			return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == DHCP_TUNING_DEBUG)
+			return(DHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
 			xil_printf("Invalid Opcode Detected!\r\n");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3280,4 +3284,74 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   }
 
   return uRetVal;
+}
+
+int DHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  struct sDHCPObject *pDHCPObj;
+  u16 data[4] = {0};
+  u16 rom[8];
+  u8 uPaddingIndex;
+
+  pDHCPObj = &(pIFObj->DHCPContextState);
+
+  sDHCPTuningDebugReqT *Command = (sDHCPTuningDebugReqT *) pCommand;
+	sDHCPTuningDebugRespT *Response = (sDHCPTuningDebugRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sDHCPTuningDebugReqT)){
+		return XST_FAILURE;
+  }
+
+  Response->uStatus = 1;
+
+  if (uDHCPSetRetryInterval(pIFObj, Command->uRetryTime) == DHCP_RETURN_FAIL){
+    Response->uStatus = 0;
+  }
+
+  if (uDHCPSetInitWait(pIFObj, Command->uInitTime) == DHCP_RETURN_FAIL){
+    Response->uStatus = 0;
+  }
+
+  /* store the values in page15 of DS2433 one-wire EEPROM on Motherboard
+     (need two bytes each)
+     -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+     -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+  */
+
+  /* pack the data */
+  data[0] = Command->uInitTime & 0xFF;
+  data[1] = (Command->uInitTime >> 8) & 0xFF;
+  data[2] = Command->uRetryTime & 0xFF;
+  data[3] = (Command->uRetryTime >> 8) & 0xFF;
+
+  if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+    Response->uStatus = 0;
+  } else {
+    if (DS2433WriteMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+      Response->uStatus = 0;
+    }
+  }
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	Response->uInitTime = Command->uInitTime; 
+	Response->uRetryTime = Command->uRetryTime; 
+
+	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  *uResponseLength = sizeof(sDHCPTuningDebugRespT);
+
+  pDHCPObj->uDHCPSMRetryInterval = Command->uRetryTime;
+  pDHCPObj->uDHCPSMInitWait = Command->uInitTime;
+
+#if 0
+  vDHCPStateMachineReset(pIFObj);
+  uDHCPSetStateMachineEnable(pIFObj, SM_TRUE);
+#endif
+
+  xil_printf("DHCP TUNING[%02x] Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Command->uRetryTime, Command->uInitTime);
+
+  return XST_SUCCESS;
 }

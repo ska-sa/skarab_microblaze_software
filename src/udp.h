@@ -1,6 +1,8 @@
 #ifndef _UDP_H_
 #define _UDP_H_
 
+#include "ipv4.h"
+
 #define UDP_FRAME_BASE              (IP_FRAME_BASE + IP_FRAME_TOTAL_LEN) //34 
 #define UDP_SRC_PORT_OFFSET         0
 #define UDP_SRC_PORT_LEN            2

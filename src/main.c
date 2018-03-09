@@ -428,7 +428,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 					// Command protocol
 					if (uUdpDstPort == ETHERNET_CONTROL_PORT_ADDRESS){
             trace_printf("Control packet received!\r\n");
-						iStatus = CommandSorter(uId, pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength);
+						iStatus = CommandSorter(uId, pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength, &(IFContext[uId]) );
 						if (iStatus == XST_SUCCESS){
               trace_printf("Control packet success\r\n");
 							// Create rest of Ethernet packet in transmit buffer for response
@@ -1919,8 +1919,26 @@ int main()
      uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
      uTempHostNameString[11] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
 
-
      uTempHostNameString[12] = '-';
+
+     /* read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
+        -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+        -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+     */
+     u16 rom[8];
+     u16 data[4];
+     u16 dhcp_wait = 0;
+     u16 dhcp_retry = 0;
+     u8 dhcp_set = 0;
+
+     if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){ 
+       if (DS2433ReadMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+         dhcp_wait = (data[0] & 0xff) | (data[1] << 8) ;
+         dhcp_retry = (data[2] & 0xff) | (data[3] << 8) ;
+         dhcp_set = 1;
+       }
+     } /* else run with the default values automatically set when interface initialized */
+
 
      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
        
@@ -1944,16 +1962,17 @@ int main()
        /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
           We thus want to delay the start of dhcp till these transitions have settled.
           The delay is determined by the DHCP_SM_WAIT macro. */
-       if (uEthernetId == 0){
+       //if (uEthernetId == 0){
          uDHCPSetWaitOnInitFlag(&(IFContext[uEthernetId]));
-       }
-
+         if (dhcp_set){
+            uDHCPSetRetryInterval(&(IFContext[uEthernetId]), (u32) dhcp_retry);
+            uDHCPSetInitWait(&(IFContext[uEthernetId]), (u32) dhcp_wait);
+         }
+       //}
        /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
-
        //uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
-
-
      }
+
 
 #if 0
      /* debug code to read MSR register - TODO: remove */

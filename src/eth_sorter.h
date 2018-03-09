@@ -36,6 +36,7 @@
 #include "sensors.h"
 #include "improved_read_write.h"
 #include "invalid_nack.h"
+#include "if.h"
 
 u32 CalculateIPChecksum(u32 uChecksum, u32 uLength, u16 *pHeaderPtr);
 int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHeaderPointer);
@@ -43,7 +44,7 @@ u8 * ExtractIPV4FieldsAndGetPayloadPointer(u8 *pIPHeaderPointer, u32 *uIPPayload
 int CheckICMPHeader(u32 uPacketLength, u8 * pICMPHeaderPtr);
 int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPointer);
 u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLength, u32 *uSourcePort, u32 *uDestinationPort);
-int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength, struct sIFObject *pIFObj);
 int CheckCommandPacket(u8 * pCommand, u32 uCommandLength);
 void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength);
 int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket);
@@ -82,5 +83,6 @@ int DebugLoopbackTestCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
 int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 int HMCReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+int DHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 #endif

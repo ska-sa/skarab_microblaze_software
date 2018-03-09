@@ -175,6 +175,10 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPRandomWait = 0;
   pDHCPObjectPtr->uDHCPRandomWaitCached = (u32) uDHCPWait(pIFObjectPtr);
 
+  /* assign default values, can be overriden by API functions */
+  pDHCPObjectPtr->uDHCPSMRetryInterval = DHCP_SM_INTERVAL;
+  pDHCPObjectPtr->uDHCPSMInitWait = DHCP_SM_WAIT;
+
   pDHCPObjectPtr->uDHCPT1 = 0;
   pDHCPObjectPtr->uDHCPT2 = 0;
   pDHCPObjectPtr->uDHCPLeaseTime = 0;
@@ -474,6 +478,79 @@ u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr){
   return DHCP_RETURN_OK;
 }
 
+//=================================================================================
+//  uDHCPSetInitWait
+//---------------------------------------------------------------------------------
+//  This method sets the delay timeout value at the start of dhcp.
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//  uInitWait       IN    count value to wait before starting dhcp
+//                        time(ms) = uInitWait x POLL_INTERVAL
+//
+//  Return
+//  ------
+//  DHCP_RETURN_OK or DHCP_RETURN_FAIL
+//=================================================================================
+u8 uDHCPSetInitWait(struct sIFObject *pIFObjectPtr, u32 uInitWait){
+  struct sDHCPObject *pDHCPObjectPtr;
+
+  SANE_DHCP(pIFObjectPtr);
+
+  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check that the requested init wait counter value is reasonable */
+  /* let's say a reasonable waiting time is between 0 and 120s */
+  /* i.e. 1200 x POLL_INTERVAL when POLL_INTERVAL = 100 (ms)*/
+  /* TODO: create a macro define for the following max value */
+
+  /* unsigned value so only have to check upper bound */
+  if (uInitWait > 1200){
+    debug_printf("DHCP [%02x] DHCP init wait value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uInitWait * POLL_INTERVAL);
+    return DHCP_RETURN_FAIL;
+  }
+
+  pDHCPObjectPtr->uDHCPSMInitWait = uInitWait;
+
+  return DHCP_RETURN_OK;
+}
+
+//=================================================================================
+//  uDHCPSetRetryInterval
+//---------------------------------------------------------------------------------
+//  This method sets the retry interval timeout value during dhcp states.
+//
+//  Parameter	      Dir   Description
+//  ---------	      ---	  -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//  uRetryinterval  IN    count value to wait before retrying
+//                        time(ms) = uRetryInterval x POLL_INTERVAL
+//
+//  Return
+//  ------
+//  DHCP_RETURN_OK or DHCP_RETURN_FAIL
+//=================================================================================
+u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval){
+  struct sDHCPObject *pDHCPObjectPtr;
+
+  SANE_DHCP(pIFObjectPtr);
+
+  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  /* check that the requested retry counter value is reasonable */
+  /* let's say a reasonable retry time is between 0.5s and 30s */
+  /* i.e. 5 x POLL_INTERVAL or 300 x POLL_INTERVAL when POLL_INTERVAL = 100 (ms)*/
+  /* TODO: create a macro define for the following min/max values */
+  if ((uRetryInterval < 5) || (uRetryInterval > 300)){
+    debug_printf("DHCP [%02x] DHCP retry value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uRetryInterval * POLL_INTERVAL);
+    return DHCP_RETURN_FAIL;
+  }
+
+  pDHCPObjectPtr->uDHCPSMRetryInterval = uRetryInterval;
+
+  return DHCP_RETURN_OK;
+}
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus
@@ -587,13 +664,14 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
     return DHCP_RETURN_NOT_ENABLED;
   }
 
-  pDHCPObjectPtr->uDHCPTimeout++;
+  //pDHCPObjectPtr->uDHCPTimeout++;
   pDHCPObjectPtr->uDHCPCurrentClkTick++;
 
+#if 0
   /* this logic prevents statemachine getting trapped in a particular state */
   if (pDHCPObjectPtr->tDHCPCurrentState < BOUND){
     /* after <t> seconds, if still not bound, reset state machine */
-    if (pDHCPObjectPtr->uDHCPTimeout >= DHCP_SM_INTERVAL){
+    if (pDHCPObjectPtr->uDHCPTimeout >= pDHCPObjectPtr->uDHCPSMRetryInterval){
       pDHCPObjectPtr->uDHCPTimeout = 0;   /* reset timeout counter  */
       /* pDHCPObjectPtr->tDHCPCurrentState = INIT; */         /* go to RANDOMIZE state rather
                                                                  in order to send another
@@ -615,6 +693,20 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
           return DHCP_RETURN_FAIL;
         }
       }
+    }
+  }
+#endif
+
+  /* check if we must stop trying eventually...else keep trying */
+  /* if we've retried <n> times, quit trying */
+  if (pDHCPObjectPtr->uDHCPRetries >= DHCP_SM_RETRIES){
+    /* pDHCPObjectPtr->uDHCPTimeoutStatus = 1; */
+    if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_AUTO_REDISCOVER) == statusCLR){
+      /* stop state machine */
+      vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
+      /* dhcp failed, increase error counter */
+      pDHCPObjectPtr->uDHCPErrors++;
+      return DHCP_RETURN_FAIL;
     }
   }
 
@@ -657,14 +749,19 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPTimeout = 0;
 
+#if 0
   pDHCPObjectPtr->uDHCPRandomWait = pDHCPObjectPtr->uDHCPRandomWaitCached;     /* wait a prerequisite amount of time before dhcp'ing. This is done
                                                                                  in order to spread requests when systems are started at the same time. */
+#endif
+
+  /* FIXME NOTE: removed "mac hashing randomized wait" */
+  pDHCPObjectPtr->uDHCPRandomWait = 0; 
 
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_INIT_WAIT_EN) == statusSET){
-    pDHCPObjectPtr->uDHCPRandomWait += DHCP_SM_WAIT; /* add an extra fixed offset to the dhcp init waiting time */
+    pDHCPObjectPtr->uDHCPRandomWait += pDHCPObjectPtr->uDHCPSMInitWait; /* add an extra fixed offset to the dhcp init waiting time */
   }
 
-  debug_printf("DHCP [%02x] Waiting %d ms before issuing DHCP discover.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL));
+  debug_printf("DHCP [%02x] Waiting %d ms before issuing DHCP discover at %d ms retry rate.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL), (pDHCPObjectPtr->uDHCPSMRetryInterval * POLL_INTERVAL));
 
   return RANDOMIZE;
 }
@@ -700,6 +797,9 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
       /* on success */
       pDHCPObjectPtr->uDHCPTx++;
     }
+    /* progress to the next state even on failure in order for timeout to catch the error */
+    /* this prevents us getting stuck in this state */
+    pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
     return SELECT;
   }
 
@@ -744,7 +844,15 @@ static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
       pDHCPObjectPtr->uDHCPErrors++;
     }
   }
-  
+
+  /* Give up "selecting" after a N seconds, where N is user selected.
+     Go back to the previous state in order to resend DISCOVER packet. */
+  if (pDHCPObjectPtr->uDHCPTimeout >= pDHCPObjectPtr->uDHCPSMRetryInterval){
+    pDHCPObjectPtr->uDHCPRandomWait = 0;    /* set to zero -> don't wait in RANDOMIZE state, send DISCOVER immediately */
+    return RANDOMIZE;
+  }
+
+  pDHCPObjectPtr->uDHCPTimeout++;
   return SELECT;
 }
 
@@ -770,11 +878,15 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
   if (pDHCPObjectPtr->uDHCPRandomWait <= 0){
     if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_DHCP_REQIP | 1<<flagDHCP_MSG_DHCP_SVRID | 1<<flagDHCP_MSG_DHCP_REQPARAM | 1<<flagDHCP_MSG_DHCP_VENDID))){
+      /* on failure */
       pDHCPObjectPtr->uDHCPErrors++;
     } else {
       pDHCPObjectPtr->uDHCPTx++;
-      return REQUEST;
     }
+    /* progress to the next state even on failure in order for timeout to catch the error */
+    /* this prevents us getting stuck in this state */
+    pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
+    return REQUEST;
   }
   
   pDHCPObjectPtr->uDHCPRandomWait--;
@@ -832,6 +944,14 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
     } 
   }
 
+  /* Give up "requesting" after a N seconds, where N is user selected.
+     Go back to the previous state in order to resend DISCOVER packet. */
+  if (pDHCPObjectPtr->uDHCPTimeout >= pDHCPObjectPtr->uDHCPSMRetryInterval){
+    pDHCPObjectPtr->uDHCPRandomWait = 0;    /* set to zero -> don't wait in RANDOMIZE state, send DISCOVER immediately */
+    return RANDOMIZE;
+  }
+
+  pDHCPObjectPtr->uDHCPTimeout++;
   return REQUEST;
 }
 
