@@ -504,8 +504,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(BigWriteWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
 			return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
-		else if (Command->uCommandType == DHCP_TUNING_DEBUG)
-			return(DHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == SET_DHCP_TUNING_DEBUG)
+			return(SetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
 			xil_printf("Invalid Opcode Detected!\r\n");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3286,7 +3286,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   return uRetVal;
 }
 
-int DHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
   struct sDHCPObject *pDHCPObj;
   u16 data[4] = {0};
   u16 rom[8];
@@ -3294,10 +3294,10 @@ int DHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 u
 
   pDHCPObj = &(pIFObj->DHCPContextState);
 
-  sDHCPTuningDebugReqT *Command = (sDHCPTuningDebugReqT *) pCommand;
-	sDHCPTuningDebugRespT *Response = (sDHCPTuningDebugRespT *) uResponsePacketPtr;
+  sSetDHCPTuningDebugReqT *Command = (sSetDHCPTuningDebugReqT *) pCommand;
+	sSetDHCPTuningDebugRespT *Response = (sSetDHCPTuningDebugRespT *) uResponsePacketPtr;
 
-	if (uCommandLength < sizeof(sDHCPTuningDebugReqT)){
+	if (uCommandLength < sizeof(sSetDHCPTuningDebugReqT)){
 		return XST_FAILURE;
   }
 
@@ -3341,7 +3341,7 @@ int DHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 u
 		Response->uPadding[uPaddingIndex] = 0;
   }
 
-  *uResponseLength = sizeof(sDHCPTuningDebugRespT);
+  *uResponseLength = sizeof(sSetDHCPTuningDebugRespT);
 
   pDHCPObj->uDHCPSMRetryInterval = Command->uRetryTime;
   pDHCPObj->uDHCPSMInitWait = Command->uInitTime;

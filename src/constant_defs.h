@@ -274,7 +274,7 @@ volatile u16 uPreviousSequenceNumber;
 //#define SPARE4                      0x0039
 //#define SPARE5                      0x0041
 #define SDRAM_PROGRAM_OVER_WISHBONE 0x0051
-#define DHCP_TUNING_DEBUG 0x0053
+#define SET_DHCP_TUNING_DEBUG 0x0053
 #define HIGHEST_DEFINED_COMMAND	    0x0053//0x0033
 
 // ETHERNET TYPE CODES
@@ -1011,19 +1011,19 @@ typedef struct sSDRAMProgramOverWishboneResp {
   u16 uPadding[7];
 } sSDRAMProgramOverWishboneRespT;
 
-typedef struct sDHCPTuningDebugReq {
+typedef struct sSetDHCPTuningDebugReq {
 	sCommandHeaderT Header;
 	u16 uInitTime;
 	u16	uRetryTime;
-} sDHCPTuningDebugReqT;
+} sSetDHCPTuningDebugReqT;
 
-typedef struct sDHCPTuningDebugResp {
+typedef struct sSetDHCPTuningDebugResp {
 	sCommandHeaderT Header;
 	u16 uInitTime;
 	u16	uRetryTime;
   u16 uStatus;
   u16 uPadding[6];
-} sDHCPTuningDebugRespT;
+} sSetDHCPTuningDebugRespT;
 
 // I2C BUS DEFINES
 #define	MB_I2C_BUS_ID				0x0
