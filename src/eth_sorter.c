@@ -506,6 +506,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SET_DHCP_TUNING_DEBUG)
 			return(SetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == GET_DHCP_TUNING_DEBUG)
+			return(GetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
 			xil_printf("Invalid Opcode Detected!\r\n");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3301,6 +3303,7 @@ int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u3
 		return XST_FAILURE;
   }
 
+  /* status: send 0 for failure, 1 for success */
   Response->uStatus = 1;
 
   if (uDHCPSetRetryInterval(pIFObj, Command->uRetryTime) == DHCP_RETURN_FAIL){
@@ -3323,11 +3326,13 @@ int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u3
   data[2] = Command->uRetryTime & 0xFF;
   data[3] = (Command->uRetryTime >> 8) & 0xFF;
 
-  if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
-    Response->uStatus = 0;
-  } else {
-    if (DS2433WriteMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+  if (Response->uStatus != 0){
+    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
       Response->uStatus = 0;
+    } else {
+      if (DS2433WriteMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+        Response->uStatus = 0;
+      }
     }
   }
 
@@ -3343,15 +3348,68 @@ int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u3
 
   *uResponseLength = sizeof(sSetDHCPTuningDebugRespT);
 
-  pDHCPObj->uDHCPSMRetryInterval = Command->uRetryTime;
-  pDHCPObj->uDHCPSMInitWait = Command->uInitTime;
+  xil_printf("DHCP TUNING[%02x] %s - Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Response->uStatus == 0 ? "FAIL" : "OK",
+                                                               Command->uRetryTime, Command->uInitTime);
 
-#if 0
-  vDHCPStateMachineReset(pIFObj);
-  uDHCPSetStateMachineEnable(pIFObj, SM_TRUE);
-#endif
+  return XST_SUCCESS;
+}
 
-  xil_printf("DHCP TUNING[%02x] Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Command->uRetryTime, Command->uInitTime);
+
+int GetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  struct sDHCPObject *pDHCPObj;
+  u16 data[4] = {0};
+  u16 rom[8];
+  u8 uPaddingIndex;
+
+  pDHCPObj = &(pIFObj->DHCPContextState);
+
+  sGetDHCPTuningDebugReqT *Command = (sGetDHCPTuningDebugReqT *) pCommand;
+	sGetDHCPTuningDebugRespT *Response = (sGetDHCPTuningDebugRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sGetDHCPTuningDebugReqT)){
+		return XST_FAILURE;
+  }
+
+  /* status: send 0 for failure, 1 for success */
+  Response->uStatus = 1;
+
+  /* read the values in page15 of DS2433 one-wire EEPROM on Motherboard
+     (two bytes each)
+     -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+     -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+  */
+
+  if (Response->uStatus != 0){
+    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+      Response->uStatus = 0;
+    } else {
+      if (DS2433ReadMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+        Response->uStatus = 0;
+      }
+    }
+  }
+
+  if (Response->uStatus != 0){
+  /* unpack the data */
+    Response->uInitTime = data[1];
+    Response->uInitTime = Response->uInitTime << 8;
+    Response->uInitTime = Response->uInitTime | (data[0] & 0xff);
+    Response->uRetryTime = data[3];
+    Response->uRetryTime = Response->uRetryTime << 8;
+    Response->uRetryTime = Response->uRetryTime | (data[2] & 0xff);
+  } else {
+    Response->uInitTime = 0;
+    Response->uRetryTime = 0;
+  } 
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  *uResponseLength = sizeof(sGetDHCPTuningDebugRespT);
 
   return XST_SUCCESS;
 }
