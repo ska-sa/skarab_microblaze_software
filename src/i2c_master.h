@@ -137,6 +137,8 @@ int WriteI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uWriteBytes, u16 uNumBytes);
 int ReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadBytes, u16 uNumBytes);
 int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadBytes, u16 uNumBytes);
 int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadBytes);
+/* TODO: change the HMCReadI2CBytes function prototype to match HMCWriteI2CBytes */
+int HMCWriteI2CBytes(u16 uId, u16 uSlaveAddress, u32 uWriteAddress, u32 uWriteData);
 
 // Specific to HitechGlobal dev board
 #define PCA9548_0_ADDRESS 	0x70

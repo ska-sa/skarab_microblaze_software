@@ -242,7 +242,6 @@ volatile u16 uPreviousSequenceNumber;
 #define NO_REBOOT				0x2
 
 // COMMAND TYPES
-
 #define WRITE_REG					0x0001
 #define READ_REG					0x0003
 #define WRITE_WISHBONE				0x0005
@@ -268,15 +267,16 @@ volatile u16 uPreviousSequenceNumber;
 #define DEBUG_LOOPBACK_TEST			0x002D
 #define QSFP_RESET_AND_PROG			0x002F
 #define HMC_READ_I2C				0x0031
-//#define SPARE1                      0x0033
+#define HMC_WRITE_I2C               0x0033
 //#define SPARE2                      0x0035
 //#define SPARE3                      0x0037
 //#define SPARE4                      0x0039
 //#define SPARE5                      0x0041
 #define SDRAM_PROGRAM_OVER_WISHBONE 0x0051
-#define SET_DHCP_TUNING_DEBUG 0x0053
-#define GET_DHCP_TUNING_DEBUG 0x0055
+#define SET_DHCP_TUNING_DEBUG       0x0053
+#define GET_DHCP_TUNING_DEBUG       0x0055
 #define HIGHEST_DEFINED_COMMAND	    0x0055//0x0033
+
 
 // ETHERNET TYPE CODES
 #define ETHERNET_TYPE_IPV4   	0x800
@@ -994,6 +994,24 @@ typedef struct sHMCReadI2CBytesResp {
   u16				uReadSuccess;
 	u16				uPadding[2];
 } sHMCReadI2CBytesRespT;
+
+typedef struct sHMCWriteI2CBytesReq {
+  sCommandHeaderT Header;
+  u16 uId;
+  u16 uSlaveAddress;
+  u16 uWriteAddress[4];
+  u16 uWriteData[4];
+} sHMCWriteI2CBytesReqT;
+
+typedef struct sHMCWriteI2CBytesResp {
+  sCommandHeaderT Header;
+  u16 uId;
+  u16 uSlaveAddress;
+  u16 uWriteAddress[4];
+  u16 uWriteData[4];
+  u16 uWriteSuccess;
+  u16 uPadding[2];
+} sHMCWriteI2CBytesRespT;
 
 /* new SDRAM programming request / response */
 #define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
