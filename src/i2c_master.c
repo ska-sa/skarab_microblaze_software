@@ -619,6 +619,41 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 }
 
 //=================================================================================
+//  HMCWriteI2CBytes
+//--------------------------------------------------------------------------------
+//  This method writes a 32-bit word to HMC registers over the I2C.
+//
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId             IN  ID of I2C master
+//  uSlaveAddress   IN  I2C slave address of device to be accessed
+//  uWriteAddress   IN  32-bit register address
+//  uWriteBytes     IN  32-bit data word
+//
+//  Return
+//  ------
+//  XST_SUCCESS or XST_FAILURE
+//=================================================================================
+int HMCWriteI2CBytes(u16 uId, u16 uSlaveAddress, u32 uWriteAddress, u32 uWriteData){
+  /* TODO: check if the card in that mezz slot (given by uId) is actually an HMC */
+
+  u16 uWriteBytes[8];
+
+  /* write the following 8 bytes of data to the I2C bus */
+  uWriteBytes[0] = (uWriteAddress >> 24) & 0xff;     /* MSB of HMC reg addr */
+  uWriteBytes[1] = (uWriteAddress >> 16) & 0xff;
+  uWriteBytes[2] = (uWriteAddress >>  8) & 0xff;
+  uWriteBytes[3] = (uWriteAddress      ) & 0xff;     /* LSB of HMC reg addr */
+
+  uWriteBytes[4] = (uWriteData >> 24) & 0xff;        /* MSB of data word to be written */
+  uWriteBytes[5] = (uWriteData >> 16) & 0xff;
+  uWriteBytes[6] = (uWriteData >>  8) & 0xff;
+  uWriteBytes[7] = (uWriteData      ) & 0xff;        /* LSB of data word to be written */
+
+  return WriteI2CBytes(uId, uSlaveAddress, uWriteBytes, 8);
+}
+
+//=================================================================================
 //	I2CPCA9548SelectChannel
 //--------------------------------------------------------------------------------
 //	This method selects a specific channel of PCA9548.

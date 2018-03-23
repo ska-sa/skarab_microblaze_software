@@ -175,7 +175,7 @@ typedef enum {statusCLR=0,
 
 struct sIFObject;
 
-typedef typeDHCPState (*dhcp_state_func_ptr)(struct sIFObject *pIFObjectPtr);
+typedef typeDHCPState (* const dhcp_state_func_ptr)(struct sIFObject *pIFObjectPtr);
 
 /* callback type definition - user function form */
 typedef int (*tcallUserFunction)(struct sIFObject *pIFObjectPtr, void *pUserData);
@@ -219,6 +219,9 @@ struct sDHCPObject{
   u32 uDHCPRandomWait;
   u32 uDHCPRandomWaitCached;
 
+  u32 uDHCPSMRetryInterval;   /* time between dhcp retries */
+  u32 uDHCPSMInitWait;        /* time to wait before sending out first dhcp discover packet */
+
   u32 uDHCPT1;
   u32 uDHCPT2;
   u32 uDHCPLeaseTime;
@@ -259,6 +262,8 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr);
 
 /* delay the start of dhcp - see DHCP_SM_WAIT macro above */
 u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr);
+u8 uDHCPSetInitWait(struct sIFObject *pIFObjectPtr, u32 uInitWait);
+u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval);
 
 #if 0
 /*TODO*/u8 uDHCPSetAutoRediscoverEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable);

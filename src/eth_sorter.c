@@ -20,6 +20,9 @@
 
 #include "eth_sorter.h"
 #include "net_utils.h"
+#include "dhcp.h"
+#include "one_wire.h"
+#include "print.h"
 
 //=================================================================================
 //	CalculateIPChecksum
@@ -435,7 +438,7 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength, struct sIFObject *pIFObj)
 {
 	int iStatus;
 	sCommandHeaderT *Command = (sCommandHeaderT *) pCommand;
@@ -492,6 +495,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(QSFPResetAndProgramCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == HMC_READ_I2C)
 			return(HMCReadI2CBytesCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == HMC_WRITE_I2C)
+			return(HMCWriteI2CBytesCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == GET_SENSOR_DATA)
 			return(GetSensorDataHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SET_FAN_SPEED)
@@ -502,6 +507,10 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 			return(BigWriteWishboneCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
 			return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == SET_DHCP_TUNING_DEBUG)
+			return(SetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+		else if (Command->uCommandType == GET_DHCP_TUNING_DEBUG)
+			return(GetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
 		else{
 			xil_printf("Invalid Opcode Detected!\r\n");
 			return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3165,6 +3174,92 @@ int HMCReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
 	return XST_SUCCESS;
 }
 
+//=================================================================================
+//  HMCWriteI2CBytesCommandHandler
+//--------------------------------------------------------------------------------
+//  This method executes the HMC_WRITE_I2C command.
+//
+//  Parameter           Dir   Description
+//  ---------           ---   -----------
+//  pCommand            IN    Pointer to command header
+//  uCommandLength      IN    Length of command
+//  uResponsePacketPtr  IN    Pointer to where response packet must be constructed
+//  uResponseLength     OUT   Length of payload of response packet
+//
+//  Return
+//  ------
+//  XST_SUCCESS if successful
+//=================================================================================
+int HMCWriteI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  int iStatus;
+  int uIndex;
+  /* u32 uData, uAddr; */
+  u16 uWriteBytes[8];
+  u8 uPaddingIndex;
+  u8 uByteIndex;
+
+  sHMCWriteI2CBytesReqT *Command = (sHMCWriteI2CBytesReqT *) pCommand;
+  sHMCWriteI2CBytesRespT *Response = (sHMCWriteI2CBytesRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sHMCWriteI2CBytesReqT)){
+    return XST_FAILURE;
+  }
+
+#if 0
+  /* pack the addr and data into 32-bit words */
+  uAddr =         ((Command->uWriteAddress[0] & 0xff) << 24);
+  uAddr = uAddr | ((Command->uWriteAddress[1] & 0xff) << 16);
+  uAddr = uAddr | ((Command->uWriteAddress[2] & 0xff) <<  8);
+  uAddr = uAddr | ((Command->uWriteAddress[3] & 0xff));
+  uData =         ((Command->uWriteData[0] & 0xff) << 24);
+  uData = uData | ((Command->uWriteData[1] & 0xff) << 16);
+  uData = uData | ((Command->uWriteData[2] & 0xff) <<  8);
+  uData = uData | ((Command->uWriteData[3] & 0xff));
+
+  //debug_printf("HMC WR[%x]: addr = %08x and data = %08x\n", Command->uId, uAddr, uData);
+#endif
+
+  //iStatus = HMCWriteI2CBytes(Command->uId, Command->uSlaveAddress, uAddr, uData);
+
+  /* pack the addr_bytes[4] and data_bytes[4] into a single 8-byte array */
+  for (uIndex = 0; uIndex < 4; uIndex++){
+    uWriteBytes[uIndex] = Command->uWriteAddress[uIndex];
+    uWriteBytes[uIndex + 4] = Command->uWriteData[uIndex];
+  }
+
+  debug_printf("HMC WR[%x]:", Command->uId);
+  for (uIndex = 0; uIndex < 8; uIndex++){
+    debug_printf(" %x", uWriteBytes[uIndex]);
+  }
+  debug_printf("\r\n");
+
+  /* write the array of 8 bytes out directly to the i2c bus. */
+  iStatus = WriteI2CBytes(Command->uId, Command->uSlaveAddress, uWriteBytes, 8);
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+  Response->uId = Command->uId;
+  Response->uSlaveAddress = Command->uSlaveAddress;
+
+  for (uByteIndex = 0; uByteIndex < 4; uByteIndex++){
+    Response->uWriteAddress[uByteIndex] = Command->uWriteAddress[uByteIndex];
+    Response->uWriteData[uByteIndex] = Command->uWriteData[uByteIndex];
+  }
+
+  if (iStatus == XST_SUCCESS){
+    Response->uWriteSuccess = 1;
+  } else {
+    Response->uWriteSuccess = 0;
+  }
+
+  for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  *uResponseLength = sizeof(sHMCWriteI2CBytesRespT);
+
+  return XST_SUCCESS;
+}
 
 //=================================================================================
 //	SDRAMProgramOverWishboneCommandHandler
@@ -3280,4 +3375,124 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   }
 
   return uRetVal;
+}
+
+int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u16 data[4] = {0};
+  u16 rom[8];
+  u8 uPaddingIndex;
+
+  sSetDHCPTuningDebugReqT *Command = (sSetDHCPTuningDebugReqT *) pCommand;
+	sSetDHCPTuningDebugRespT *Response = (sSetDHCPTuningDebugRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sSetDHCPTuningDebugReqT)){
+		return XST_FAILURE;
+  }
+
+  /* status: send 0 for failure, 1 for success */
+  Response->uStatus = 1;
+
+  if (uDHCPSetRetryInterval(pIFObj, Command->uRetryTime) == DHCP_RETURN_FAIL){
+    Response->uStatus = 0;
+  }
+
+  if (uDHCPSetInitWait(pIFObj, Command->uInitTime) == DHCP_RETURN_FAIL){
+    Response->uStatus = 0;
+  }
+
+  /* store the values in page15 of DS2433 one-wire EEPROM on Motherboard
+     (need two bytes each)
+     -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+     -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+  */
+
+  /* pack the data */
+  data[0] = Command->uInitTime & 0xFF;
+  data[1] = (Command->uInitTime >> 8) & 0xFF;
+  data[2] = Command->uRetryTime & 0xFF;
+  data[3] = (Command->uRetryTime >> 8) & 0xFF;
+
+  if (Response->uStatus != 0){
+    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+      Response->uStatus = 0;
+    } else {
+      if (DS2433WriteMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+        Response->uStatus = 0;
+      }
+    }
+  }
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	Response->uInitTime = Command->uInitTime; 
+	Response->uRetryTime = Command->uRetryTime; 
+
+	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  *uResponseLength = sizeof(sSetDHCPTuningDebugRespT);
+
+  xil_printf("DHCP TUNING[%02x] %s - Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Response->uStatus == 0 ? "FAIL" : "OK",
+                                                               Command->uRetryTime, Command->uInitTime);
+
+  return XST_SUCCESS;
+}
+
+
+int GetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u16 data[4] = {0};
+  u16 rom[8];
+  u8 uPaddingIndex;
+
+  sGetDHCPTuningDebugReqT *Command = (sGetDHCPTuningDebugReqT *) pCommand;
+	sGetDHCPTuningDebugRespT *Response = (sGetDHCPTuningDebugRespT *) uResponsePacketPtr;
+
+	if (uCommandLength < sizeof(sGetDHCPTuningDebugReqT)){
+		return XST_FAILURE;
+  }
+
+  /* status: send 0 for failure, 1 for success */
+  Response->uStatus = 1;
+
+  /* read the values in page15 of DS2433 one-wire EEPROM on Motherboard
+     (two bytes each)
+     -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+     -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+  */
+
+  if (Response->uStatus != 0){
+    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+      Response->uStatus = 0;
+    } else {
+      if (DS2433ReadMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) != XST_SUCCESS){
+        Response->uStatus = 0;
+      }
+    }
+  }
+
+  if (Response->uStatus != 0){
+  /* unpack the data */
+    Response->uInitTime = data[1];
+    Response->uInitTime = Response->uInitTime << 8;
+    Response->uInitTime = Response->uInitTime | (data[0] & 0xff);
+    Response->uRetryTime = data[3];
+    Response->uRetryTime = Response->uRetryTime << 8;
+    Response->uRetryTime = Response->uRetryTime | (data[2] & 0xff);
+  } else {
+    Response->uInitTime = 0;
+    Response->uRetryTime = 0;
+  } 
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++){
+		Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  *uResponseLength = sizeof(sGetDHCPTuningDebugRespT);
+
+  return XST_SUCCESS;
 }
