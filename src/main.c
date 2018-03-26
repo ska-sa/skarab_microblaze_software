@@ -49,6 +49,7 @@
 #include "if.h"
 #include "arp.h"
 #include "memtest.h"
+#include "diagnostics.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 
@@ -2442,33 +2443,7 @@ int main()
       if (uFlagRunTask_Diagnostics){
         uFlagRunTask_Diagnostics = 0;
         for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          IFContext[uEthernetId].uTxTotal = IFContext[uEthernetId].uTxEthArpReplyOk + IFContext[uEthernetId].uTxEthArpRequestOk + IFContext[uEthernetId].uTxEthLldpOk +
-                                            IFContext[uEthernetId].uTxIpIcmpReplyOk + IFContext[uEthernetId].uTxIpIgmpOk +
-                                            IFContext[uEthernetId].uTxUdpDhcpOk + IFContext[uEthernetId].uTxUdpCtrlOk;
-
-          debug_printf("IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\r\n", uEthernetId,
-                                                                        IFContext[uEthernetId].uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
-                                                                        IFContext[uEthernetId].stringIFAddrIP,
-                                                                        IFContext[uEthernetId].stringIFAddrNetmask);
-          debug_printf(" Rx Total:        %10d | Tx Total:     %10d\r\n", IFContext[uEthernetId].uRxTotal            , IFContext[uEthernetId].uTxTotal);
-          debug_printf(" Rx  ETH Unknown: %10d | Tx  ARP\r\n",          IFContext[uEthernetId].uRxEthUnknown);
-          debug_printf(" Rx  ARP:         %10d | Tx   Reply:   %10d\r\n", IFContext[uEthernetId].uRxEthArp           , IFContext[uEthernetId].uTxEthArpReplyOk);
-          debug_printf(" Rx   Reply:      %10d | Tx   Request: %10d\r\n", IFContext[uEthernetId].uRxArpReply         , IFContext[uEthernetId].uTxEthArpRequestOk);
-          debug_printf(" Rx   Request:    %10d | Tx   Err:     %10d\r\n", IFContext[uEthernetId].uRxArpRequest       , IFContext[uEthernetId].uTxEthArpErr);
-          debug_printf(" Rx   Conflict:   %10d | Tx  LLDP\r\n",          IFContext[uEthernetId].uRxArpConflict);
-          debug_printf(" Rx   Invalid:    %10d | Tx   Ok:      %10d\r\n", IFContext[uEthernetId].uRxArpInvalid       , IFContext[uEthernetId].uTxEthLldpOk);
-          debug_printf(" Rx  IP:          %10d | Tx   Err:     %10d\r\n", IFContext[uEthernetId].uRxEthIp            , IFContext[uEthernetId].uTxEthLldpErr);
-          debug_printf(" Rx   Chksm Err:  %10d | Tx  ICMP\r\n",          IFContext[uEthernetId].uRxIpChecksumErrors);
-          debug_printf(" Rx   Unknown:    %10d | Tx   Reply:   %10d\r\n", IFContext[uEthernetId].uRxIpUnknown        , IFContext[uEthernetId].uTxIpIcmpReplyOk);
-          debug_printf(" Rx   ICMP:       %10d | Tx   Err:     %10d\r\n", IFContext[uEthernetId].uRxIpIcmp           , IFContext[uEthernetId].uTxIpIcmpReplyErr);
-          debug_printf(" Rx    Invalid:   %10d | Tx  IGMP\r\n",          IFContext[uEthernetId].uRxIcmpInvalid);
-          debug_printf(" Rx   UDP:        %10d | Tx   Ok:      %10d\r\n", IFContext[uEthernetId].uRxIpUdp            , IFContext[uEthernetId].uTxIpIgmpOk);
-          debug_printf(" Rx    Unknown:   %10d | Tx   Err:     %10d\r\n", IFContext[uEthernetId].uRxUdpUnknown       , IFContext[uEthernetId].uTxIpIgmpErr);
-          debug_printf(" Rx    CTRL:      %10d | Tx  DHCP\r\n",          IFContext[uEthernetId].uRxUdpCtrl);
-          debug_printf(" Rx    DHCP:      %10d | Tx   Ok:      %10d\r\n", IFContext[uEthernetId].uRxUdpDhcp          , IFContext[uEthernetId].uTxUdpDhcpOk);
-          debug_printf(" Rx     Invalid:  %10d | Tx   Err:     %10d\r\n", IFContext[uEthernetId].uRxDhcpInvalid      ,  IFContext[uEthernetId].uTxUdpDhcpErr);
-          debug_printf("                             | Tx  CTRL\r\n");
-          debug_printf("                             | Tx   Ok:      %10d\r\n", IFContext[uEthernetId].uTxUdpCtrlOk);
+          PrintInterfaceCounters(&(IFContext[uEthernetId]));
         }
       }
 
