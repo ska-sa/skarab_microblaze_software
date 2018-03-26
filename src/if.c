@@ -93,6 +93,7 @@ u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffe
   pIFObjectPtr->uRxUdpCtrl = 0;
   pIFObjectPtr->uRxUdpDhcp = 0;
   pIFObjectPtr->uRxDhcpInvalid = 0;
+  pIFObjectPtr->uRxDhcpUnknown = 0;
   pIFObjectPtr->uRxUdpUnknown = 0;
   pIFObjectPtr->uRxIpUnknown = 0;
   pIFObjectPtr->uRxEthUnknown = 0;

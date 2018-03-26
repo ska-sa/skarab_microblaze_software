@@ -60,7 +60,8 @@ struct sIFObject{
         u32 uRxUdpDhcp;     /* dhcp reply */
           u32 uRxDhcpInvalid;   /* these are packets destined for us but failed validation (problems with xid, etc.). 
                                    These include dhcp server bcast replies meant for other nodes */
-        u32 uRxUdpUnknown;  /* packets dropped at UDP layer (includes dhcp requests from other nodes) */
+          u32 uRxDhcpUnknown;   /* possible dhcp broadcasts from other nodes destined for the dhcp server */
+        u32 uRxUdpUnknown;  /* packets dropped at UDP layer */
       u32 uRxIpUnknown;     /* packets dropped at IP layer */
     u32 uRxEthUnknown;      /* packets dropped at Ethernet layer */
 

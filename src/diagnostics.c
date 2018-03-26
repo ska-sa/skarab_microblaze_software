@@ -73,9 +73,9 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
   debug_printf(" Tx%2sDHCP\r\n", "");
   debug_printf(" Rx%4s%-10s%11d%2s", "", "DHCP:",         pIFObj->uRxUdpDhcp,         "|");
   debug_printf(" Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpDhcpOk,       "\r\n");
-  debug_printf(" Rx%5s%-9s%11d%2s", "", "Invalid:",      pIFObj->uRxDhcpInvalid,     "|");
+  debug_printf(" Rx%5s%-9s%11d%2s", "", "Invalid:",       pIFObj->uRxDhcpInvalid,     "|");
   debug_printf(" Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxUdpDhcpErr,      "\r\n");
-  debug_printf("%30s", "|");
+  debug_printf(" Rx%5s%-9s%11d%2s", "", "Unknown:",       pIFObj->uRxDhcpUnknown,     "|");
   debug_printf(" Tx%2sCTRL\r\n", "");
   debug_printf("%30s", "|");
   debug_printf(" Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpCtrlOk,       "\r\n");

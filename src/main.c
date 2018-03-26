@@ -593,10 +593,11 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
             pIFObjectPtr->uRxUdpDhcp++;
             uReturnType = PACKET_FILTER_DHCP;
           } else if ((uUDPDstPort == BOOTP_SERVER_PORT) && (uUDPSrcPort == BOOTP_CLIENT_PORT)){
-            /* These packets are broadcast  DISCOVER / REQUEST packets from other network nodes / SKARABs
-               can probably safely drop these packets */
+            /* These are probably broadcast DISCOVER / REQUEST packets from other network nodes / SKARABs
+               destined for the dhcp server and can probably safely be dropped */
             trace_printf("DHCP packet destined for DHCP server received! Can probably safely drop packet!\r\n");
-            pIFObjectPtr->uRxUdpUnknown++;
+            pIFObjectPtr->uRxDhcpUnknown++;
+            pIFObjectPtr->uRxUdpDhcp++;   /* increment total dhcp counter too since this is a dhcp packet (even tho not destined for us) */
             uReturnType = PACKET_FILTER_DROP;
           } else {
             debug_printf("UNKNOWN UDP ports: [src] 0x%04x & [dst] 0x%04x!\r\n", uUDPSrcPort, uUDPDstPort);
