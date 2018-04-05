@@ -350,8 +350,12 @@ volatile u16 uPreviousSequenceNumber;
 
 // TIMER DEFINES
 #define DHCP_RETRY_TIMER_ID		0x0
-//#define DHCP_TIMER_RESET_VALUE	15625000 // (156.25x10^6 x 0.1) 0.1 second
+
+#ifdef REDUCED_CLK_ARCH
 #define DHCP_TIMER_RESET_VALUE     3906250 // (39.0625x10^6 x 0.1) 0.1 second
+#else
+#define DHCP_TIMER_RESET_VALUE	15625000 // (156.25x10^6 x 0.1) 0.1 second
+#endif
 
 // USB PHY DEFINES
 #define USB_I2C_CONTROL			0x100
@@ -399,11 +403,7 @@ volatile u16 uPreviousSequenceNumber;
 #define QSFP_I2C_MICROBLAZE_ENABLE		0x1
 #define QSFP_I2C_MICROBLAZE_DISABLE		0x0
 
-/* for 156.25MHz clock... */
-//#define QSFP_I2C_ACCESS_TIMEOUT			500000
-
-/* for 39.0625MHz clock... */
-#define QSFP_I2C_ACCESS_TIMEOUT			125000
+#define QSFP_I2C_ACCESS_TIMEOUT			500000
 
 #define QSFP_STATE_RESET								0x1
 #define QSFP_STATE_BOOTLOADER_VERSION_WRITE_MODE		0x2

@@ -5,7 +5,7 @@
 # This will generate the Makefile.inc file                      #
 #################################################################
 
--include Makefile.inc
+-include Makefile.inc Makefile.config
 
 #version info
 GIT_BRANCH=$(shell git rev-parse --verify -q --abbrev-ref HEAD 2>/dev/null || echo unknown)
@@ -16,9 +16,6 @@ VERSION=$(GIT_DESCRIBE)-$(GIT_BRANCH)
 #Additional build flags
 
 LDFLAGS +=
-
-#Compile in consistency checks?
-CPPFLAGS += -DDO_SANITY_CHECKS
 
 CFLAGS += -DGITVERSION=\"$(VERSION)\" -DGITVERSION_SIZE=$(shell echo -n $(VERSION) | wc -c)
 

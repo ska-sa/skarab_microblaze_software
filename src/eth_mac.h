@@ -33,11 +33,13 @@
 #define ETH_MAC_SOFT_RESET			0x01000000
 #define ETH_MAC_ENABLE				0x00010000
 
-/* for 156.25MHz clock... */
-//#define ETH_MAC_RESET_TIMEOUT     1000
-
+#ifdef REDUCED_CLK_ARCH
 /* for 39.0625MHz clock... */
 #define ETH_MAC_RESET_TIMEOUT     250
+#else
+/* for 156.25MHz clock... */
+#define ETH_MAC_RESET_TIMEOUT     1000
+#endif
 
 #define ETH_MAC_REG_SOURCE_MAC_UPPER_16			0x0u
 #define ETH_MAC_REG_SOURCE_MAC_LOWER_32			0x1u
@@ -61,11 +63,13 @@
 #define ETH_MAC_ARP_CACHE_LOW_ADDRESS				0x3000u
 #define ETH_MAC_ARP_CACHE_HIGH_ADDRESS				0x37FFu
 
-/* for 156.25MHz clock... */
-//#define ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT    1000
-
+#ifdef REDUCED_CLK_ARCH
 /* for 39.0625MHz clock... */
 #define ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT      250
+#else
+/* for 156.25MHz clock... */
+#define ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT    1000
+#endif
 
 u32 GetAddressOffset(u8 uId);
 int SoftReset(u8 uId);

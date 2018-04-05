@@ -99,17 +99,9 @@
 #define FLASH_PARTITION_ADDRESS_MASK		0x3800000
 #define FLASH_BLOCK_ADDRESS_MASK			0x3FE0000
 
-#if 0
-/* for 156.25MHz clock... */
-#define FLASH_TIMEOUT           100
-#define FLASH_PROGRAM_TIMEOUT   1000
-#define FLASH_ERASE_TIMEOUT     100000
-#endif
-
-/* for 39.0625MHz clock... */
-#define FLASH_TIMEOUT           25
-#define FLASH_PROGRAM_TIMEOUT   250
-#define FLASH_ERASE_TIMEOUT     25000
+#define FLASH_TIMEOUT				100
+#define FLASH_PROGRAM_TIMEOUT		1000
+#define FLASH_ERASE_TIMEOUT			100000
 
 void SetOutputMode(u8 uOutputMode, u8 uFlashOutputEnable);
 void SetUpperAddressBits(u32 uAddress);
