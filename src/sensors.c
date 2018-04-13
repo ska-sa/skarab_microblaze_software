@@ -281,14 +281,25 @@ void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
 	// read temperature
+
+	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
 	if ((TempSensorPage == MEZZANINE_0_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_1_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_2_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_3_TEMP_ADC_PAGE))
 	{
-		// read mezzanine temperatures
+		WriteBytes[0] = 0x7D;
+		WriteBytes[1] = 0x00;
+		Mezzanine
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 	}
+	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
+	else if
+	{
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+
+	}
+	// read other temperatures
 	else
 	{
-		// read other temperatures
+		
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
 	}
 }
@@ -368,7 +379,7 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 									   MEZZANINE_2_TEMP_ADC_PAGE, MEZZANINE_3_TEMP_ADC_PAGE };
 
 
-		for (i = 0; i<6; i++){
+		for (i = 0; i<10; i++){
 			if(i == 0){
 				ReadTemperature(ReadBytes, TempSensorPages[i], true);
 			}
