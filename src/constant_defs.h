@@ -1007,7 +1007,8 @@ typedef struct sHMCReadI2CBytesResp {
 } sHMCReadI2CBytesRespT;
 
 /* new SDRAM programming request / response */
-#define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
+//#define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
+#define CHUNK_SIZE  1988   /* amount of 16-bit words per chunk */
 
 typedef struct sSDRAMProgramOverWishboneReq {
 	sCommandHeaderT Header;

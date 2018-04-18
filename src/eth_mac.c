@@ -319,7 +319,7 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 
 	uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
-  debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
+  //debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
 
 	//return (2 * (uReg & 0xFF));
 	return (2 * (uReg & 0x7FF));    /* value stored in lower 11-bits of this wishbone register */
@@ -422,7 +422,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		return XST_FAILURE;
   }
 
-  debug_printf("[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
+  //debug_printf("[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
 
 	// Program transmit packet words into FIFO
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
@@ -457,7 +457,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 		return XST_FAILURE;
   }
 
-  debug_printf("[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
+  //debug_printf("[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
 
 	return XST_SUCCESS;
 
@@ -482,6 +482,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
 	unsigned uIndex = 0x0;
 	u32 uAddressOffset = GetAddressOffset(uId);
+  u16 pktlen = 0, padlen = 0;
 	//u32 uReg;
 
 	// GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
@@ -497,7 +498,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 		return XST_FAILURE;
 	}
 
-  debug_printf("[RECV %02x] About to read %d 32-bit words from the cpu receive buffer\r\n", uId, uNumWords);
+  //debug_printf("%02x: rd %d words\n", uId, uNumWords);
 
 	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
 	{
@@ -506,7 +507,26 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 		//puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 	}
 
-  debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
+  if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
+    pktlen = ((((puReceivePacket[4] >> 16) & 0xff) + ((puReceivePacket[4] >> 24) & 0xff)) * 2) + 8 + 14;
+  } else { /* others */
+    pktlen = (puReceivePacket[4] & 0xffff) + 14; /*ip total len + eth len*/
+  }
+  padlen = 8 - (pktlen % 8);
+
+  /* and with 0b111 since only interested in values of 0 to 7 */
+  padlen = padlen & 0x7;
+
+  pktlen = pktlen + padlen; /* bytes padded to 64-bit boundary */
+  pktlen = pktlen >> 2;   /* convert to amount of 32-bit words ie div by 4 */
+
+  pktlen = pktlen < 16 ? 16 : pktlen;     /* lowest value is 16 */
+
+  if (uNumWords != pktlen){
+    xil_printf("[RECV %02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+  }
+
+  //debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
 
 	// Acknowledge reading the packet from the FIFO
 	AckHostPacketReceive(uId);
