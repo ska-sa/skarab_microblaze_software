@@ -1,5 +1,6 @@
 *.elf
 *.swp
 output/
+elf/
 Makefile.inc
 tags

@@ -1596,16 +1596,12 @@ int main()
      u32 uIndex = 0;      /* used to index arrays / buffers */
      u16 *pBuffer = NULL;  /* pointer to working buffer */ 
      u16 uChecksum = 0;
-     //u32 uTimeout = 0;
-     //u32 loop = 0;
      u32 uHMCBitMask;
 
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
      u32 uKeepAliveReg;
-
-     //u32 *iPtr;
      u32 uMemTest = 0;
 
 #ifdef TIME_PROFILE
@@ -1619,25 +1615,11 @@ int main()
        always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
        always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
        always_printf("[Memory Test] computed value              : 0x%08x\r\n", uMemTest);
+       always_printf("[Memory Test] %s\r\n", (uMemTest == _location_checksum_) ? "***PASSED***" : "***FAILED***");
      } else {
        always_printf("[Memory Test] Error - could not execute\r\n");
      }
 
-
-#if 0
-     /* very crude program memory test */
-     for (iPtr = (u32 *)0x50; iPtr <= (u32 *) &_text_section_end_; iPtr++){
-       /*print first, middle and last instruction*/
-       /*if ((iPtr == (u32 *)0x50) || (iPtr == (u32 *)0x1424c) || (iPtr == (u32 *)0xa150)){
-         xil_printf("\r\niPtr @ %p = %08x\r\n", iPtr, *iPtr);
-       }*/
-        uMemTest = uMemTest + *(iPtr);
-     }
-     always_printf("\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n", 0x50, &_text_section_end_);
-     always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
-     always_printf("[Memory Test] computed value                  : 0x%08x\r\n", uMemTest);
-     /* TODO pass / fail -> what to do upon failure? */
-#endif 
 
 	   //Xil_ICacheEnable();
 	   //Xil_DCacheEnable();
@@ -1673,7 +1655,7 @@ int main()
      xil_printf("MSR 0x%x\r\n", k);
 #endif
 
-	   xil_printf("\r\n---Entering main---\r\n");
+	   xil_printf("---Entering main---\r\n");
 	   xil_printf("Embedded software version: %d.%d.%d\r\n", EMBEDDED_SOFTWARE_VERSION_MAJOR,
                                                            EMBEDDED_SOFTWARE_VERSION_MINOR,
                                                            EMBEDDED_SOFTWARE_VERSION_PATCH);
