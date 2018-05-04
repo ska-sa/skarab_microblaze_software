@@ -3281,12 +3281,28 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   /* State variables */
   /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
   static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
+  static u32 uChunkSizeBytesCached = 0;      /* cache the chunk length which is obtained from chunk 0 */
 
 	sSDRAMProgramOverWishboneReqT *Command = (sSDRAMProgramOverWishboneReqT *) pCommand;
 	sSDRAMProgramOverWishboneRespT *Response = (sSDRAMProgramOverWishboneRespT *) uResponsePacketPtr;
 
+#if 0
 	if (uCommandLength < sizeof(sSDRAMProgramOverWishboneReqT)){
 		return XST_FAILURE;
+  }
+#endif
+
+  /* only support (+-) 2k, 4k and 8k programming modes */
+  /* JUST A NOTE: chunk length must be even for +2 step increment of upcoming for loop */
+  if (((uCommandLength - 8) != 1988) && ((uCommandLength - 8) != 3976) && ((uCommandLength - 8) != 7952)){
+    xil_printf("SDRAM PROGRAM[%02x] Unsupported chunk size of %d bytes.\r\n" , uId, uCommandLength - 8);
+    return XST_FAILURE;
+  }
+
+  /* check that the chunk size matches the previously cached size set by chunk 0 */
+  if ((Command->uChunkNum != 0) && ((uCommandLength - 8) != uChunkSizeBytesCached)){
+    xil_printf("SDRAM PROGRAM[%02x] Chunk size mismatch - %d expected but %d received.\r\n" , uId, uChunkSizeBytesCached, uCommandLength - 8);
+    return XST_FAILURE;
   }
 
 	for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
@@ -3303,6 +3319,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
   /* Chunk number 0 is special case, resets everything */
   if(Command->uChunkNum == 0x0){
+    uChunkSizeBytesCached = uCommandLength - 8;
 
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
@@ -3319,7 +3336,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
       }
     }
 
-    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram.\r\n", uId);
+    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
     uChunkIdCached = 0;
     ClearSdram();
 		SetOutputMode(0x1, 0x1);
@@ -3334,7 +3351,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 #ifdef DEBUG_PRINT
     /* xil_printf("chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */
 #endif
-    for (uChunkByteIndex = 0; uChunkByteIndex < CHUNK_SIZE; uChunkByteIndex = uChunkByteIndex + 2){
+    for (uChunkByteIndex = 0; uChunkByteIndex < (uChunkSizeBytesCached / 2) /*16bit words*/; uChunkByteIndex = uChunkByteIndex + 2){
       uTemp = (Command->uBitstreamChunk[uChunkByteIndex] << 16 & 0xFFFF0000) | (Command->uBitstreamChunk[uChunkByteIndex + 1] & 0x0000FFFF);
 
       /* Write the 32-bit data word via the Wishbone Bus */

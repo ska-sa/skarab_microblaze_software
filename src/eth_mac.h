@@ -54,6 +54,7 @@
 #define ETH_MC_RECV_IP 							0xCu
 #define ETH_MC_RECV_IP_MASK						0xDu
 
+#if 0
 #define ETH_MAC_REG_LOW_ADDRESS						0x0000u
 #define ETH_MAC_REG_HIGH_ADDRESS					0x07FFu
 #define ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS		0x1000u
@@ -62,6 +63,17 @@
 #define ETH_MAC_CPU_RECEIVE_BUFFER_HIGH_ADDRESS		0x27FFu
 #define ETH_MAC_ARP_CACHE_LOW_ADDRESS				0x3000u
 #define ETH_MAC_ARP_CACHE_HIGH_ADDRESS				0x37FFu
+#endif
+
+/* Wishbone address map for ethernet mac - in line with CASPER standardization */
+#define ETH_MAC_REG_LOW_ADDRESS                       0x0000u
+#define ETH_MAC_REG_HIGH_ADDRESS                      0x0FFFu
+#define ETH_MAC_ARP_CACHE_LOW_ADDRESS                 0x1000u
+#define ETH_MAC_ARP_CACHE_HIGH_ADDRESS                0x3FFFu
+#define ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS       0x4000u
+#define ETH_MAC_CPU_TRANSMIT_BUFFER_HIGH_ADDRESS      0x7FFFu
+#define ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS        0x8000u
+#define ETH_MAC_CPU_RECEIVE_BUFFER_HIGH_ADDRESS       0xBFFFu
 
 #ifdef REDUCED_CLK_ARCH
 /* for 39.0625MHz clock... */

@@ -2030,6 +2030,10 @@ int main()
                   if (uUDPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                     if(uChecksum != 0xffff){
                       error_printf("%s [%02x] RX - Invalid UDP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : "CTRL", uEthernetId);
+                      for (u8 n = 0; n < 50; n++){
+                        error_printf("%04x ", (pBuffer[n]));
+                      }
+                      error_printf("\r\n");
                       IFContext[uEthernetId].uRxUdpChecksumErrors++;
                       break;  /*TODO FIXME does this break break the switch or the if statement?*/
                     }
