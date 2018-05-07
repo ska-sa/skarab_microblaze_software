@@ -321,8 +321,11 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 
   //debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
 
-	//return (2 * (uReg & 0xFF));
+#ifdef WISHBONE_LEGACY_MAP
+	return (2 * (uReg & 0xFF));
+#else
 	return (2 * (uReg & 0x7FF));    /* value stored in lower 11-bits of this wishbone register */
+#endif
 
 }
 
@@ -507,6 +510,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 		//puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 	}
 
+  /* added to debug packet length and firmware read buffer length discrepancy */
   if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
     pktlen = ((((puReceivePacket[4] >> 16) & 0xff) + ((puReceivePacket[4] >> 24) & 0xff)) * 2) + 8 + 14;
   } else { /* others */

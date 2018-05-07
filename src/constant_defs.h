@@ -165,19 +165,22 @@ volatile u16 uPreviousSequenceNumber;
 #define I2C_3_ADDR					0x00038000
 #define I2C_4_ADDR					0x00040000
 #define ONE_GBE_MAC_ADDR			0x00048000
-#if 0
+
+#ifdef WISHBONE_LEGACY_MAP
+/* original/legacy wishbone slave map */
 #define FORTY_GBE_MAC_0_ADDR    0x00050000
 #define FORTY_GBE_MAC_1_ADDR    0x00058000
 #define FORTY_GBE_MAC_2_ADDR    0x00060000
 #define FORTY_GBE_MAC_3_ADDR    0x00068000
-#define DSP_REGISTER_ADDR     0x00070000
-#endif
-/* adjusted wishbone slave address map */
+#define DSP_REGISTER_ADDR       0x00070000
+#else
+/* adjusted wishbone slave address map - provision for "jumbo" ethernet support */
 #define FORTY_GBE_MAC_0_ADDR    0x00054000
 #define FORTY_GBE_MAC_1_ADDR    0x00060000
 #define FORTY_GBE_MAC_2_ADDR    0x0006C000
 #define FORTY_GBE_MAC_3_ADDR    0x00078000
 #define DSP_REGISTER_ADDR       0x00084000
+#endif
 
 /*#define DUAL_PORT_RAM_ADDR			0x00000
 #define BOARD_REGISTER_ADDR			0x08000
@@ -1027,14 +1030,14 @@ typedef struct sHMCWriteI2CBytesResp {
 } sHMCWriteI2CBytesRespT;
 
 /* new SDRAM programming request / response */
-//#define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
-#define CHUNK_SIZE  1988   /* amount of 16-bit words per chunk */
+#define CHUNK_SIZE  994   /* amount of 16-bit words per chunk */
+//#define CHUNK_SIZE  1988   /* amount of 16-bit words per chunk */
 
 typedef struct sSDRAMProgramOverWishboneReq {
 	sCommandHeaderT Header;
 	u16 uChunkNum;
 	u16	uChunkTotal;
-	u16 uBitstreamChunk[CHUNK_SIZE];
+	u16 uBitstreamChunk[];
 } sSDRAMProgramOverWishboneReqT;
 
 typedef struct sSDRAMProgramOverWishboneResp {
