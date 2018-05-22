@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include "xparameters.h"
 #include "xil_cache.h"
+#include "xil_assert.h"
 #include "xintc.h"
 #include "xwdttb.h"
 
@@ -50,6 +51,7 @@
 #include "arp.h"
 #include "memtest.h"
 #include "diagnostics.h"
+#include "scratchpad.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 
@@ -1598,6 +1600,10 @@ int main()
      u16 uChecksum = 0;
      u32 uHMCBitMask;
 
+#define HMC_MAX_RECONFIG_COUNT 20
+     u8 uHMCReconfigCount = HMC_MAX_RECONFIG_COUNT;
+     u8 PMemState = PMEM_RETURN_ERROR;
+
      typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
      u8 uValidate = 0;
 
@@ -1801,24 +1807,36 @@ int main()
      error_printf("[INIT] Mezzanine locations\r\n");
 	   InitialiseQSFPMezzanineLocation();
 
+     PMemState = PersistentMemory_Check();
+     if (PMemState == PMEM_RETURN_DEFAULT){
+       /* if the memory in it's default state, we're safe to proceed and clear
+        * the memory */
+       debug_printf("[INIT] persistent memory contains default value. Clearing...\r\n");
+       PMemState = PersistentMemory_Clear();
+     }
+
+     /* catch any errors */
+     if (PMemState == PMEM_RETURN_ERROR){
+       error_printf("[INIT] error setting up persistent memory.\r\n");
+     }
+
      error_printf("[INIT] Waiting for HMC(s) to complete init...\r\n");
      
      /*
-        - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
-        - each byte represents the status of a Mezz slot
-
-        31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
-        +-------+--------+--------+--------+
-        | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
-        +-------+--------+--------+--------+
-
-        bit 7 & 6 => reserved
-        bit 5     => HMC post ok
-        bit 4     => HMC init ok
-        bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
-        bit 0     => Present
-
-     */
+      *  - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
+      *  - each byte represents the status of a Mezz slot
+      *
+      *  31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
+      *  +-------+--------+--------+--------+
+      *  | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
+      *  +-------+--------+--------+--------+
+      *
+      *  bit 7 & 6 => reserved
+      *  bit 5     => HMC post ok
+      *  bit 4     => HMC init ok
+      *  bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
+      *  bit 0     => Present
+      */
 
 #define HMC_INIT_TIMEOUT    100    /* x 100ms */
 #define BYTE_MASK_HMC_INIT  0x35  /* b00110101 */
@@ -1849,17 +1867,38 @@ int main()
 
      always_printf("[INIT] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
+     PersistentMemory_ReadByte(HMC_RECONFIG_COUNT_BYTE, &uHMCReconfigCount);
+
      if (uTimeoutCounter == 0){
-       error_printf("[HMC] all HMCs did not init within %d ms...invoking reconfigure of FPGA\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
-       SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-       ResetSdramReadAddress();
-       AboutToBootFromSdram();
-       Delay(100000);
-       IcapeControllerInSystemReconfiguration();
+       error_printf("[HMC] all HMCs did not init within %d ms\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
+       if (PMemState != PMEM_RETURN_ERROR){
+         if (uHMCReconfigCount < HMC_MAX_RECONFIG_COUNT){
+           /* for each reconfigure, increment count and write back to register */
+           uHMCReconfigCount = uHMCReconfigCount + 1;
+           PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_BYTE, uHMCReconfigCount);
+           error_printf("[HMC] invoking reconfigure of FPGA\r\n");
+           SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+           ResetSdramReadAddress();
+           AboutToBootFromSdram();
+           Delay(100000);
+           IcapeControllerInSystemReconfiguration();
+         } else {
+           error_printf("[HMC] maximum reconfiguration count reached [%d]\r\n",
+               HMC_MAX_RECONFIG_COUNT);
+           /*
+            * clear the persistent memory register here so that the reconfig cycle starts
+            * fresh on the next reset. Otherwise the only way to clear it would be via
+            * hard reset or explicitly writing to it via casperfpga (fan_ctrl/i2c commands)
+            */
+           PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_BYTE, 0);
+         }
+       } else {
+         error_printf("[HMC] error accessing persistent memory register\r\n");
+       }
      } else {
        /* if we haven't TIMED OUT then we're OK */
        always_printf("[HMC] all HMCs initialized within %d ms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
-     }  
+     }
 
      error_printf("[INIT] Interface parameters\r\n");
 	   InitialiseEthernetInterfaceParameters();
