@@ -50,6 +50,8 @@ OBJ := $(SRC:.c=.o)
 MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul -mno-xl-soft-div
 #common flags
 CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
+#some extra flags to check switch statements (not automatically enabled by -Wall)
+CFLAGS += -Wswitch-enum -Wswitch-default
 #optimization flags
 
 #CFLAGS += -Os
