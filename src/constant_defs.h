@@ -637,22 +637,25 @@ typedef struct sReadWishboneResp {
     u16				uPadding[5];
 } sReadWishboneRespT;
 
+#define MAX_I2C_WRITE_BYTES 33
+
 typedef struct sWriteI2CReq {
 	sCommandHeaderT Header;
     u16				uId;
     u16				uSlaveAddress;
     u16				uNumBytes;
-    u16				uWriteBytes[32];
+    u16				uWriteBytes[MAX_I2C_WRITE_BYTES];
 } sWriteI2CReqT;
+
 
 typedef struct sWriteI2CResp {
 	sCommandHeaderT Header;
     u16				uId;
     u16				uSlaveAddress;
     u16				uNumBytes;
-    u16				uWriteBytes[32];
+    u16				uWriteBytes[MAX_I2C_WRITE_BYTES];
     u16				uWriteSuccess;
-    u16				uPadding[1];
+    //u16				uPadding[1];
 } sWriteI2CRespT;
 
 typedef struct sReadI2CReq {

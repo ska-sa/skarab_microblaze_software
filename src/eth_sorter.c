@@ -872,8 +872,10 @@ int WriteI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
 	u8 uIndex;
 	u32 uTimeout;
 
+  /*
 	if (uCommandLength < sizeof(sWriteI2CReqT))
 		return XST_FAILURE;
+    */
 
 #ifdef DEBUG_PRINT
 	//xil_printf("ID: %x SLAVE ADDRESS: %x NUM BYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uNumBytes);
@@ -922,7 +924,7 @@ int WriteI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
 	Response->uId = Command->uId;
 	Response->uSlaveAddress = Command->uSlaveAddress;
 	Response->uNumBytes = Command->uNumBytes;
-	for (uIndex = 0; uIndex < 32; uIndex++)
+	for (uIndex = 0; uIndex < MAX_I2C_WRITE_BYTES; uIndex++)
 		Response->uWriteBytes[uIndex] = Command->uWriteBytes[uIndex];
 
 	if (iStatus == XST_SUCCESS)
@@ -930,7 +932,7 @@ int WriteI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
 	else
 		Response->uWriteSuccess = 0;
 
-	Response->uPadding[0] = 0;
+	//Response->uPadding[0] = 0;
 
 	*uResponseLength = sizeof(sWriteI2CRespT);
 
