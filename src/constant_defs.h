@@ -60,8 +60,6 @@
 
 //#define DO_40GBE_LOOPBACK_TEST
 
-//#define DEV_PLATFORM
-
 #define NUM_REGISTERS				32
 
 volatile u32 uWriteBoardShadowRegs[NUM_REGISTERS];

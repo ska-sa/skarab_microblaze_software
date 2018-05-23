@@ -1563,9 +1563,6 @@ int main()
 {
 	   int iStatus;
 	   u32 uReadReg;
-#ifdef DEV_PLATFORM
-	   u32 uSleepCount;
-#endif
 	   u8 uEthernetId;
 	   u32 uNumWords;
 	   u32 uResponsePacketLength;
@@ -1641,18 +1638,6 @@ int main()
 	   InitI2C(0x3, SPEED_400kHz);
 	   InitI2C(0x4, SPEED_400kHz);
 
-#ifdef DEV_PLATFORM
-	   iStatus = I2CProgramRefClkOsc();
-	   if (iStatus == 0)
-	   {
-		   xil_printf("Programming Refclk OSC success\r\n");
-	   }
-	   else
-	   {
-		   xil_printf("Programming Refclk OSC failed\r\n");
-	   }
-#endif
-
 #if 0
      /* debug code to read MSR register - TODO: remove */
      int k; 
@@ -1666,24 +1651,6 @@ int main()
                                                            EMBEDDED_SOFTWARE_VERSION_MINOR,
                                                            EMBEDDED_SOFTWARE_VERSION_PATCH);
 	   xil_printf("Running ELF version: %s\r\n", VENDOR_ID);
-
-#ifdef DEV_PLATFORM
-	   iStatus = I2CProgramSFPClkOsc();
-	   if (iStatus == 0)
-	   {
-		   xil_printf("Programming SFP OSC success\r\n");
-	   }
-	   else
-	   {
-		   xil_printf("Programming SFP OSC failed\r\n");
-	   }
-
-	   // Sleep for five seconds because this is a dangerous time for the
-	   // system clock
-	   for (uSleepCount = 0; uSleepCount < 5000; uSleepCount++)
-		   Delay(1000);
-#endif
-
 
 #if 0
 	   // Enable the watchdog timer
