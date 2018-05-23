@@ -48,11 +48,6 @@ int CheckCommandPacket(u8 * pCommand, u32 uCommandLength);
 void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength);
 int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket);
 void ArpHandler(u8 uId, u8 uType, u8 *pReceivedArp, u8 *pTransmitBuffer, u32 * uResponseLength, u32 uRequestedIPAddress);
-void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOptionsLength);
-void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOptionsLength, u32 uRequestedIPAddress, u32 uServerIPAddress);
-void CreateDHCPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u32 uDHCPOptionsLength);
-int CheckDHCPHeader(u8 uId, u32 uDHCPPacketLength, u8 * pDHCPHeaderPointer);
-int DHCPHandler(u8 uId, u8 *pReceivedDHCPPacket, u32 uReceivedLength, u8 *pTransmitBuffer, u32 * uResponseLength);
 void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMessageType, u32 uGroupAddress);
 
 // COMMAND HANDLERS
