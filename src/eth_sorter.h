@@ -41,7 +41,6 @@
 u32 CalculateIPChecksum(u32 uChecksum, u32 uLength, u16 *pHeaderPtr);
 int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHeaderPointer);
 u8 * ExtractIPV4FieldsAndGetPayloadPointer(u8 *pIPHeaderPointer, u32 *uIPPayloadLength, u32 *uResponseIPAddr, u32 *uProtocol, u32 * uTOS);
-int CheckICMPHeader(u32 uPacketLength, u8 * pICMPHeaderPtr);
 int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPointer);
 u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLength, u32 *uSourcePort, u32 *uDestinationPort);
 int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength, struct sIFObject *pIFObj);
@@ -49,7 +48,6 @@ int CheckCommandPacket(u8 * pCommand, u32 uCommandLength);
 void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength);
 int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket);
 void ArpHandler(u8 uId, u8 uType, u8 *pReceivedArp, u8 *pTransmitBuffer, u32 * uResponseLength, u32 uRequestedIPAddress);
-void ICMPHandler(u8 uId, u8 *pReceivedICMPPacket, u32 uReceivedLength, u8 *pTransmitBuffer, u32 * uResponseLength);
 void CreateDHCPDiscoverPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOptionsLength);
 void CreateDHCPRequestPacketOptions(u8 uId, u8 *pTransmitBuffer, u32 * uDHCPOptionsLength, u32 uRequestedIPAddress, u32 uServerIPAddress);
 void CreateDHCPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u32 uDHCPOptionsLength);
