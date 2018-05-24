@@ -10,6 +10,10 @@
 
 #include "constant_defs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // adding a new command for the uBlaze requires:
 // * an opcode
 // * new structures for the request and response
@@ -192,4 +196,7 @@ typedef struct sInvalidOpcodeResp {
 	u16				uPadding[9];
 } sInvalidOpcodeRespT;
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* CUSTOM_CONSTANTS_H_ */

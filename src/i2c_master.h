@@ -43,6 +43,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Definitions for the Opencores i2c master core
  */
@@ -166,4 +170,7 @@ int I2CWriteRefclkOscBytes(u16 uId, u16 uByteAddress, u16* uWriteBytes, unsigned
 int I2CProgramSFPClkOsc();
 int I2CProgramRefClkOsc();
 
+#ifdef __cplusplus
+}
+#endif
 #endif

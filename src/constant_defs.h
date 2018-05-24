@@ -21,6 +21,10 @@
 *  This file contains global constant and type definitions.
 * ------------------------------------------------------------------------------*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // GLOBAL VARIABLES
 
 //#define SKARAB_BSP
@@ -1085,4 +1089,7 @@ typedef struct sGetDHCPTuningDebugResp {
 
 #define GBE_88E1111_I2C_DEVICE_ADDRESS	0x58	// Without read/write bit
 
+#ifdef __cplusplus
+}
+#endif
 #endif

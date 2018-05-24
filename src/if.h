@@ -3,6 +3,10 @@
 
 #include "dhcp.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IF_MAGIC 0xAABBCCDD
 
 #define IF_RETURN_OK    (0)
@@ -90,4 +94,8 @@ struct sIFObject{
 };
 
 u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr, u8 uEthernetId);
+
+#ifdef __cplusplus
+}
+#endif
 #endif

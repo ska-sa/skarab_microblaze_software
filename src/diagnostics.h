@@ -16,6 +16,13 @@
 
 #include "if.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void PrintInterfaceCounters(struct sIFObject *pIFObj);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -26,6 +26,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define FLASH_MODE 			0x0
 #define SDRAM_PROGRAM_MODE	0x1
 #define SDRAM_READ_MODE		0x2
@@ -151,4 +155,7 @@ int ProgramBuffer(u32 uAddress, u16 * puDataArray, u16 uTotalNumWords, u16 uNumW
 // Maximum buffer size is 512 words
 int EraseBlock(u32 uBlockAddress);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

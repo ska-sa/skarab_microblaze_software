@@ -10,7 +10,14 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // function declarations
 int NewOpCodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* OPCODE_TEMPLATE_H_ */

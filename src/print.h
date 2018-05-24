@@ -5,6 +5,10 @@
 
 #include "constant_defs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* enable all levels above selected print level */
 #ifdef TRACE_PRINT
 #define DEBUG_PRINT
@@ -61,4 +65,7 @@
   #define trace_printf(...)
 #endif
 
+#ifdef __cplusplus
+}
+#endif
 #endif

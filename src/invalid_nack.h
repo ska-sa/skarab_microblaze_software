@@ -9,7 +9,14 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // function declarations
 int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* INVALID_NACK_H_ */

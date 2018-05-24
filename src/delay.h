@@ -21,6 +21,13 @@
 *  This file contains the definitions of a function to create a microsecond delay.
 * ------------------------------------------------------------------------------*/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void Delay(unsigned int uLengthInMicroSeconds);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

@@ -26,6 +26,10 @@
 
 #include "if.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 u32 CalculateIPChecksum(u32 uChecksum, u32 uLength, u16 *pHeaderPtr);
 int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHeaderPointer);
 u8 * ExtractIPV4FieldsAndGetPayloadPointer(u8 *pIPHeaderPointer, u32 *uIPPayloadLength, u32 *uResponseIPAddr, u32 *uProtocol, u32 * uTOS);
@@ -68,4 +72,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 int GetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

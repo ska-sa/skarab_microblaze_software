@@ -21,6 +21,10 @@
 #include <stdint.h>
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef u8
 #define u8 uint8_t
 #endif
@@ -39,4 +43,7 @@ int uUDPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr);
 
 int uIPV4_ntoa(char *stringIP, u32 uIP32);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* _NET_UTILS_H_ */

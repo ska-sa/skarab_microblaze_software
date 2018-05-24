@@ -59,6 +59,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ONE_WIRE_CTL_DAT_MSK           0x1  // data bit
 #define ONE_WIRE_CTL_DAT_OFST          (0)
 #define ONE_WIRE_CTL_RST_MSK           0x2  // reset
@@ -145,4 +149,7 @@ int DS2433WriteMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, 
 int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u16 uBufferSize, u16 uTA1, u16 uTA2, u16 uOneWirePort);
 
 
+#ifdef __cplusplus
+}
+#endif
 #endif

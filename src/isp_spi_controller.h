@@ -26,6 +26,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ISP_SPI_ADDRESS_MASK_LOW	0xFFFF
 
 #define ISP_SPI_WRITE_BYTE			0x100
@@ -62,4 +66,7 @@ int ISPSPIReadPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes);
 int ISPSPIProgramPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes);
 int ISPSPIEraseSector(u32 uSectorAddress);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

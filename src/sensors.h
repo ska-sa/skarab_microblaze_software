@@ -13,6 +13,10 @@
 
 #include "custom_constants.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // command handlers
 int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 int SetFanSpeedHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
@@ -35,4 +39,7 @@ void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch);
 // auxiliary functions
 void ConfigureSwitch(unsigned SwitchSelection);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* SENSORS_H_ */

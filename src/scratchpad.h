@@ -3,6 +3,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
   PMEM_RETURN_OK = 0,
   PMEM_RETURN_ERROR,
@@ -20,4 +24,7 @@ tPMemReturn PersistentMemory_WriteByte(tPMemByteIndex byte_index, u8 byte_data);
 tPMemReturn PersistentMemory_ReadByte(tPMemByteIndex byte_index, u8 *read_byte_data);
 tPMemReturn PersistentMemory_Clear(void);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /*_SCRATCHPAD_H_*/

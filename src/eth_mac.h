@@ -27,6 +27,10 @@
 
 #include <xil_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ETH_MAC_SOFT_RESET			0x01000000
 #define ETH_MAC_ENABLE				0x00010000
 
@@ -97,4 +101,7 @@ void AckHostPacketReceive(u8 uId);
 int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords);	// GT 31/03/2017 INSTRUCT COMPILER BUFFER IS VOLATILE
 int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords); // GT 31/03/2017 INSTRUCT COMPILER BUFFER IS VOLATILE
 
+#ifdef __cplusplus
+}
+#endif
 #endif

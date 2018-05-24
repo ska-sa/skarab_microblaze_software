@@ -13,6 +13,10 @@
 
 #include "eth.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*link custom return values */
 #define LLDP_RETURN_FAIL     XST_FAILURE
 #define LLDP_RETURN_OK       XST_SUCCESS
@@ -113,5 +117,8 @@ void reverse(char *str, int len);
 int u8ToStr(u8 x, char *str, int d);
 
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* SRC_LLDP_H_ */
 
