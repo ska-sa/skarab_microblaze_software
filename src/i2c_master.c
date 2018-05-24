@@ -19,8 +19,13 @@
 *  master over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xstatus.h>
+#include <xil_io.h>
+
 #include "i2c_master.h"
+#include "constant_defs.h"
 #include "register.h"
+#include "delay.h"
 
 //=================================================================================
 //	GetI2CAddressOffset

@@ -19,6 +19,9 @@
 *  Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_io.h>
+#include <xparameters.h>
+
 #include "register.h"
 #include "constant_defs.h"
 

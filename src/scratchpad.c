@@ -16,12 +16,14 @@
  * byte[2-8]  => reserved for future use
  */
 
-#include "xparameters.h"
+#include <xparameters.h>
+#include <xil_assert.h>
+#include <xstatus.h>
+
 #include "sensors.h"
 #include "i2c_master.h"
 #include "print.h"
 #include "scratchpad.h"
-#include "xil_assert.h"
 
 #define MFR_LOCATION_CMD 0x9c
 #define MFR_LOCATION_LEN 8

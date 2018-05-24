@@ -23,10 +23,7 @@
 *  controller over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
+#include <xil_types.h>
 
 #define ICAPE_DATA_REG_ADDRESS	0x4010
 #define ICAPE_CTL_REG_ADDRESS	0x4014

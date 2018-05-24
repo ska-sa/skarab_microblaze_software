@@ -5,11 +5,10 @@
  *      Author: tyronevb
  */
 
-#include "xtmrctr.h"
-#include "xintc.h"
-
 #ifndef CUSTOM_CONSTANTS_H_
 #define CUSTOM_CONSTANTS_H_
+
+#include "constant_defs.h"
 
 // adding a new command for the uBlaze requires:
 // * an opcode

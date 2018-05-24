@@ -21,9 +21,6 @@
 *  This file contains global constant and type definitions.
 * ------------------------------------------------------------------------------*/
 
-#include "xtmrctr.h"
-#include "xintc.h"
-
 // GLOBAL VARIABLES
 
 //#define SKARAB_BSP

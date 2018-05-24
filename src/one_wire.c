@@ -53,7 +53,13 @@
 *                                                                             *
 ******************************************************************************/
 
+#include <xil_io.h>
+#include <xparameters.h>
+#include <xstatus.h>
+
 #include "one_wire.h"
+#include "constant_defs.h"
+#include "delay.h"
 
 
 //=================================================================================

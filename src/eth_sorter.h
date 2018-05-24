@@ -22,20 +22,8 @@
 *  This file contains the definitions for sorting Ethernet packets.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "register.h"
-#include "i2c_master.h"
-#include "flash_sdram_controller.h"
-#include "icape_controller.h"
-#include "isp_spi_controller.h"
-#include "one_wire.h"
-#include "eth_mac.h"
-#include "sensors.h"
-#include "improved_read_write.h"
-#include "invalid_nack.h"
+#include <xil_types.h>
+
 #include "if.h"
 
 u32 CalculateIPChecksum(u32 uChecksum, u32 uLength, u16 *pHeaderPtr);

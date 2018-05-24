@@ -24,11 +24,7 @@
 *  the NOR flash and boot SDRAM.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "delay.h"
+#include <xil_types.h>
 
 #define FLASH_MODE 			0x0
 #define SDRAM_PROGRAM_MODE	0x1

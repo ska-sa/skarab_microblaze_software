@@ -24,11 +24,7 @@
 *  the Spartan 3AN FPGA SPI Flash.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "delay.h"
+#include <xil_types.h>
 
 #define ISP_SPI_ADDRESS_MASK_LOW	0xFFFF
 

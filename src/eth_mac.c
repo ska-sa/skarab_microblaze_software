@@ -19,6 +19,11 @@
 *  over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_io.h>
+#include <xil_types.h>
+#include <xparameters.h>
+#include <xstatus.h>
+
 #include "eth_mac.h"
 #include "print.h"
 

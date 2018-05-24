@@ -10,7 +10,11 @@
  *  This file contains the implementation of sensor reading functions.
  * ------------------------------------------------------------------------------*/
 
+#include <xstatus.h>
+
 #include "sensors.h"
+#include "i2c_master.h"
+#include "custom_constants.h"
 
 // function definitions
 

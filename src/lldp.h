@@ -7,34 +7,18 @@
 
 #ifndef SRC_LLDP_H_
 #define SRC_LLDP_H_
-#include<stdint.h>
-/* some profitability stuff for datatypes used*/
-#ifndef u8
-#define u8 uint8_t
-#endif
 
-#ifndef u16
-#define u16 uint16_t
-#endif
+#include <xil_types.h>
+#include <xstatus.h>
 
-#ifndef u32
-#define u32 uint32_t
-#endif
+#include "eth.h"
 
 /*link custom return values */
 #define LLDP_RETURN_FAIL     XST_FAILURE
 #define LLDP_RETURN_OK       XST_SUCCESS
 #define LLDP_RETURN_INVALID  XST_FAILURE
+
 /*lldp packet offsets */
-#define ETH_DST_OFFSET                           0
-#define ETH_DST_LEN                              6
-#define ETH_SRC_OFFSET                           (ETH_DST_OFFSET + ETH_DST_LEN) //6
-#define ETH_SRC_LEN                              6
-#define ETH_FRAME_TYPE_OFFSET                    (ETH_SRC_OFFSET + ETH_SRC_LEN) //12
-#define ETH_FRAME_TYPE_LEN                       2
-
-#define ETH_FRAME_TOTAL_LEN                      (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN) /*ethernet length = 14*/
-
 #define LLDP_CHASSIS_ID_TLV_TYPE_OFFSET          (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN) //14
 #define LLDP_CHASSIS_ID_TLV_TYPE_LEN             1
 #define LLDP_CHASSIS_ID_TLV_LEN_OFFSET           (LLDP_CHASSIS_ID_TLV_TYPE_OFFSET + LLDP_CHASSIS_ID_TLV_TYPE_LEN) // 15

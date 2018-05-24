@@ -18,7 +18,23 @@
 *  This file contains the implementation of functions to sort Ethernet packets.
 * ------------------------------------------------------------------------------*/
 
+#include <xstatus.h>
+#include <xil_types.h>
+#include <xil_io.h>
+#include <xparameters.h>
+
 #include "eth_sorter.h"
+#include "constant_defs.h"
+#include "custom_constants.h"
+#include "eth_mac.h"
+#include "sensors.h"
+#include "improved_read_write.h"
+#include "invalid_nack.h"
+#include "flash_sdram_controller.h"
+#include "i2c_master.h"
+#include "isp_spi_controller.h"
+#include "register.h"
+#include "delay.h"
 #include "net_utils.h"
 #include "dhcp.h"
 #include "one_wire.h"

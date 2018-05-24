@@ -19,7 +19,11 @@
 *  controller over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_io.h>
+#include <xparameters.h>
+
 #include "icape_controller.h"
+#include "constant_defs.h"
 
 //=================================================================================
 //	IcapeControllerWriteWord

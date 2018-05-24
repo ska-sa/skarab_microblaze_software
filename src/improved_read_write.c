@@ -5,7 +5,11 @@
  *      Author: tyronevb
  */
 
+#include <xil_io.h> 
+#include <xstatus.h> 
+
 #include "improved_read_write.h"
+#include "custom_constants.h"
 
 // function definitions
 

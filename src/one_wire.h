@@ -57,11 +57,7 @@
 *                                                                             *
 ******************************************************************************/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "delay.h"
+#include <xil_types.h>
 
 #define ONE_WIRE_CTL_DAT_MSK           0x1  // data bit
 #define ONE_WIRE_CTL_DAT_OFST          (0)

@@ -19,7 +19,14 @@
 *  controller over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_io.h>
+#include <xstatus.h>
+#include <xparameters.h>
+#include <xil_types.h>
+
 #include "isp_spi_controller.h"
+#include "constant_defs.h"
+#include "delay.h"
 
 
 //=================================================================================

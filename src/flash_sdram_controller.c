@@ -19,7 +19,13 @@
 *  SDRAM controller over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_io.h>
+#include <xparameters.h>
+#include <xstatus.h>
+
 #include "flash_sdram_controller.h"
+#include "constant_defs.h"
+#include "delay.h"
 
 //=================================================================================
 //	SetOutputMode

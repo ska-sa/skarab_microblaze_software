@@ -1,6 +1,8 @@
 #ifndef _SCRATCHPAD_H_
 #define _SCRATCHPAD_H_
 
+#include <xil_types.h>
+
 typedef enum {
   PMEM_RETURN_OK = 0,
   PMEM_RETURN_ERROR,

@@ -41,11 +41,7 @@
 /////////////////////////////////////////////////////////////////////
 */
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "delay.h"
+#include <xil_types.h>
 
 /*
  * Definitions for the Opencores i2c master core

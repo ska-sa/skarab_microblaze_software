@@ -21,8 +21,6 @@
 *  This file contains the definitions of a function to create a microsecond delay.
 * ------------------------------------------------------------------------------*/
 
-#include "xparameters.h"
-
 void Delay(unsigned int uLengthInMicroSeconds);
 
 #endif

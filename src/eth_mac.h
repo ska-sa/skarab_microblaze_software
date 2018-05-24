@@ -25,10 +25,7 @@
 
 // INCLUDES
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
+#include <xil_types.h>
 
 #define ETH_MAC_SOFT_RESET			0x01000000
 #define ETH_MAC_ENABLE				0x00010000

@@ -5,7 +5,11 @@
  *      Author: tyronevb
  */
 
+#include <xil_types.h>
+#include <xstatus.h>
+
 #include "opcode_template.h"
+#include "custom_constants.h"
 
 // function definitions
 

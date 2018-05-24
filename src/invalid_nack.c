@@ -5,7 +5,12 @@
  *      Author: tyronevb
  */
 
+#include <xil_types.h>
+#include <xstatus.h>
+
 #include "invalid_nack.h"
+#include "custom_constants.h"
+#include "print.h"
 
 // function definitions
 
@@ -31,7 +36,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	sInvalidOpcodeRespT *Response = (sInvalidOpcodeRespT *) uResponsePacketPtr;
 	u8 uPaddingIndex;
 
-	xil_printf("Creating Response Packet for NACK. . .\r\n");
+	trace_printf("Creating Response Packet for NACK. . .\r\n");
 	// Create response packet
 	Response->Header.uCommandType = NACK_OPCODE_RESP;
 	Response->Header.uSequenceNumber = 0xFFFF;
@@ -43,11 +48,11 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	
 	
 	// padding bytes
-	for (uPaddingIndex = 0; uPaddingIndex < 9; uPaddingIndex++)
+	for (uPaddingIndex = 0; uPaddingIndex < 9; uPaddingIndex++){
 		Response->uPadding[uPaddingIndex] = 0;
+  }
 	
-
-	xil_printf("Created Response for NACK!!!!!\r\n");
+	debug_printf("Created Response for NACK!!!!!\r\n");
 
 	*uResponseLength = sizeof(sInvalidOpcodeRespT);
 

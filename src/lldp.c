@@ -12,7 +12,6 @@
 #include "lldp.h"
 #include "constant_defs.h"
 #include "register.h"
-/* Local function prototypes*/
 
 static char lookup[17] = "0123456789ABCDEF";
 
