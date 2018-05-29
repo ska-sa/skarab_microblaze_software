@@ -849,7 +849,7 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 	u16 Mez3WriteBytes[3];
 
 	WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
-	WriteBytes[1] = TempSensorPage;
+	WriteBytes[1] = MezzaninePage;
 
 	if (OpenSwitch)
 	{
@@ -862,7 +862,7 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 	// read temperature
 
 	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
-	if (TempSensorPage == MEZZANINE_3_TEMP_ADC_PAGE)
+	if (MezzaninePage == MEZZANINE_3_TEMP_ADC_PAGE)
 	{
 		Mez3WriteBytes[0] = 0x7D;
 		Mez3WriteBytes[1] = 0x00;
@@ -875,7 +875,7 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 	}
 	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
-	else if ((TempSensorPage == MEZZANINE_0_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_1_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_2_TEMP_ADC_PAGE))
+	else if ((MezzaninePage == MEZZANINE_0_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_1_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_2_TEMP_ADC_PAGE))
 	{
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 
