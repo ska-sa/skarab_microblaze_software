@@ -52,6 +52,7 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	GetAllTempSensors(Response); // temperature sensors (excl. mezzanine sites)
 	GetAllVoltages(Response); // psu voltages
 	GetAllCurrents(Response); // psu currents
+	GetAllMezzanineTempSensors(Response); // mezzanine temperatures
 
 	// add padding to 64-bit boundary
 	for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++)
@@ -268,7 +269,6 @@ void GetAllFanSpeedsPWM(sGetSensorDataRespT *Response)
 void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 {
 	u16 WriteBytes[3];
-	u16 Mez3WriteBytes[3];
 
 	WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
 	WriteBytes[1] = TempSensorPage;
@@ -282,32 +282,7 @@ void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
 	// read temperature
-
-	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
-	if (TempSensorPage == MEZZANINE_3_TEMP_ADC_PAGE)
-	{
-		Mez3WriteBytes[0] = 0x7D;
-		Mez3WriteBytes[1] = 0x00;
-
-		// configure the QSFP to have it's temperature read
-		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, 2, Mez3WriteBytes);
-
-		// sleep(5000);
-		
-		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
-	}
-	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
-	else if ((TempSensorPage == MEZZANINE_0_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_1_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_2_TEMP_ADC_PAGE))
-	{
-		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
-
-	}
-	// read other temperatures
-	else
-	{
-		
-		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
-	}
+	PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
 }
 //=================================================================================
 //	ReadVoltageMonTemperature
@@ -379,13 +354,12 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 		u16 temperature;
 		int i;
 
-		unsigned TempSensorPages[10] = {INLET_TEMP_SENSOR_PAGE, OUTLET_TEMP_SENSOR_PAGE, FPGA_TEMP_DIODE_ADC_PAGE,
+		unsigned TempSensorPages[6] = {INLET_TEMP_SENSOR_PAGE, OUTLET_TEMP_SENSOR_PAGE, FPGA_TEMP_DIODE_ADC_PAGE,
 									   FAN_CONT_TEMP_SENSOR_PAGE, VOLTAGE_MON_TEMP_SENSOR_PAGE,
-									   CURRENT_MON_TEMP_SENSOR_PAGE, MEZZANINE_0_TEMP_ADC_PAGE, MEZZANINE_1_TEMP_ADC_PAGE,
-									   MEZZANINE_2_TEMP_ADC_PAGE, MEZZANINE_3_TEMP_ADC_PAGE };
+									   CURRENT_MON_TEMP_SENSOR_PAGE};
 
 
-		for (i = 0; i<10; i++){
+		for (i = 0; i<6; i++){
 			if(i == 0){
 				ReadTemperature(ReadBytes, TempSensorPages[i], true);
 			}
@@ -404,8 +378,6 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 			Response->uSensorData[i+10] = temperature; // offset of 10 to account for previous sensor data
 		}
-
-		// adding two new sensors will shift all the sensor data around!!!
 
 		/*
 		// INLET TEMPERATURE SENSOR
@@ -437,27 +409,6 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 		ReadCurrentMonTemperature(ReadBytes, false);
 		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 		Response->uSensorData[15] = temperature;
-
-		// MEZZANINE SITE 0 TEMPERATURE SENSOR
-		ReadVoltageMonTemperature(ReadBytes, true);
-		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
-		Response->uSensorData[16] = temperature;
-
-		// MEZZANINE SITE 1 TEMPERATURE SENSOR
-		ReadCurrentMonTemperature(ReadBytes, false);
-		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
-		Response->uSensorData[17] = temperature;
-
-		// MEZZANINE SITE 2 TEMPERATURE SENSOR
-		ReadVoltageMonTemperature(ReadBytes, true);
-		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
-		Response->uSensorData[18] = temperature;
-
-		// MEZZANINE SITE 3 TEMPERATURE SENSOR
-		ReadCurrentMonTemperature(ReadBytes, false);
-		temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
-		Response->uSensorData[19] = temperature;
-
 		*/
 
 }
@@ -578,9 +529,9 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
 
 			Voltage = (ReadBytes[0] + (ReadBytes[1] << 8));
 			VoltageScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+20] = Voltage;
-			Response->uSensorData[(i*3)+21] = VoltageScaleFactor;
-			Response->uSensorData[(i*3)+22] = VoltagePages[i];
+			Response->uSensorData[(i*3)+16] = Voltage;
+			Response->uSensorData[(i*3)+17] = VoltageScaleFactor;
+			Response->uSensorData[(i*3)+18] = VoltagePages[i];
 		}
 
 		/*// 12V2 Voltage
@@ -774,9 +725,9 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
 
 			Current = (ReadBytes[0] + (ReadBytes[1] << 8));
 			ScaleFactor = ReadBytes[2];
-			Response->uSensorData[(i*3)+59] = Current;
-			Response->uSensorData[(i*3)+60] = ScaleFactor;
-			Response->uSensorData[(i*3)+61] = CurrentPages[i];
+			Response->uSensorData[(i*3)+55] = Current;
+			Response->uSensorData[(i*3)+56] = ScaleFactor;
+			Response->uSensorData[(i*3)+57] = CurrentPages[i];
 		}
 		/*
 		// 12V2 Current
@@ -875,6 +826,92 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
 		Response->uSensorData[89] = ScaleFactor;
 		Response->uSensorData[90] = P3V3_CONFIG_CURRENT_MON_PAGE;
 		*/
+}
+//=================================================================================
+//	ReadMezzanineTemperature
+//--------------------------------------------------------------------------------
+//	This method reads a temperature from the MAX31785 Fan Controller
+//
+//	---------	---		-----------
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//  ReadBytes			OUT Read bytes (temperature)
+//	TempSensorPage		IN	Desired messanine temperature
+//	OpenSwitch			IN	True if the PCA9546 I2C switch needs to be opened first
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch)
+{
+	u16 WriteBytes[3];
+	u16 Mez3WriteBytes[3];
+
+	WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
+	WriteBytes[1] = TempSensorPage;
+
+	if (OpenSwitch)
+	{
+		ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+	}
+
+	// request temperature read
+	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+
+	// read temperature
+
+	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
+	if (TempSensorPage == MEZZANINE_3_TEMP_ADC_PAGE)
+	{
+		Mez3WriteBytes[0] = 0x7D;
+		Mez3WriteBytes[1] = 0x00;
+
+		// configure the QSFP to have it's temperature read
+		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, 2, Mez3WriteBytes);
+
+		// sleep(5000);
+		
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+	}
+	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
+	else if ((TempSensorPage == MEZZANINE_0_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_1_TEMP_ADC_PAGE) || (TempSensorPage == MEZZANINE_2_TEMP_ADC_PAGE))
+	{
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+
+	}
+}
+//=================================================================================
+//	GetAllMezzanineTempSensors
+//--------------------------------------------------------------------------------
+//	This method reads all the temperature sensors on the SKARAB motherboard
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	Response	IN		Pointer to the response packet structure
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
+{
+		u16 ReadBytes[3];
+		u16 temperature;
+		int i;
+
+		unsigned MezzanineSensorPages[4] = {MEZZANINE_0_TEMP_ADC_PAGE,
+											MEZZANINE_1_TEMP_ADC_PAGE,
+											MEZZANINE_2_TEMP_ADC_PAGE,
+											MEZZANINE_3_TEMP_ADC_PAGE};
+
+
+		for (i = 0; i<4; i++)
+		{
+			ReadTemperature(ReadBytes, MezzanineSensorPages[i], true);			
+			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+			Response->uSensorData[i+91] = temperature; // offset of 91 to account for previous sensor data
+		}
 }
 //=================================================================================
 //	ConfigureSwitch
