@@ -290,7 +290,7 @@ void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 		Mez3WriteBytes[1] = 0x00;
 
 		// configure the QSFP to have it's temperature read
-		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, 2, WriteBytes);
+		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, 2, Mez3WriteBytes);
 
 		// sleep(5000);
 		
