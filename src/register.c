@@ -1,23 +1,23 @@
 /**------------------------------------------------------------------------------
-*  FILE NAME            : register.c
-* ------------------------------------------------------------------------------
-*  COMPANY              : PERALEX ELECTRONIC (PTY) LTD
-* ------------------------------------------------------------------------------
-*  COPYRIGHT NOTICE :
-*
-*  The copyright, manufacturing and patent rights stemming from this
-*  document in any form are vested in PERALEX ELECTRONICS (PTY) LTD.
-*
-*  (c) Peralex 2011
-*
-*  PERALEX ELECTRONICS (PTY) LTD has ceded these rights to its clients
-*  where contractually agreed.
-* ------------------------------------------------------------------------------
-*  DESCRIPTION :
-*
-*  This file contains the implementation of functions to registers over the
-*  Wishbone bus.
-* ------------------------------------------------------------------------------*/
+ *  FILE NAME            : register.c
+ * ------------------------------------------------------------------------------
+ *  COMPANY              : PERALEX ELECTRONIC (PTY) LTD
+ * ------------------------------------------------------------------------------
+ *  COPYRIGHT NOTICE :
+ *
+ *  The copyright, manufacturing and patent rights stemming from this
+ *  document in any form are vested in PERALEX ELECTRONICS (PTY) LTD.
+ *
+ *  (c) Peralex 2011
+ *
+ *  PERALEX ELECTRONICS (PTY) LTD has ceded these rights to its clients
+ *  where contractually agreed.
+ * ------------------------------------------------------------------------------
+ *  DESCRIPTION :
+ *
+ *  This file contains the implementation of functions to registers over the
+ *  Wishbone bus.
+ * ------------------------------------------------------------------------------*/
 
 #include <xil_io.h>
 #include <xparameters.h>
@@ -26,84 +26,84 @@
 #include "constant_defs.h"
 
 //=================================================================================
-//	WriteBoardRegister
+//  WriteBoardRegister
 //--------------------------------------------------------------------------------
-//	This method writes a board register.
+//  This method writes a board register.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uWriteAddress	IN	Register to write to
-//	uWriteData		IN	Data to write
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uWriteAddress IN  Register to write to
+//  uWriteData    IN  Data to write
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void WriteBoardRegister(u32 uWriteAddress, u32 uWriteData)
 {
 
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + BOARD_REGISTER_ADDR + uWriteAddress, uWriteData);
-	uWriteBoardShadowRegs[uWriteAddress >> 2] = uWriteData;
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + BOARD_REGISTER_ADDR + uWriteAddress, uWriteData);
+  uWriteBoardShadowRegs[uWriteAddress >> 2] = uWriteData;
 
 }
 
 //=================================================================================
-//	ReadBoardRegister
+//  ReadBoardRegister
 //--------------------------------------------------------------------------------
-//	This method reads a board register.
+//  This method reads a board register.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uReadAddress	IN	Register to read from
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uReadAddress  IN  Register to read from
 //
-//	Return
-//	------
-//	Data read
+//  Return
+//  ------
+//  Data read
 //=================================================================================
 u32 ReadBoardRegister(u32 uReadAddress)
 {
 
-	return (Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + BOARD_REGISTER_ADDR + uReadAddress));
+  return (Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + BOARD_REGISTER_ADDR + uReadAddress));
 
 }
 
 //=================================================================================
-//	WriteDSPRegister
+//  WriteDSPRegister
 //--------------------------------------------------------------------------------
-//	This method writes a DSP register.
+//  This method writes a DSP register.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uWriteAddress	IN	Register to write to
-//	uWriteData		IN	Data to write
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uWriteAddress IN  Register to write to
+//  uWriteData    IN  Data to write
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void WriteDSPRegister(u32 uWriteAddress, u32 uWriteData)
 {
 
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + DSP_REGISTER_ADDR + uWriteAddress, uWriteData);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + DSP_REGISTER_ADDR + uWriteAddress, uWriteData);
 
 }
 
 //=================================================================================
-//	ReadDSPRegister
+//  ReadDSPRegister
 //--------------------------------------------------------------------------------
-//	This method reads a DSP register.
+//  This method reads a DSP register.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uReadAddress	IN	Register to read from
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uReadAddress  IN  Register to read from
 //
-//	Return
-//	------
-//	Data read
+//  Return
+//  ------
+//  Data read
 //=================================================================================
 u32 ReadDSPRegister(u32 uReadAddress)
 {
 
-	return (Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + DSP_REGISTER_ADDR + uReadAddress));
+  return (Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + DSP_REGISTER_ADDR + uReadAddress));
 
 }

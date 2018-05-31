@@ -15,46 +15,46 @@
 // function definitions
 
 //=================================================================================
-//	InvalidOpcodeHandler
+//  InvalidOpcodeHandler
 //--------------------------------------------------------------------------------
-//	Function is called in the case where the SKARAB receives a request for an unknown opcode
+//  Function is called in the case where the SKARAB receives a request for an unknown opcode
 //  Responds with a packet containing an opcode that indicates this behaviour
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	pCommand				IN	Pointer to command header
-//	uCommandLength			IN	Length of command
-//	uResponsePacketPtr		IN	Pointer to where response packet must be constructed
-//	uResponseLength			OUT	Length of payload of response packet
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  pCommand        IN  Pointer to command header
+//  uCommandLength      IN  Length of command
+//  uResponsePacketPtr    IN  Pointer to where response packet must be constructed
+//  uResponseLength     OUT Length of payload of response packet
 //
-//	Return
-//	------
-//	XST_SUCCESS if successful
+//  Return
+//  ------
+//  XST_SUCCESS if successful
 //=================================================================================
 int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
 
-	sInvalidOpcodeRespT *Response = (sInvalidOpcodeRespT *) uResponsePacketPtr;
-	u8 uPaddingIndex;
+  sInvalidOpcodeRespT *Response = (sInvalidOpcodeRespT *) uResponsePacketPtr;
+  u8 uPaddingIndex;
 
-	trace_printf("Creating Response Packet for NACK. . .\r\n");
-	// Create response packet
-	Response->Header.uCommandType = NACK_OPCODE_RESP;
-	Response->Header.uSequenceNumber = 0xFFFF;
-	//Response->Dummy1 = 0;
-	//Response->Dummy2 = 0;
-	//Response->Dummy3 = 0;
-	//Response->Dummy4 = 0;
-	
-	
-	
-	// padding bytes
-	for (uPaddingIndex = 0; uPaddingIndex < 9; uPaddingIndex++){
-		Response->uPadding[uPaddingIndex] = 0;
+  trace_printf("Creating Response Packet for NACK. . .\r\n");
+  // Create response packet
+  Response->Header.uCommandType = NACK_OPCODE_RESP;
+  Response->Header.uSequenceNumber = 0xFFFF;
+  //Response->Dummy1 = 0;
+  //Response->Dummy2 = 0;
+  //Response->Dummy3 = 0;
+  //Response->Dummy4 = 0;
+
+
+
+  // padding bytes
+  for (uPaddingIndex = 0; uPaddingIndex < 9; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
   }
-	
-	debug_printf("Created Response for NACK!!!!!\r\n");
 
-	*uResponseLength = sizeof(sInvalidOpcodeRespT);
+  debug_printf("Created Response for NACK!!!!!\r\n");
 
-	return XST_SUCCESS;
+  *uResponseLength = sizeof(sInvalidOpcodeRespT);
+
+  return XST_SUCCESS;
 }

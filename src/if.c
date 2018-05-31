@@ -1,14 +1,14 @@
 /**----------------------------------------------------------------------------
-*   FILE:       if.c
-*   BRIEF:      Implementation for control the interface states.
-*
-*   DATE:       NOV 2017
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
-*------------------------------------------------------------------------------*/
+ *   FILE:       if.c
+ *   BRIEF:      Implementation for control the interface states.
+ *
+ *   DATE:       NOV 2017
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
+ *------------------------------------------------------------------------------*/
 
 #include <string.h>
 
@@ -52,7 +52,7 @@ u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffe
   /* zero the buffers */
   memset(pTxBufferPtr, 0x0, (size_t) uTxBufferSize);
   memset(pRxBufferPtr, 0x0, (size_t) uRxBufferSize);
-  
+
   for (uLoopIndex = 0; uLoopIndex < 6; uLoopIndex++){
     pIFObjectPtr->arrIFAddrMac[uLoopIndex] = arrUserMacAddr[uLoopIndex];
     /* FIXME: possible buffer overrun if user issues smaller array - rather use string logic */

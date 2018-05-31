@@ -47,8 +47,8 @@ u8 SanityCheckICMP(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  Call this method to initialize the ICMP state object.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pICMPObjectPtr  IN    handle to ICMP state object
 //  pRxBufferPtr    IN    ptr to user supplied rx buffer which will contain rx ICMP packet
 //  uRxBufferSize   IN    size of the user specified rx buffer
@@ -94,8 +94,8 @@ u8 uICMPInit(struct sICMPObject *pICMPObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffer
 //---------------------------------------------------------------------------------
 //  This method checks whether a message in the user rx buffer is a valid ICMP message
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr  IN    handle to IF state object
 //
 //  Return
@@ -169,8 +169,8 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method builds the ICMP Reply Message.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pICMPObjectPtr  IN    handle to ICMP state object
 //
 //  Return
@@ -214,7 +214,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   pTxBuffer[ETH_FRAME_TYPE_OFFSET] = 0x08;
 
   /*****  ip frame struff  *****/
-  
+
   pTxBuffer[IP_FRAME_BASE + IP_FLAG_FRAG_OFFSET] = 0x40;    /* ip flags = don't fragment */
   pTxBuffer[IP_FRAME_BASE + IP_V_HIL_OFFSET] = 0x45;
 
@@ -223,7 +223,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
 
   memcpy(pTxBuffer + IP_FRAME_BASE + IP_DST_OFFSET, pRxBuffer + IP_FRAME_BASE + IP_SRC_OFFSET, 4);
   memcpy(pTxBuffer + IP_FRAME_BASE + IP_SRC_OFFSET, pRxBuffer + IP_FRAME_BASE + IP_DST_OFFSET, 4);
-  
+
   /*****  icmp frame struff  *****/
   pTxBuffer[ICMP_FRAME_BASE + ICMP_TYPE_OFFSET] = 0;
 
@@ -253,7 +253,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
     /* copy ICMP payload */
     pTxBuffer[ICMP_FRAME_BASE + ICMP_DATA_OFFSET + uIndex] = pRxBuffer[ICMP_FRAME_BASE + ICMP_DATA_OFFSET + uIndex + uIPLenAdjust];
   }
-  
+
   /* calculate ICMP checksum */
   uChecksum16Calc(pTxBuffer, ICMP_FRAME_BASE, ICMP_FRAME_BASE + uICMPTotalLength - 1, &uChecksum, 0, 0);
   pTxBuffer[ICMP_FRAME_BASE + ICMP_CHKSM_OFFSET    ] = (u8) ((uChecksum & 0xff00) >> 8);
@@ -272,7 +272,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   /* pad to nearest 64 bit boundary */
   /* simply increase total length by following amount - these bytes already zero due to earlier memset */
   uPaddingLength = 8 - ((uIPTotalLength + ETH_FRAME_TOTAL_LEN) % 8);
-  
+
   /* and with 0b111 since only interested in values of 0 to 7 */
   uPaddingLength = uPaddingLength & 0x7; 
 

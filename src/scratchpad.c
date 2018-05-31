@@ -42,7 +42,7 @@ typedef enum {
   PMEM_READ_BYTE,
   PMEM_CHECK_REG,
   SKIP  /* this is used to skip the switch-case statement upon an earlier error,
-         allows us to have one exit point from function */
+           allows us to have one exit point from function */
 } tPMemOperation;
 
 /* local unction prototype */
@@ -76,7 +76,7 @@ tPMemReturn PersistentMemory_Clear(void){
 static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index, u8 *byte_data){
   const u16 wr_bytes_page[2] = {PAGE_CMD, 255};
   const u16 MFR_LOCATION_default_values[8] = {0x30, 0x31, 0x30, 0x31, 0x30,
-      0x31, 0x30, 0x31};
+    0x31, 0x30, 0x31};
   u16 rd_bytes[8] = {0x0};
   u16 wr_bytes_data[MFR_LOCATION_LEN + 1] = {0};
   u8 index;
@@ -195,7 +195,7 @@ typePMemReturn PersistentMemory_Check(void){
   u8 ret;
   const u16 WriteBytes[2] = {PAGE_CMD, 255};
   const u16 MFR_LOCATION_default_values[8] = {0x30, 0x31, 0x30, 0x31, 0x30,
-      0x31, 0x30, 0x31};
+    0x31, 0x30, 0x31};
   u16 ReadBytes[8] = {0x0};
 
   ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
@@ -223,9 +223,9 @@ typePMemReturn PersistentMemory_Check(void){
   debug_printf("\r\n");
 
   for (index = 0; index < MFR_LOCATION_LEN; index++){ 
-      if (ReadBytes[index] != MFR_LOCATION_default_values[index]){
-        return PMEM_RETURN_NON_DEFAULT;
-      }
+    if (ReadBytes[index] != MFR_LOCATION_default_values[index]){
+      return PMEM_RETURN_NON_DEFAULT;
+    }
   }
 
   return PMEM_RETURN_DEFAULT;
@@ -291,11 +291,11 @@ typePMemReturn PersistentMemory_ReadByte(typePMemByteIndex byte_index, u8 *read_
   u8 ret;
   const u16 WriteBytes[2] = {PAGE_CMD, 255};
   const u16 MFR_LOCATION_default_values[8] = {0x30, 0x31, 0x30, 0x31, 0x30,
-      0x31, 0x30, 0x31};
+    0x31, 0x30, 0x31};
   u16 ReadBytes[8] = {0x0};
 
   Xil_AssertNonvoid(((HMC_RECONFIG_COUNT_BYTE == byte_index) ||
-      (DHCP_RECONFIG_COUNT_BYTE == byte_index)) && (NULL != read_byte_data));
+        (DHCP_RECONFIG_COUNT_BYTE == byte_index)) && (NULL != read_byte_data));
 
   ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
 
