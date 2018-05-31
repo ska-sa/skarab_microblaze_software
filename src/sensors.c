@@ -859,8 +859,6 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 	// request temperature read
 	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
-	// read temperature
-
 	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
 	if (MezzaninePage == MEZZANINE_3_TEMP_ADC_PAGE)
 	{
@@ -868,14 +866,14 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 		Mez3WriteBytes[1] = 0x00;
 
 		// configure the QSFP to have it's temperature read
-		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, 2, Mez3WriteBytes);
+		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, Mez3WriteBytes, 2);
 
-		// sleep(5000);
+		//Delay(5000000);
 		
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 	}
 	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
-	else if ((MezzaninePage == MEZZANINE_0_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_1_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_2_TEMP_ADC_PAGE))
+	if ((MezzaninePage == MEZZANINE_0_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_1_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_2_TEMP_ADC_PAGE))
 	{
 		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 
@@ -908,7 +906,7 @@ void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
 
 		for (i = 0; i<4; i++)
 		{
-			ReadTemperature(ReadBytes, MezzanineSensorPages[i], true);			
+			ReadMezzanineTemperature(ReadBytes, MezzanineSensorPages[i], true);			
 			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 			Response->uSensorData[i+91] = temperature; // offset of 91 to account for previous sensor data
 		}
