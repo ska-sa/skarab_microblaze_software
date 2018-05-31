@@ -85,31 +85,31 @@ volatile char pIPBuffer[15]; // for IP address string in dot notation
 
 enum LLDP_TLV_TYPE {
 
-	/* start to mandatory TLV */
-	LLDP_END_OF_LLDPDU_TLV = 0,
-	LLDP_CHASSIS_ID_TLV = 2,
-	LLPD_PORT_ID_TLV = 4,
-	LLDP_TTL_TLV = 6,
-	/* end of mandatory TLV */
+  /* start to mandatory TLV */
+  LLDP_END_OF_LLDPDU_TLV = 0,
+  LLDP_CHASSIS_ID_TLV = 2,
+  LLPD_PORT_ID_TLV = 4,
+  LLDP_TTL_TLV = 6,
+  /* end of mandatory TLV */
 
-	/* start of optional TLV */
-	LLDP_PORT_DESC_TLV = 8,
-	LLDP_SYSTEM_NAME_TLV = 10,
-	LLDP_SYSTEM_DESCR_TLV = 12,
-	LLDP_MANAGEMENT_ADDRESS_TLV = 16,
+  /* start of optional TLV */
+  LLDP_PORT_DESC_TLV = 8,
+  LLDP_SYSTEM_NAME_TLV = 10,
+  LLDP_SYSTEM_DESCR_TLV = 12,
+  LLDP_MANAGEMENT_ADDRESS_TLV = 16,
 
 };
 
 enum LLDP_CHASSIS_ID_SUBTYPE {
-	LLDP_CHASSIS_ID_MAC_ADDRESS = 4
+  LLDP_CHASSIS_ID_MAC_ADDRESS = 4
 };
 
 enum LLDP_PORT_ID_SUBTYPE {
-	LLDP_PORT_ID_INTERFACE_NAME = 5
+  LLDP_PORT_ID_INTERFACE_NAME = 5
 };
 
 enum LLDP_MANAGEMENT_ADDRESS_SUBTYPE {
-	LLDP_MANAGEMENT_ADDRESS_IP_ADDRESS = 1
+  LLDP_MANAGEMENT_ADDRESS_IP_ADDRESS = 1
 };
 int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength);
 int uIPToString(char* pIPBuffer, u8* pIPAddr);

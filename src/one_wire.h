@@ -84,21 +84,21 @@ extern "C" {
 #define ONE_WIRE_CTL_POWER_MSK         (0xffff0000)  // power (strong pull-up), if there is more than one 1-wire line
 #define ONE_WIRE_CTL_POWER_OFST        (16)
 
-#define DS2433_MODEL 					0x23
+#define DS2433_MODEL          0x23
 
-#define ONE_WIRE_READ_ROM				0x33
-#define ONE_WIRE_MATCH_ROM				0x55
-#define ONE_WIRE_SEARCH_ROM				0xF0
-#define ONE_WIRE_SKIP_ROM				0xCC
-#define ONE_WIRE_RESUME					0xA5
+#define ONE_WIRE_READ_ROM       0x33
+#define ONE_WIRE_MATCH_ROM        0x55
+#define ONE_WIRE_SEARCH_ROM       0xF0
+#define ONE_WIRE_SKIP_ROM       0xCC
+#define ONE_WIRE_RESUME         0xA5
 
-#define ONE_WIRE_WRITE_SCRATCHPAD 		0x0F
-#define ONE_WIRE_READ_SCRATCHPAD  		0xAA
-#define ONE_WIRE_COPY_SCRATCHPAD  		0x55
-#define ONE_WIRE_READ_MEMORY      		0xF0
+#define ONE_WIRE_WRITE_SCRATCHPAD     0x0F
+#define ONE_WIRE_READ_SCRATCHPAD      0xAA
+#define ONE_WIRE_COPY_SCRATCHPAD      0x55
+#define ONE_WIRE_READ_MEMORY          0xF0
 
-#define ONE_WIRE_PF_FLAG				0x20
-#define ONE_WIRE_AA_FLAG				0x80
+#define ONE_WIRE_PF_FLAG        0x20
+#define ONE_WIRE_AA_FLAG        0x80
 
 u32 uPower;
 u16 uEnableInterrupts;

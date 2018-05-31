@@ -52,27 +52,27 @@ extern "C" {
  */
 
 /* --- Definitions for i2c master's registers --- */
-	
+  
 /* ----- Read-write access                                            */
 
-#define OC_I2C_PRER_LO 0x00     /* Low byte clock prescaler register  */	
-#define OC_I2C_PRER_HI 0x01     /* High byte clock prescaler register */	
-#define OC_I2C_CTR     0x02     /* Control register                   */	
-										
+#define OC_I2C_PRER_LO 0x00     /* Low byte clock prescaler register  */  
+#define OC_I2C_PRER_HI 0x01     /* High byte clock prescaler register */  
+#define OC_I2C_CTR     0x02     /* Control register                   */  
+                    
 /* ----- Write-only registers                                         */
-										
-#define OC_I2C_TXR     0x03     /* Transmit byte register             */	
-#define OC_I2C_CR      0x04     /* Command register                   */	
-	
+                    
+#define OC_I2C_TXR     0x03     /* Transmit byte register             */  
+#define OC_I2C_CR      0x04     /* Command register                   */  
+  
 /* ----- Read-only registers                                          */
-										
+                    
 #define OC_I2C_RXR     0x03     /* Receive byte register              */
 #define OC_I2C_SR      0x04     /* Status register                    */
-	
+  
 /* ----- Bits definition                                              */
-	
+  
 /* ----- Control register                                             */
-	
+  
 #define OC_I2C_EN (1<<7)        /* Core enable bit:                   */
                                 /*      1 - core is enabled           */
                                 /*      0 - core is disabled          */
@@ -110,8 +110,8 @@ extern "C" {
 #define OC_BITTOGGLE(reg,bitmask)   ((reg)^(bitmask))
 #define OC_REGMOVE(reg,value)       ((reg)=(value))
 
-#define SPEED_100kHz	0x0
-#define SPEED_400kHz	0x1
+#define SPEED_100kHz  0x0
+#define SPEED_400kHz  0x1
 
 #ifdef REDUCED_CLK_ARCH
 // Clock prescaler ratios for 39.0625MHz Wishbone clock
@@ -123,7 +123,7 @@ extern "C" {
 #define SPEED_400kHz_CLOCK_PRESCALER 0x4E  // 78
 #endif
 
-#define I2C_TIMEOUT		10000
+#define I2C_TIMEOUT   10000
 
 u32 GetI2CAddressOffset(u16 uId);
 void InitI2C(u16 uId, u16 uSpeed);
@@ -135,31 +135,31 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 int HMCWriteI2CBytes(u16 uId, u16 uSlaveAddress, u32 uWriteAddress, u32 uWriteData);
 
 // Specific to HitechGlobal dev board
-#define PCA9548_0_ADDRESS 	0x70
-#define PCA9548_1_ADDRESS 	0x71
-#define PCA9548_2_ADDRESS 	0x73
-#define PCA9548_REFCLK_OSC 	0x80
-#define PCA9548_SFP_OSC		0x08
-#define PCA9548_FMC_OSC 	0x02
+#define PCA9548_0_ADDRESS   0x70
+#define PCA9548_1_ADDRESS   0x71
+#define PCA9548_2_ADDRESS   0x73
+#define PCA9548_REFCLK_OSC  0x80
+#define PCA9548_SFP_OSC   0x08
+#define PCA9548_FMC_OSC   0x02
 
-#define SI570_HS_N1_ADDRESS			0x07
-#define SI570_FREEZE_DCO_ADDRESS	0x89
-#define SI570_NEW_FREQ_ADDRESS		0x87
+#define SI570_HS_N1_ADDRESS     0x07
+#define SI570_FREEZE_DCO_ADDRESS  0x89
+#define SI570_NEW_FREQ_ADDRESS    0x87
 
-#define SI570_FREEZE_DCO_VAL		0x10
-#define SI570_NEW_FREQ_VAL			0x40
+#define SI570_FREEZE_DCO_VAL    0x10
+#define SI570_NEW_FREQ_VAL      0x40
 
-#define SI570_FMC_OSC_ADDRESS		0x55
-#define SI570_FMC_REG_7_VAL			0x02
-#define SI570_FMC_REG_8_VAL			0x42
+#define SI570_FMC_OSC_ADDRESS   0x55
+#define SI570_FMC_REG_7_VAL     0x02
+#define SI570_FMC_REG_8_VAL     0x42
 
-#define SI570_SFP_OSC_ADDRESS		0x58
-#define SI570_SPF_REG_7_VAL			0x02
-#define SI570_SFP_REG_8_VAL			0x42
+#define SI570_SFP_OSC_ADDRESS   0x58
+#define SI570_SPF_REG_7_VAL     0x02
+#define SI570_SFP_REG_8_VAL     0x42
 
-#define SI570_REFCLK_OSC_ADDRESS	0x57
-#define SI570_REFCLK_REG_7_VAL		0x01
-#define SI570_REFCLK_REG_8_VAL		0xC2
+#define SI570_REFCLK_OSC_ADDRESS  0x57
+#define SI570_REFCLK_REG_7_VAL    0x01
+#define SI570_REFCLK_REG_8_VAL    0xC2
 
 int I2CPCA9548SelectChannel(u16 uId, u16 uChannelSelection);
 int I2CFMCReadClkOscBytes(u16 uId, u16 uByteAddress, u16* uReadBytes, unsigned uNumBytes);
