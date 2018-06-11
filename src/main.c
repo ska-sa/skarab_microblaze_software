@@ -473,20 +473,6 @@ typedef enum {
   PACKET_FILTER_UNKNOWN_ETH
 } typePacketFilter;
 
-#if 0
-#define PACKET_FILTER_UNKNOWN 0
-#define PACKET_FILTER_ERROR   1
-#define PACKET_FILTER_ARP     2
-#define PACKET_FILTER_ICMP    3
-#define PACKET_FILTER_DHCP    4
-#define PACKET_FILTER_CONTROL 5
-
-#define PACKET_FILTER_DROP        252
-#define PACKET_FILTER_UNKNOWN_UDP 253
-#define PACKET_FILTER_UNKNOWN_IP  254
-#define PACKET_FILTER_UNKNOWN_ETH 255
-#endif
-
 #define ETHER_TYPE_ARP    0x0806
 #define ETHER_TYPE_IPV4   0x0800
 
@@ -1636,50 +1622,12 @@ int main()
   InitI2C(0x3, SPEED_400kHz);
   InitI2C(0x4, SPEED_400kHz);
 
-#if 0
-  /* debug code to read MSR register - TODO: remove */
-  int k; 
-
-  asm ("mfs %0, rmsr" : "=d" (k));
-  xil_printf("MSR 0x%x\r\n", k);
-#endif
-
   xil_printf("---Entering main---\r\n");
   xil_printf("Embedded software version: %d.%d.%d\r\n", EMBEDDED_SOFTWARE_VERSION_MAJOR,
       EMBEDDED_SOFTWARE_VERSION_MINOR,
       EMBEDDED_SOFTWARE_VERSION_PATCH);
   xil_printf("Running ELF version: %s\r\n", VENDOR_ID);
 
-#if 0
-  // Enable the watchdog timer
-  xil_printf("Initialising the WDT.\r\n");
-
-  iStatus = XWdtTb_Initialize(& WatchdogTimer, XPAR_WDTTB_0_DEVICE_ID);
-
-  // GT 31/03/2017 FIX DETECTION OF WHETHER PREVIOUS RESET WAS RESULT OF WATCHDOG
-  if (iStatus == XST_DEVICE_IS_STARTED)
-  {
-    if (XWdtTb_IsWdtExpired(& WatchdogTimer))
-      xil_printf("Previous reset result of WDT.\r\n");
-
-    XWdtTb_Stop(& WatchdogTimer);
-
-    iStatus = XWdtTb_Initialize(& WatchdogTimer, XPAR_WDTTB_0_DEVICE_ID);
-
-    XWdtTb_Start(& WatchdogTimer);
-  }
-  else if (iStatus == XST_SUCCESS)
-  {
-    if (XWdtTb_IsWdtExpired(& WatchdogTimer))
-      xil_printf("Previous reset result of WDT.\r\n");
-
-    XWdtTb_Start(& WatchdogTimer);
-  }
-  else
-    xil_printf("Failed to initialise the WDT.\r\n");
-#endif
-
-  //#if 0
   XWdtTb_Config *WatchdogTimerConfig;
 
 
@@ -1734,8 +1682,6 @@ int main()
   /* read wdt registers after setup */
   always_printf("[WDT] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TWCSR0_OFFSET));
   always_printf("[WDT] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TBR_OFFSET));
-  //#endif
-
 
   error_printf("[INIT] Interrupts, exceptions and timers ");
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
@@ -1960,21 +1906,6 @@ int main()
     /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
     //uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
   }
-
-
-#if 0
-  /* debug code to read MSR register - TODO: remove */
-  asm ("mfs %0, rmsr" : "=d" (k));
-  xil_printf("MSR 0x%x\r\n", k);
-
-  volatile int foo = 8;
-  volatile int bar = 0;
-  volatile int z;
-
-  z = 8 / 0;
-  z++;
-  xil_printf("PRINTING z: %d\r\n", z);
-#endif
 
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
@@ -2583,12 +2514,6 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     pIFObjectPtr->stringIFAddrIP[15] = '\0';
     info_printf("DHCP [%02x] Setting IP address to: %s\r\n", id, pIFObjectPtr->stringIFAddrIP);
   }
-#if 0 
-  xil_printf("DHCP [%02x] Setting IP address to: %u.%u.%u.%u\r\n", id, ((ip >> 24) & 0xFF),
-      ((ip >> 16) & 0xFF),
-      ((ip >> 8) & 0xFF),
-      (ip & 0xFF));
-#endif
 
   /* convert netmask to string and cache for later use / printing */
   if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrNetmask), netmask) != 0){
@@ -2597,13 +2522,6 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     pIFObjectPtr->stringIFAddrNetmask[15] = '\0';
     info_printf("DHCP [%02x] Setting Netmask address to: %s\r\n", id, pIFObjectPtr->stringIFAddrNetmask);
   }
-
-#if 0
-  xil_printf("DHCP [%02x] Setting netmask to: %u.%u.%u.%u\r\n", id, ((netmask >> 24) & 0xFF),
-      ((netmask >> 16) & 0xFF),
-      ((netmask >> 8) & 0xFF),
-      (netmask & 0xFF));
-#endif
 
   uEthernetFabricIPAddress[id] = ip;
 
