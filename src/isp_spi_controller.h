@@ -24,23 +24,23 @@
 *  the Spartan 3AN FPGA SPI Flash.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
-#include "delay.h"
+#include <xil_types.h>
 
-#define ISP_SPI_ADDRESS_MASK_LOW	0xFFFF
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define ISP_SPI_WRITE_BYTE			0x100
-#define ISP_SPI_READ_BYTE			0x200
-#define ISP_SPI_CMD_FAST_READ		0x0
-#define ISP_SPI_CMD_BUFFER_WRITE	0x400
-#define ISP_SPI_CMD_BUFFER_PROGRAM	0x800
-#define ISP_SPI_CMD_SECTOR_ERASE	0xC00
-#define ISP_SPI_CMD_READ_STATUS		0x1000
-#define ISP_SPI_START_TRANS			0x2000
-#define ISP_SPI_TRANS_COMPLETE		0x100
+#define ISP_SPI_ADDRESS_MASK_LOW  0xFFFF
+
+#define ISP_SPI_WRITE_BYTE      0x100
+#define ISP_SPI_READ_BYTE     0x200
+#define ISP_SPI_CMD_FAST_READ   0x0
+#define ISP_SPI_CMD_BUFFER_WRITE  0x400
+#define ISP_SPI_CMD_BUFFER_PROGRAM  0x800
+#define ISP_SPI_CMD_SECTOR_ERASE  0xC00
+#define ISP_SPI_CMD_READ_STATUS   0x1000
+#define ISP_SPI_START_TRANS     0x2000
+#define ISP_SPI_TRANS_COMPLETE    0x100
 
 #ifdef REDUCED_CLK_ARCH
 /* for 39.0625MHz clock... */
@@ -56,14 +56,17 @@
 
 
 // DEFINITIONS FOR STATUS COMMAND BIT POSITIONS
-#define ISP_SPI_STATUS_READY		0x80
+#define ISP_SPI_STATUS_READY    0x80
 
-#define ISP_SPI_ADDRESS_REG_ADDRESS		0x4018
-#define ISP_SPI_DATA_CTRL_REG_ADDRESS	0x401C
+#define ISP_SPI_ADDRESS_REG_ADDRESS   0x4018
+#define ISP_SPI_DATA_CTRL_REG_ADDRESS 0x401C
 
 u8 IsISPSPIReady();
 int ISPSPIReadPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes);
 int ISPSPIProgramPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes);
 int ISPSPIEraseSector(u32 uSectorAddress);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

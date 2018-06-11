@@ -13,6 +13,10 @@
 #ifndef _ETH_H_
 #define _ETH_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ETH_FRAME_BASE              0
 #define ETH_DST_OFFSET              0
 #define ETH_DST_LEN                 6
@@ -23,4 +27,7 @@
 
 #define ETH_FRAME_TOTAL_LEN         (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN)  /* ethernet length = 14 */
 
+#ifdef __cplusplus
+}
+#endif
 #endif

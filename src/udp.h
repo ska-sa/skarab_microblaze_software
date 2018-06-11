@@ -3,6 +3,10 @@
 
 #include "ipv4.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UDP_FRAME_BASE              (IP_FRAME_BASE + IP_FRAME_TOTAL_LEN) //34 
 #define UDP_SRC_PORT_OFFSET         0
 #define UDP_SRC_PORT_LEN            2
@@ -16,4 +20,7 @@
 
 #define UDP_HEADER_TOTAL_LEN        (UDP_CHKSM_OFFSET + UDP_CHKSM_LEN)  /* udp length = 8 */
 
+#ifdef __cplusplus
+}
+#endif
 #endif

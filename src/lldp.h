@@ -7,34 +7,22 @@
 
 #ifndef SRC_LLDP_H_
 #define SRC_LLDP_H_
-#include<stdint.h>
-/* some profitability stuff for datatypes used*/
-#ifndef u8
-#define u8 uint8_t
-#endif
 
-#ifndef u16
-#define u16 uint16_t
-#endif
+#include <xil_types.h>
+#include <xstatus.h>
 
-#ifndef u32
-#define u32 uint32_t
+#include "eth.h"
+
+#ifdef __cplusplus
+extern "C" {
 #endif
 
 /*link custom return values */
 #define LLDP_RETURN_FAIL     XST_FAILURE
 #define LLDP_RETURN_OK       XST_SUCCESS
 #define LLDP_RETURN_INVALID  XST_FAILURE
+
 /*lldp packet offsets */
-#define ETH_DST_OFFSET                           0
-#define ETH_DST_LEN                              6
-#define ETH_SRC_OFFSET                           (ETH_DST_OFFSET + ETH_DST_LEN) //6
-#define ETH_SRC_LEN                              6
-#define ETH_FRAME_TYPE_OFFSET                    (ETH_SRC_OFFSET + ETH_SRC_LEN) //12
-#define ETH_FRAME_TYPE_LEN                       2
-
-#define ETH_FRAME_TOTAL_LEN                      (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN) /*ethernet length = 14*/
-
 #define LLDP_CHASSIS_ID_TLV_TYPE_OFFSET          (ETH_FRAME_TYPE_OFFSET + ETH_FRAME_TYPE_LEN) //14
 #define LLDP_CHASSIS_ID_TLV_TYPE_LEN             1
 #define LLDP_CHASSIS_ID_TLV_LEN_OFFSET           (LLDP_CHASSIS_ID_TLV_TYPE_OFFSET + LLDP_CHASSIS_ID_TLV_TYPE_LEN) // 15
@@ -97,31 +85,31 @@ volatile char pIPBuffer[15]; // for IP address string in dot notation
 
 enum LLDP_TLV_TYPE {
 
-	/* start to mandatory TLV */
-	LLDP_END_OF_LLDPDU_TLV = 0,
-	LLDP_CHASSIS_ID_TLV = 2,
-	LLPD_PORT_ID_TLV = 4,
-	LLDP_TTL_TLV = 6,
-	/* end of mandatory TLV */
+  /* start to mandatory TLV */
+  LLDP_END_OF_LLDPDU_TLV = 0,
+  LLDP_CHASSIS_ID_TLV = 2,
+  LLPD_PORT_ID_TLV = 4,
+  LLDP_TTL_TLV = 6,
+  /* end of mandatory TLV */
 
-	/* start of optional TLV */
-	LLDP_PORT_DESC_TLV = 8,
-	LLDP_SYSTEM_NAME_TLV = 10,
-	LLDP_SYSTEM_DESCR_TLV = 12,
-	LLDP_MANAGEMENT_ADDRESS_TLV = 16,
+  /* start of optional TLV */
+  LLDP_PORT_DESC_TLV = 8,
+  LLDP_SYSTEM_NAME_TLV = 10,
+  LLDP_SYSTEM_DESCR_TLV = 12,
+  LLDP_MANAGEMENT_ADDRESS_TLV = 16,
 
 };
 
 enum LLDP_CHASSIS_ID_SUBTYPE {
-	LLDP_CHASSIS_ID_MAC_ADDRESS = 4
+  LLDP_CHASSIS_ID_MAC_ADDRESS = 4
 };
 
 enum LLDP_PORT_ID_SUBTYPE {
-	LLDP_PORT_ID_INTERFACE_NAME = 5
+  LLDP_PORT_ID_INTERFACE_NAME = 5
 };
 
 enum LLDP_MANAGEMENT_ADDRESS_SUBTYPE {
-	LLDP_MANAGEMENT_ADDRESS_IP_ADDRESS = 1
+  LLDP_MANAGEMENT_ADDRESS_IP_ADDRESS = 1
 };
 int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength);
 int uIPToString(char* pIPBuffer, u8* pIPAddr);
@@ -129,5 +117,8 @@ void reverse(char *str, int len);
 int u8ToStr(u8 x, char *str, int d);
 
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* SRC_LLDP_H_ */
 

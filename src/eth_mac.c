@@ -1,158 +1,163 @@
 /**------------------------------------------------------------------------------
-*  FILE NAME            : eth_mac.c
-* ------------------------------------------------------------------------------
-*  COMPANY              : PERALEX ELECTRONIC (PTY) LTD
-* ------------------------------------------------------------------------------
-*  COPYRIGHT NOTICE :
-*
-*  The copyright, manufacturing and patent rights stemming from this
-*  document in any form are vested in PERALEX ELECTRONICS (PTY) LTD.
-*
-*  (c) Peralex 2011
-*
-*  PERALEX ELECTRONICS (PTY) LTD has ceded these rights to its clients
-*  where contractually agreed.
-* ------------------------------------------------------------------------------
-*  DESCRIPTION :
-*
-*  This file contains the implementation of functions to access the ETH MAC core
-*  over the Wishbone bus.
-* ------------------------------------------------------------------------------*/
+ *  FILE NAME            : eth_mac.c
+ * ------------------------------------------------------------------------------
+ *  COMPANY              : PERALEX ELECTRONIC (PTY) LTD
+ * ------------------------------------------------------------------------------
+ *  COPYRIGHT NOTICE :
+ *
+ *  The copyright, manufacturing and patent rights stemming from this
+ *  document in any form are vested in PERALEX ELECTRONICS (PTY) LTD.
+ *
+ *  (c) Peralex 2011
+ *
+ *  PERALEX ELECTRONICS (PTY) LTD has ceded these rights to its clients
+ *  where contractually agreed.
+ * ------------------------------------------------------------------------------
+ *  DESCRIPTION :
+ *
+ *  This file contains the implementation of functions to access the ETH MAC core
+ *  over the Wishbone bus.
+ * ------------------------------------------------------------------------------*/
+
+#include <xil_io.h>
+#include <xil_types.h>
+#include <xparameters.h>
+#include <xstatus.h>
 
 #include "eth_mac.h"
 #include "print.h"
 
 //=================================================================================
-//	GetAddressOffset
+//  GetAddressOffset
 //--------------------------------------------------------------------------------
-//	This method gets the offset address of the selected ETH MAC on the Wishbone bus.
+//  This method gets the offset address of the selected ETH MAC on the Wishbone bus.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want offset address for
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want offset address for
 //
-//	Return
-//	------
-//	Wishbone bus address offset
+//  Return
+//  ------
+//  Wishbone bus address offset
 //=================================================================================
 u32 GetAddressOffset(u8 uId)
 {
-	if (uId == 0)
-		return ONE_GBE_MAC_ADDR;
-	else if (uId == 1)
-		return FORTY_GBE_MAC_0_ADDR;
-	else if (uId == 2)
-		return FORTY_GBE_MAC_1_ADDR;
-	else if (uId == 3)
-		return FORTY_GBE_MAC_2_ADDR;
-	else
-		return FORTY_GBE_MAC_3_ADDR;
+  if (uId == 0)
+    return ONE_GBE_MAC_ADDR;
+  else if (uId == 1)
+    return FORTY_GBE_MAC_0_ADDR;
+  else if (uId == 2)
+    return FORTY_GBE_MAC_1_ADDR;
+  else if (uId == 3)
+    return FORTY_GBE_MAC_2_ADDR;
+  else
+    return FORTY_GBE_MAC_3_ADDR;
 
 }
 
 //=================================================================================
-//	SoftReset
+//  SoftReset
 //--------------------------------------------------------------------------------
-//	This method performs a soft reset of the ETH MAC core.
+//  This method performs a soft reset of the ETH MAC core.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to reset
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to reset
 //
-//	Return
-//	------
-//	XST_SUCCESS if successful
+//  Return
+//  ------
+//  XST_SUCCESS if successful
 //=================================================================================
 int SoftReset(u8 uId)
 {
-	unsigned uTimeout = 0x0;
-	u32 uStatus = 0x0;
+  unsigned uTimeout = 0x0;
+  u32 uStatus = 0x0;
 
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	// Assert soft reset bit
-	Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 3, 0x1);
+  // Assert soft reset bit
+  Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 3, 0x1);
 
-	// Wait for reset bit to be cleared indicating that the reset is complete
-	do
-	{
-		uStatus = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_GBE_MAC_ADDR + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE));
-		uTimeout++;
-	}
-	while(((uStatus & ETH_MAC_SOFT_RESET) != 0x0)&&(uTimeout < ETH_MAC_RESET_TIMEOUT));
+  // Wait for reset bit to be cleared indicating that the reset is complete
+  do
+  {
+    uStatus = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_GBE_MAC_ADDR + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE));
+    uTimeout++;
+  }
+  while(((uStatus & ETH_MAC_SOFT_RESET) != 0x0)&&(uTimeout < ETH_MAC_RESET_TIMEOUT));
 
-	if (uTimeout == ETH_MAC_RESET_TIMEOUT)
-		return XST_FAILURE;
+  if (uTimeout == ETH_MAC_RESET_TIMEOUT)
+    return XST_FAILURE;
 
-	return XST_SUCCESS;
+  return XST_SUCCESS;
 
 }
 
 //=================================================================================
-//	SetFabricSourceMACAddress
+//  SetFabricSourceMACAddress
 //--------------------------------------------------------------------------------
-//	This method sets the fabric source MAC address of the ETH MAC core.
+//  This method sets the fabric source MAC address of the ETH MAC core.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId						IN	ID of ETH MAC want to set fabric MAC address
-//	uMACAddressUpper16Bits	IN	Upper 16 bits of the source MAC address
-//	uMACAddressLower32Bits 	IN	Lower 32 bits of the source MAC address
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId           IN  ID of ETH MAC want to set fabric MAC address
+//  uMACAddressUpper16Bits  IN  Upper 16 bits of the source MAC address
+//  uMACAddressLower32Bits  IN  Lower 32 bits of the source MAC address
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_UPPER_16), uMACAddressUpper16Bits);
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_LOWER_32), uMACAddressLower32Bits);
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_UPPER_16), uMACAddressUpper16Bits);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_LOWER_32), uMACAddressLower32Bits);
 
 }
 
 //=================================================================================
-//	SetFabricGatewayARPCacheAddress
+//  SetFabricGatewayARPCacheAddress
 //--------------------------------------------------------------------------------
-//	This method sets the location in the ARP cache of the gateway MAC address.
+//  This method sets the location in the ARP cache of the gateway MAC address.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId						IN 	ID of ETH MAC want to set gateway MAC address location
-//	uGatewayARPCacheAddress	IN	Location in ARP cache
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId           IN  ID of ETH MAC want to set gateway MAC address location
+//  uGatewayARPCacheAddress IN  Location in ARP cache
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_GATEWAY), uGatewayARPCacheAddress);
+  Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_GATEWAY), uGatewayARPCacheAddress);
 
 }
 
 //=================================================================================
-//	SetFabricSourceIPAddress
+//  SetFabricSourceIPAddress
 //--------------------------------------------------------------------------------
-//	This method sets the source IP address of the FPGA fabric.
+//  This method sets the source IP address of the FPGA fabric.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to set source fabric IP address
-//	uIPAddress	IN		Source IP address of the FPGA fabric
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to set source fabric IP address
+//  uIPAddress  IN    Source IP address of the FPGA fabric
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_IP_ADDRESS), uIPAddress);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_IP_ADDRESS), uIPAddress);
 
 }
 
@@ -178,262 +183,262 @@ void SetFabricNetmask(u8 uId, u32 uNetmask)
 }
 
 //=================================================================================
-//	SetMultiCastIPAddress
+//  SetMultiCastIPAddress
 //--------------------------------------------------------------------------------
-//	This method sets the Multicast IP address parameters.
+//  This method sets the Multicast IP address parameters.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId						IN	ID of ETH MAC want to set Multicast IP parameters for
-//	uMultiCastIPAddress		IN	Multicast IP address
-//	uMultiCastIPAddressMask	IN	Mask to select portion of multicast IP address that applies
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId           IN  ID of ETH MAC want to set Multicast IP parameters for
+//  uMultiCastIPAddress   IN  Multicast IP address
+//  uMultiCastIPAddressMask IN  Mask to select portion of multicast IP address that applies
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddressMask)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP), uMultiCastIPAddress);
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP_MASK), uMultiCastIPAddressMask);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP), uMultiCastIPAddress);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP_MASK), uMultiCastIPAddressMask);
 
 }
 
 //=================================================================================
-//	SetFabricSourcePortAddress
+//  SetFabricSourcePortAddress
 //--------------------------------------------------------------------------------
-//	This method sets the source port address of the FPGA fabric.
+//  This method sets the source port address of the FPGA fabric.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to set fabric source port address for
-//	uIPAddress	IN		Source IP address of the FPGA fabric
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to set fabric source port address for
+//  uIPAddress  IN    Source IP address of the FPGA fabric
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE), uPortAddress);
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE), uPortAddress);
 
 }
 
 //=================================================================================
-//	EnableFabricInterface
+//  EnableFabricInterface
 //--------------------------------------------------------------------------------
-//	This method is used to enable or disable the FPGA fabric interface.
+//  This method is used to enable or disable the FPGA fabric interface.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to enable/disable
-//	uEnable		IN		1 = enable, 0 = disable
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to enable/disable
+//  uEnable   IN    1 = enable, 0 = disable
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void EnableFabricInterface(u8 uId, u8 uEnable)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 2, uEnable);
+  Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 2, uEnable);
 
 }
 
 //=================================================================================
-//	ProgramARPCacheEntry
+//  ProgramARPCacheEntry
 //--------------------------------------------------------------------------------
-//	This method is used to program an entry in the ARP cache.
+//  This method is used to program an entry in the ARP cache.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId						IN 	ID of ETH MAC want to program ARP cache for
-//	uIPAddressLower8Bits	IN	Lower 8 bits of destination IP address to index into table
-//	uMACAddressUpper16Bits	IN	Upper 16 bits of destination MAC address for corresponding IP address
-//	uMACAddressLower32Bits	IN	Lower 32 bits of destination MAC address for corresponding IP address
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId           IN  ID of ETH MAC want to program ARP cache for
+//  uIPAddressLower8Bits  IN  Lower 8 bits of destination IP address to index into table
+//  uMACAddressUpper16Bits  IN  Upper 16 bits of destination MAC address for corresponding IP address
+//  uMACAddressLower32Bits  IN  Lower 32 bits of destination MAC address for corresponding IP address
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
   //trace_printf("Program ARP cache...\r\n");
-	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
-	Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*((2 * uIPAddressLower8Bits) + 1)), uMACAddressLower32Bits);
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*((2 * uIPAddressLower8Bits) + 1)), uMACAddressLower32Bits);
 
 }
 
 //=================================================================================
-//	GetHostTransmitBufferLevel
+//  GetHostTransmitBufferLevel
 //--------------------------------------------------------------------------------
-//	This method is used to get the current host transmit FIFO level in 32 bit words.
-//	Value read is in 64 bit words so multiplied by 2.
+//  This method is used to get the current host transmit FIFO level in 32 bit words.
+//  Value read is in 64 bit words so multiplied by 2.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to get transmit buffer level of
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to get transmit buffer level of
 //
-//	Return
-//	------
-//	Transmit buffer level
+//  Return
+//  ------
+//  Transmit buffer level
 //=================================================================================
 u32 GetHostTransmitBufferLevel(u8 uId)
 {
-	u32 uReg = 0x0;
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uReg = 0x0;
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
+  uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
-	uReg = (uReg >> 16) & 0xFF;
+  uReg = (uReg >> 16) & 0xFF;
 
-	return (2 * uReg);
+  return (2 * uReg);
 
 }
 
 //=================================================================================
-//	GetHostReceiveBufferLevel
+//  GetHostReceiveBufferLevel
 //--------------------------------------------------------------------------------
-//	This method is used to get the current host receive FIFO level in 32 bit words.
-//	Value read is in 64 bit words so multiplied by 2.
+//  This method is used to get the current host receive FIFO level in 32 bit words.
+//  Value read is in 64 bit words so multiplied by 2.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC want to get receive buffer level of
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC want to get receive buffer level of
 //
-//	Return
-//	------
-//	Receive buffer level
+//  Return
+//  ------
+//  Receive buffer level
 //=================================================================================
 u32 GetHostReceiveBufferLevel(u8 uId)
 {
-	u32 uReg = 0x0;
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uReg = 0x0;
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
+  uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
   //debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
 
 #ifdef WISHBONE_LEGACY_MAP
-	return (2 * (uReg & 0xFF));
+  return (2 * (uReg & 0xFF));
 #else
-	return (2 * (uReg & 0x7FF));    /* value stored in lower 11-bits of this wishbone register */
+  return (2 * (uReg & 0x7FF));    /* value stored in lower 11-bits of this wishbone register */
 #endif
 
 }
 
 //=================================================================================
-//	SetHostTransmitBufferLevel
+//  SetHostTransmitBufferLevel
 //--------------------------------------------------------------------------------
-//	This method is used to set the current host transmit FIFO level in 32 bit words.
-//	Value written is in 64 bit words so divided by 2.
+//  This method is used to set the current host transmit FIFO level in 32 bit words.
+//  Value written is in 64 bit words so divided by 2.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId				IN	ID of ETH MAC want to set current transmit buffer level to
-//	uBufferLevel	IN
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId       IN  ID of ETH MAC want to set current transmit buffer level to
+//  uBufferLevel  IN
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel)
 {
-	u16 uReg = uBufferLevel / 2;
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u16 uReg = uBufferLevel / 2;
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL) + 2, uReg);
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL) + 2, uReg);
 
 }
 
 //=================================================================================
-//	AckHostPacketReceive
+//  AckHostPacketReceive
 //--------------------------------------------------------------------------------
-//	This method is used to acknowledge that the received host packet has been read.
+//  This method is used to acknowledge that the received host packet has been read.
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId			IN		ID of ETH MAC that want to ACK host packet received
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId     IN    ID of ETH MAC that want to ACK host packet received
 //
-//	Return
-//	------
-//	None
+//  Return
+//  ------
+//  None
 //=================================================================================
 void AckHostPacketReceive(u8 uId)
 {
-	u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = GetAddressOffset(uId);
 
-	Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL), 0x0);
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL), 0x0);
 
 }
 
 //=================================================================================
-//	TransmitHostPacket
+//  TransmitHostPacket
 //--------------------------------------------------------------------------------
-//	This method is used to send a packet from the host (MicroBlaze).
+//  This method is used to send a packet from the host (MicroBlaze).
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId					IN	ID of ETH MAC that want to send packet from
-//	puTransmitPacket	IN	Pointer to contents of packet to transmit
-//	uNumWords			IN	Number of 32-bit words in transmit packet
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId         IN  ID of ETH MAC that want to send packet from
+//  puTransmitPacket  IN  Pointer to contents of packet to transmit
+//  uNumWords     IN  Number of 32-bit words in transmit packet
 //
-//	Return
-//	------
-//	XST_SUCCESS if successful
+//  Return
+//  ------
+//  XST_SUCCESS if successful
 //=================================================================================
 int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 {
-	unsigned uTimeout = 0x0;
-	u32 uHostTransmitBufferLevel = 0x0;
-	u32 uIndex = 0x0;
-	u32 uAddressOffset = GetAddressOffset(uId);
-	//u32 uReg;
+  unsigned uTimeout = 0x0;
+  u32 uHostTransmitBufferLevel = 0x0;
+  u32 uIndex = 0x0;
+  u32 uAddressOffset = GetAddressOffset(uId);
+  //u32 uReg;
   u8 uPaddingWords = 0;
   u32 uPaddingIndex = 0;
 
-	// Must be a multiple of 64 bits
-	if ((uNumWords % 2) != 0x0)
-	{
-		xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uNumWords);
-		return XST_FAILURE;
-	}
+  // Must be a multiple of 64 bits
+  if ((uNumWords % 2) != 0x0)
+  {
+    xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uNumWords);
+    return XST_FAILURE;
+  }
 
   if (uNumWords < 16){
     uPaddingWords = (16 - uNumWords);
     xil_printf("TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", (uPaddingWords * 4) /* bytes */ );
   }
 
-	// Check that the transmit buffer is ready for a packet
-	do
-	{
-		uHostTransmitBufferLevel = GetHostTransmitBufferLevel(uId);
-		uTimeout++;
-	}
-	while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
-
-	if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  // Check that the transmit buffer is ready for a packet
+  do
   {
-		xil_printf("TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uHostTransmitBufferLevel);
-		return XST_FAILURE;
+    uHostTransmitBufferLevel = GetHostTransmitBufferLevel(uId);
+    uTimeout++;
+  }
+  while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
+
+  if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  {
+    xil_printf("TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uHostTransmitBufferLevel);
+    return XST_FAILURE;
   }
 
   //debug_printf("[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
 
-	// Program transmit packet words into FIFO
-	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
-	{
-		//uReg = ((puTransmitPacket[uIndex] >> 16) & 0xFFFF) | ((puTransmitPacket[uIndex] & 0xFFFF) << 16);
-		//Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, uReg);
-		Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
-	}
+  // Program transmit packet words into FIFO
+  for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
+  {
+    //uReg = ((puTransmitPacket[uIndex] >> 16) & 0xFFFF) | ((puTransmitPacket[uIndex] & 0xFFFF) << 16);
+    //Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, uReg);
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
+  }
 
   // Write padding words (zero) to FIFO
   if (uPaddingWords != 0){
@@ -443,72 +448,72 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     }
   }
 
-	// Program the packet size into buffer level register to trigger start of packet transmission
-	SetHostTransmitBufferLevel(uId, uNumWords + uPaddingWords);
+  // Program the packet size into buffer level register to trigger start of packet transmission
+  SetHostTransmitBufferLevel(uId, uNumWords + uPaddingWords);
 
-	// Wait for the packet to be transmitted
-	do
-	{
-		uHostTransmitBufferLevel = GetHostTransmitBufferLevel(uId);
-		uTimeout++;
-	}
-	while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
-
-	if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  // Wait for the packet to be transmitted
+  do
   {
-		xil_printf("TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uHostTransmitBufferLevel);
-		return XST_FAILURE;
+    uHostTransmitBufferLevel = GetHostTransmitBufferLevel(uId);
+    uTimeout++;
+  }
+  while((uHostTransmitBufferLevel != 0x0)&&(uTimeout < ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT));
+
+  if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
+  {
+    xil_printf("TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uHostTransmitBufferLevel);
+    return XST_FAILURE;
   }
 
   //debug_printf("[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
 
-	return XST_SUCCESS;
+  return XST_SUCCESS;
 
 }
 
 //=================================================================================
-//	ReadHostPacket
+//  ReadHostPacket
 //--------------------------------------------------------------------------------
-//	This method is used to read a packet from the host (MicroBlaze).
+//  This method is used to read a packet from the host (MicroBlaze).
 //
-//	Parameter	Dir		Description
-//	---------	---		-----------
-//	uId				IN	ID of ETH MAC that want to read a packet from
-//	puReceivePacket	OUT	Pointer to location where to store received packet
-//	uNumWords		IN	Number of 32-bit words to read
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uId       IN  ID of ETH MAC that want to read a packet from
+//  puReceivePacket OUT Pointer to location where to store received packet
+//  uNumWords   IN  Number of 32-bit words to read
 //
-//	Return
-//	------
-//	XST_SUCCESS if successful
+//  Return
+//  ------
+//  XST_SUCCESS if successful
 //=================================================================================
 int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
-	unsigned uIndex = 0x0;
-	u32 uAddressOffset = GetAddressOffset(uId);
+  unsigned uIndex = 0x0;
+  u32 uAddressOffset = GetAddressOffset(uId);
   u16 pktlen = 0, padlen = 0;
-	//u32 uReg;
+  //u32 uReg;
 
-	// GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
-	//if (uNumWords > GetHostReceiveBufferLevel(uId))
-	//{
-	//	xil_printf("ReadHostPacket: Packet too big!\r\n");
-	//	return XST_FAILURE;
-	//}
+  // GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
+  //if (uNumWords > GetHostReceiveBufferLevel(uId))
+  //{
+  //  xil_printf("ReadHostPacket: Packet too big!\r\n");
+  //  return XST_FAILURE;
+  //}
 
-	if (uNumWords > RX_BUFFER_MAX)
-	{
-		xil_printf("ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", RX_BUFFER_MAX, uNumWords);
-		return XST_FAILURE;
-	}
+  if (uNumWords > RX_BUFFER_MAX)
+  {
+    xil_printf("ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", RX_BUFFER_MAX, uNumWords);
+    return XST_FAILURE;
+  }
 
   //debug_printf("%02x: rd %d words\n", uId, uNumWords);
 
-	for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
-	{
-		puReceivePacket[uIndex] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
-		//uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
-		//puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
-	}
+  for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
+  {
+    puReceivePacket[uIndex] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
+    //uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
+    //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
+  }
 
   /* added to debug packet length and firmware read buffer length discrepancy */
   if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
@@ -532,8 +537,8 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   //debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
 
-	// Acknowledge reading the packet from the FIFO
-	AckHostPacketReceive(uId);
+  // Acknowledge reading the packet from the FIFO
+  AckHostPacketReceive(uId);
 
-	return XST_SUCCESS;
+  return XST_SUCCESS;
 }

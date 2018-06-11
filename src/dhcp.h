@@ -23,6 +23,10 @@
 //#include "ipv4.h"
 #include "udp.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* link custom return values */
 #define DHCP_RETURN_OK            XST_SUCCESS
 #define DHCP_RETURN_FAIL          XST_FAILURE
@@ -298,4 +302,7 @@ int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callba
   /* this callback will typically set the interface configurations - ip, subnet, etc. */
 int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callback, void *pDataPtr);
 
+#ifdef __cplusplus
+}
+#endif
 #endif /* _DHCP_H_ */

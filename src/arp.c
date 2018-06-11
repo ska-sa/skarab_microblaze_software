@@ -1,14 +1,14 @@
 /**----------------------------------------------------------------------------
-*   FILE:       arp.c
-*   BRIEF:      Implementation of ARP functionality.
-*
-*   DATE:       OCT 2017
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
-*------------------------------------------------------------------------------*/
+ *   FILE:       arp.c
+ *   BRIEF:      Implementation of ARP functionality.
+ *
+ *   DATE:       OCT 2017
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
+ *------------------------------------------------------------------------------*/
 
 #include <xil_types.h>
 
@@ -63,7 +63,7 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   SANE_ARP(pIFObjectPtr);
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
-  
+
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
     debug_printf("ARP: Ethernet HW Type problem!\r\n");
     return ARP_RETURN_INVALID;

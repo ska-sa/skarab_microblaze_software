@@ -1,14 +1,14 @@
 /**----------------------------------------------------------------------------
-*   FILE:       memtest.c
-*   BRIEF:      Implementation of the memory test algorithm for integrity testing.
-*
-*   DATE:       JAN 2018
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
-*------------------------------------------------------------------------------*/
+ *   FILE:       memtest.c
+ *   BRIEF:      Implementation of the memory test algorithm for integrity testing.
+ *
+ *   DATE:       JAN 2018
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
+ *------------------------------------------------------------------------------*/
 
 #include "memtest.h"
 #include "print.h"
@@ -23,8 +23,8 @@ static inline u8 uAdler32Calc(const u8 *pDataPtr, const u32 uDataSize, u32 *pChe
 //---------------------------------------------------------------------------------
 //  This method implements the Adler32 checksum algorithm over a given dataset.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pDataPtr        IN    pointer to the base of the dataset
 //  uDataSize       IN    size of the dataset
 //  pTxBufferPtr    OUT   ptr to user supplied 32bit data storage for calculated checksum
@@ -58,8 +58,8 @@ static inline u8 uAdler32Calc(const u8 *pDataPtr, const u32 uDataSize, u32 *pChe
 //---------------------------------------------------------------------------------
 //  This method is a wrapper around the checksum algorithm method.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pDataPtr        IN    pointer to the base of the dataset
 //  uDataSize       IN    size of the dataset
 //  pTxBufferPtr    OUT   ptr to user supplied 32bit data storage for calculated checksum

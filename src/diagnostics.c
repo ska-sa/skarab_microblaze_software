@@ -1,13 +1,13 @@
 /**----------------------------------------------------------------------------
-*   FILE:       diagnostics.c
-*   BRIEF:      Implementation of various diagnostic functions
-*
-*   DATE:       MARCH 2018
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*------------------------------------------------------------------------------*/
+ *   FILE:       diagnostics.c
+ *   BRIEF:      Implementation of various diagnostic functions
+ *
+ *   DATE:       MARCH 2018
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *------------------------------------------------------------------------------*/
 
 /* vim settings: "set sw=2 ts=2 expandtab autoindent" */
 
@@ -21,8 +21,8 @@
 //---------------------------------------------------------------------------------
 //  Print all the counters for a specific interface to the terminal screen.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -35,12 +35,12 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
   }
 
   pIFObj->uTxTotal = pIFObj->uTxEthArpReplyOk + pIFObj->uTxEthArpRequestOk + pIFObj->uTxEthLldpOk +
-                     pIFObj->uTxIpIcmpReplyOk + pIFObj->uTxIpIgmpOk + pIFObj->uTxUdpDhcpOk + pIFObj->uTxUdpCtrlOk;
+    pIFObj->uTxIpIcmpReplyOk + pIFObj->uTxIpIgmpOk + pIFObj->uTxUdpDhcpOk + pIFObj->uTxUdpCtrlOk;
 
   debug_printf("IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\r\n", pIFObj->uIFEthernetId,
-                                                                pIFObj->uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
-                                                                pIFObj->stringIFAddrIP,
-                                                                pIFObj->stringIFAddrNetmask);
+      pIFObj->uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
+      pIFObj->stringIFAddrIP,
+      pIFObj->stringIFAddrNetmask);
   debug_printf(" Rx%1s%-13s%11d%2s", "","Total:",         pIFObj->uRxTotal,           "|");
   debug_printf(" Tx%1s%-13s%11d%2s", "","Total:",         pIFObj->uTxTotal,           "\r\n");
   debug_printf(" Rx%2s%-12s%11d%2s", "", "ETH Unknown:",  pIFObj->uRxEthUnknown,      "|");

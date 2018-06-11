@@ -1,15 +1,15 @@
 /**----------------------------------------------------------------------------
-*   FILE:       dhcp.c
-*   BRIEF:      Implementation of DHCP client functionality to obtain and
-*               renew IPv4 leases.
-*
-*   DATE:       MAY 2017
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   REFERENCES: RFC 2131 & 2132
-*------------------------------------------------------------------------------*/
+ *   FILE:       dhcp.c
+ *   BRIEF:      Implementation of DHCP client functionality to obtain and
+ *               renew IPv4 leases.
+ *
+ *   DATE:       MAY 2017
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   REFERENCES: RFC 2131 & 2132
+ *------------------------------------------------------------------------------*/
 
 /* vim settings: "set sw=2 ts=2 expandtab autoindent" */
 
@@ -121,8 +121,8 @@ u8 SanityCheckDHCP(struct sIFObject *pIFObjectPtr){
 //  Call this method to initialize the DHCP state object. This method must be called
 //  first before invoking the DHCP state machine.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  pRxBufferPtr    IN    ptr to user supplied rx buffer which will contain rx dhcp packet
 //  uRxBufferSize   IN    size of the user specified rx buffer
@@ -157,7 +157,7 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
 #endif
 
   pDHCPObjectPtr->tDHCPCurrentState = INIT;
-  
+
   pDHCPObjectPtr->uDHCPMessageReady = 0;
   pDHCPObjectPtr->uDHCPTx = 0;
   pDHCPObjectPtr->uDHCPRx = 0;
@@ -217,8 +217,8 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
 //  This method checks whether a message in the user rx buffer is valid for the
 //  current DHCP context / state. Use in conjuction with uDHCPSetGotMsgFlag().
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -332,8 +332,8 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
 //  This method is called once a valid DHCP message is found in the user rx buffer.
 //  Use in conjuction with uDHCPMessageValidate().
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -348,7 +348,7 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
-  
+
   return DHCP_RETURN_OK;
 }
 
@@ -357,8 +357,8 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method enables the DHCP state machine.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  uEnable         IN    set to SM_TRUE or SM_FALSE
 //
@@ -394,8 +394,8 @@ u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
 //---------------------------------------------------------------------------------
 //  This method resets the DHCP state machine (re-enable state machine after this call)
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -422,8 +422,8 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method sets the host name to be requested in a DHCP message.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  stringHostName  IN    pointer to host name string. Limited to HOST_NAME_MAX_SIZE.
 //
@@ -458,8 +458,8 @@ u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName){
 //---------------------------------------------------------------------------------
 //  This method sets a flag to delay the start of dhcp by a fixed offset.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -483,8 +483,8 @@ u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method sets the delay timeout value at the start of dhcp.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  uInitWait       IN    count value to wait before starting dhcp
 //                        time(ms) = uInitWait x POLL_INTERVAL
@@ -521,8 +521,8 @@ u8 uDHCPSetInitWait(struct sIFObject *pIFObjectPtr, u32 uInitWait){
 //---------------------------------------------------------------------------------
 //  This method sets the retry interval timeout value during dhcp states.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  uRetryinterval  IN    count value to wait before retrying
 //                        time(ms) = uRetryInterval x POLL_INTERVAL
@@ -558,8 +558,8 @@ u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval){
 //  
 //  
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pDHCPObjectPtr  IN    handle to DHCP state object
 //
 //  Return
@@ -571,7 +571,7 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
   if (pDHCPObjectPtr == NULL){
     return 0;
   }
-  
+
   return pDHCPObjectPtr->uDHCPTimeoutStatus; 
 }
 #endif
@@ -584,8 +584,8 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
 //  This method registers the callback to be invoked once a complete message exists
 //  in the user supplied tx buffer.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  callback        IN    function pointer of type defined form tcallUserFunction
 //  pDataPtr        IN    pointer to a data object to be passed to the callback
@@ -613,8 +613,8 @@ int eventDHCPOnMsgBuilt(struct sIFObject *pIFObjectPtr, tcallUserFunction callba
 //  This method registers the callback to be invoked once a the DHCP lease has been
 //  successfully acquired.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  callback        IN    function pointer of type defined form tcallUserFunction
 //  pDataPtr        IN    pointer to a data object to be passed to the callback
@@ -645,8 +645,8 @@ int eventDHCPOnLeaseAcqd(struct sIFObject *pIFObjectPtr, tcallUserFunction callb
 //  called is important for internal state timers (e.g. renewal timer, etc.)
 //  See POLL_INTERVAL in dhcp.h file.
 //
-//  Parameter	      Dir     Description
-//  ---------	      ---	    -----------
+//  Parameter       Dir     Description
+//  ---------       ---     -----------
 //  pIFObjectPtr    IN      handle to IF state object
 //
 //  Return
@@ -723,8 +723,8 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method initialises the state machine parameters (timers, flags, counters).
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -751,7 +751,7 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
 
 #if 0
   pDHCPObjectPtr->uDHCPRandomWait = pDHCPObjectPtr->uDHCPRandomWaitCached;     /* wait a prerequisite amount of time before dhcp'ing. This is done
-                                                                                 in order to spread requests when systems are started at the same time. */
+                                                                                  in order to spread requests when systems are started at the same time. */
 #endif
 
   /* FIXME NOTE: removed "mac hashing randomized wait" */
@@ -771,8 +771,8 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method implements a randomized wait state before sending DHCP Discover msg.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -812,8 +812,8 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method implements the selecting state which waits for a valid DHCP Offer msg.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -861,8 +861,8 @@ static typeDHCPState select_dhcp_state(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method implements a randomized wait state before sending a DHCP Request msg.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -888,7 +888,7 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
     pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
     return REQUEST;
   }
-  
+
   pDHCPObjectPtr->uDHCPRandomWait--;
   return WAIT;
 }
@@ -900,8 +900,8 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  It sets the various lease parameters and calls the user specified callback once
 //  the lease has been obtained.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -961,8 +961,8 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  This method implements the bound state which waits the prerequisite amount of 
 //  time before attempting to renew the lease.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -1001,7 +1001,7 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
       return RANDOMIZE;
     }
   }
-  
+
   return BOUND;
 }
 
@@ -1012,8 +1012,8 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  from the DHCP server, in which case it returns to the bound state. Otherwise,
 //  it waits the prerequisite amount of time before attempting to rebind the lease.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -1034,7 +1034,7 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
 
   if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE) == statusSET){
     vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_GOT_MESSAGE);
-    
+
     tDHCPMsgType = tDHCPProcessMsg(pIFObjectPtr);
     /* expecting a DHCP ACK message */
     if (tDHCPMsgType == DHCPACK){
@@ -1055,7 +1055,7 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
     }
     return REBIND;
   }
-  
+
   return RENEW;
 }
 
@@ -1067,8 +1067,8 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  it waits the prerequisite amount of time before "timing out". It tries to
 //  "re-discover" the DHCP server if the relevant flag is set.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -1114,7 +1114,7 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
     }
     return RANDOMIZE;
   }
-  
+
   return REBIND; 
 }
 
@@ -1127,8 +1127,8 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
 //  places it in the user supplied tx buffer. It calls the user defined callback
 //  once the message has been built.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //  tDHCPMsgType    IN    DHCP message type (ennumerated type)
 //  tDHCPMsgFlags   IN    flags to set various message parameters (enumerated type)
@@ -1199,7 +1199,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     memset(pBuffer + IP_FRAME_BASE + IP_DST_OFFSET, 0xff, 4);     /* broadcast */
     pBuffer[BOOTP_FRAME_BASE + BOOTP_FLAGS_OFFSET] = 0x80;        /* set the broadcast bit flag in the bootp/dhcp payload */
   }
-  
+
   /*****  udp frame struff  *****/
   pBuffer[UDP_FRAME_BASE + UDP_SRC_PORT_OFFSET + 1] = 0x44;
   pBuffer[UDP_FRAME_BASE + UDP_DST_PORT_OFFSET + 1] = 0x43;
@@ -1222,7 +1222,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   pBuffer[BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 1] =  ((pDHCPObjectPtr->uDHCPXidCached >> 16) & 0xff);
   pBuffer[BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 2] =  ((pDHCPObjectPtr->uDHCPXidCached >>  8) & 0xff);
   pBuffer[BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 3] =  ((pDHCPObjectPtr->uDHCPXidCached      ) & 0xff);
-  
+
 
   if (tDHCPAuxTestFlag( (u8 *) &(tDHCPMsgFlags), flagDHCP_MSG_DHCP_RESET_SEC) != statusSET){
     uSeconds = (pDHCPObjectPtr->uDHCPCurrentClkTick - pDHCPObjectPtr->uDHCPCachedClkTick) * pDHCPObjectPtr->uDHCPExternalTimerTick; 
@@ -1375,7 +1375,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   /* pad to nearest 64 bit boundary */
   /* simply increase total length by following amount - these bytes already zero due to earlier memset */
   uPaddingLength = 8 - ((uLength + ETH_FRAME_TOTAL_LEN) % 8);
-  
+
   /* and with 0b111 since only interested in values of 0 to 7 */
   uPaddingLength = uPaddingLength & 0x7; 
 
@@ -1397,8 +1397,8 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 //  This method processes a valid DHCP message located in the user supplied rx buffer
 //  and extracts all the necessary lease parameters.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -1466,7 +1466,7 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
   uDHCPTmpXid = uDHCPTmpXid | (u32) pBuffer[uIPLen + BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 1] << 16;
   uDHCPTmpXid = uDHCPTmpXid | (u32) pBuffer[uIPLen + BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 2] <<  8;
   uDHCPTmpXid = uDHCPTmpXid | (u32) pBuffer[uIPLen + BOOTP_FRAME_BASE + BOOTP_XID_OFFSET + 3];
-  
+
   /* compared xid with last cached xid, just in case there's a duplicate packet lingering in some buffer somewhere*/
   if (pDHCPObjectPtr->uDHCPXidCached != uDHCPTmpXid){
     pDHCPObjectPtr->uDHCPInvalid++;
@@ -1524,7 +1524,7 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
         uOptionIndex = uOptionIndex + pBuffer[uOptionIndex + 1] + 2;
         break;
 
-      /* get the server addr - retrieved from the Server ID dhcp option included in DHCPOFFER (see rfc 2132, par 9.7) */
+        /* get the server addr - retrieved from the Server ID dhcp option included in DHCPOFFER (see rfc 2132, par 9.7) */
       case 54:        //Server ID
         memcpy(pDHCPObjectPtr->arrDHCPAddrServerCached, pBuffer + uOptionIndex + 2, 4);
         uOptionIndex = uOptionIndex + pBuffer[uOptionIndex + 1] + 2;
@@ -1550,8 +1550,8 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method "hashes" the MAC address to generate a waiting time between 1 and 30 counts.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pIFObjectPtr    IN    handle to IF state object
 //
 //  Return
@@ -1584,8 +1584,8 @@ static u8 uDHCPWait(struct sIFObject *pIFObjectPtr){
 //---------------------------------------------------------------------------------
 //  This method generates a pseudo "random" number.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  uSeed           IN    Seed the random number generator with this value.
 //
 //  Return
@@ -1610,8 +1610,8 @@ static u32 uDHCPRandomNumber(u32 uSeed){
 //---------------------------------------------------------------------------------
 //  This auxiliary method clears a bit in the flag register.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pFlagRegister   IN    pointer to the register holding the flag to be cleared
 //  tBitPosition    IN    bit/flag to be cleared. enumerated typeDHCPRegisterFlags 
 //
@@ -1639,8 +1639,8 @@ static void vDHCPAuxClearFlag(u8 *pFlagRegister, typeDHCPRegisterFlags tBitPosit
 //---------------------------------------------------------------------------------
 //  This auxiliary method sets a bit in the flag register.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pFlagRegister   IN    pointer to the register holding the flag to be set
 //  tBitPosition    IN    bit/flag to be set. enumerated typeDHCPRegisterFlags 
 //
@@ -1668,8 +1668,8 @@ static void vDHCPAuxSetFlag(u8 *pFlagRegister, typeDHCPRegisterFlags tBitPositio
 //---------------------------------------------------------------------------------
 //  This auxiliary method tests a bit in the flag register.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pFlagRegister   IN    pointer to the register holding the flag to be tested
 //  tBitPosition    IN    bit/flag to test. enumerated typeDHCPRegisterFlags 
 //
@@ -1684,10 +1684,10 @@ static typeDHCPFlagStatus tDHCPAuxTestFlag(u8 *pFlagRegister, typeDHCPRegisterFl
   if (pFlagRegister == NULL){
     return statusERR;
   }
-  
+
   if (tBitPosition > 7){
     return statusERR;
   }
-  
+
   return ( ((*pFlagRegister) & uMask) ? statusSET : statusCLR);
 }

@@ -23,14 +23,18 @@
 *  over the Wishbone bus.
 * ------------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include "xparameters.h"
-#include "xil_types.h"
-#include "constant_defs.h"
+#include <xil_types.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 void WriteBoardRegister(u32 uWriteAddress, u32 uWriteData);
 u32 ReadBoardRegister(u32 uReadAddress);
 void WriteDSPRegister(u32 uWriteAddress, u32 uWriteData);
 u32 ReadDSPRegister(u32 uReadAddress);
 
+#ifdef __cplusplus
+}
+#endif
 #endif
