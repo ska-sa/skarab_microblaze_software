@@ -61,6 +61,17 @@ static dhcp_state_func_ptr dhcp_state_table[] = {
   [RENEW]     = renew_dhcp_state,
   [REBIND]    = rebind_dhcp_state };
 
+static const char *dhcp_msg_string_lookup[] = {
+  [DHCPDISCOVER]  = "DISCOVER",
+  [DHCPOFFER]     = "OFFER",
+  [DHCPREQUEST]   = "REQUEST",
+  [DHCPDECLINE]   = "DECLINE",
+  [DHCPACK]       = "ACK",
+  [DHCPNAK]       = "NAK",
+  [DHCPRELEASE]   = "RELEASE",
+  [DHCPINFORM]    = "INFORM"
+};
+
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
 #define SANE_DHCP(IFobject) if (SanityCheckDHCP(IFobject)) { return DHCP_RETURN_FAIL; }
@@ -71,6 +82,8 @@ static dhcp_state_func_ptr dhcp_state_table[] = {
 #ifdef DO_SANITY_CHECKS
 u8 SanityCheckDHCP(struct sIFObject *pIFObjectPtr){
   struct sDHCPObject *pDHCPObjectPtr;
+
+  /* TODO: should we assert rather that return? */
 
   if (pIFObjectPtr == NULL){
     debug_printf("No interface state handle\r\n");
@@ -164,6 +177,8 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPErrors = 0;
   pDHCPObjectPtr->uDHCPInvalid = 0;
   pDHCPObjectPtr->uDHCPRetries = 0;
+
+  pDHCPObjectPtr->uDHCPRebootReqs = 0;
 
   pDHCPObjectPtr->uDHCPTimeout = 0;
   pDHCPObjectPtr->uDHCPTimeoutStatus = 0;
@@ -551,6 +566,41 @@ u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval){
 
   return DHCP_RETURN_OK;
 }
+
+//=================================================================================
+//  uDHCPSetRequestCachedIP
+//---------------------------------------------------------------------------------
+//  This method is used to pre-load the state machine with an IP to be requested
+//  from the DHCP server i.e. the INIT-REBOOT state of the DHCP state machine
+//  (pg 35 RFC 2131 Mar 1997). This function must be called before the state machine
+//  is enabled.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//  uCachedIP       IN    The IP to request from the DHCP server
+//
+//  Return
+//  ------
+//  DHCP_RETURN_OK or DHCP_RETURN_FAIL
+//=================================================================================
+u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
+  struct sDHCPObject *pDHCPObjectPtr;
+
+  SANE_DHCP(pIFObjectPtr);
+
+  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  pDHCPObjectPtr->arrDHCPAddrYIPCached[0] =  ((uCachedIP >> 24) & 0xff);
+  pDHCPObjectPtr->arrDHCPAddrYIPCached[1] =  ((uCachedIP >> 16) & 0xff);
+  pDHCPObjectPtr->arrDHCPAddrYIPCached[2] =  ((uCachedIP >>  8) & 0xff);
+  pDHCPObjectPtr->arrDHCPAddrYIPCached[3] =  ( uCachedIP        & 0xff);
+
+  vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
+
+  return DHCP_RETURN_OK;
+}
+
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus
@@ -748,6 +798,7 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPErrors = 0;
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPTimeout = 0;
+  pDHCPObjectPtr->uDHCPRebootReqs = 0;
 
 #if 0
   pDHCPObjectPtr->uDHCPRandomWait = pDHCPObjectPtr->uDHCPRandomWaitCached;     /* wait a prerequisite amount of time before dhcp'ing. This is done
@@ -761,7 +812,10 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
     pDHCPObjectPtr->uDHCPRandomWait += pDHCPObjectPtr->uDHCPSMInitWait; /* add an extra fixed offset to the dhcp init waiting time */
   }
 
-  debug_printf("DHCP [%02x] Waiting %d ms before issuing DHCP discover at %d ms retry rate.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL), (pDHCPObjectPtr->uDHCPSMRetryInterval * POLL_INTERVAL));
+  debug_printf("DHCP [%02x] Waiting %d ms before starting DHCP at %d ms retry rate.\r\n",
+      (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
+      (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL),
+      (pDHCPObjectPtr->uDHCPSMRetryInterval * POLL_INTERVAL));
 
   return RANDOMIZE;
 }
@@ -788,19 +842,55 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
 
   if (pDHCPObjectPtr->uDHCPRandomWait <= 0){
+    /*FIXME: check the usefulness of this counter - perhaps better to implement
+     * per message-type counter rather than a general retry counter */
     pDHCPObjectPtr->uDHCPRetries++;
 
-    if (uDHCPBuildMessage(pIFObjectPtr, DHCPDISCOVER, (1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
-      /* on failure */
-      pDHCPObjectPtr->uDHCPErrors++;
+    if (tDHCPAuxTestFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP) == statusSET){
+      /*
+       * attempt to acquire a pre-loaded / cached lease - skip discover step
+       * RFC2131 allows for this - see INIT-REBOOT state (p35, RFC2131 Mar 1997)
+       */
+      debug_printf("DHCP [%02x] Requesting cached lease %d.%d.%d.%d\r\n",
+          (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
+          pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
+          pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
+          pDHCPObjectPtr->arrDHCPAddrYIPCached[2],
+          pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
+
+      if (uDHCPBuildMessage(pIFObjectPtr, DHCPREQUEST, (1<<flagDHCP_MSG_DHCP_REQIP | 1<<flagDHCP_MSG_DHCP_REQPARAM
+              | 1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+        pDHCPObjectPtr->uDHCPErrors++;
+      } else {
+        pDHCPObjectPtr->uDHCPTx++;
+      }
+
+      if (pDHCPObjectPtr->uDHCPRebootReqs >= (DHCP_REBOOTING_REQS_MAX - 1)){
+        /* stop trying to request cached IP - will send DISCOVER on next cycle */
+        vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
+#if 0
+        pDHCPObjectPtr->uDHCPRebootReqCount = 0; /* TODO: do we really want to
+                                                  * clear this counter here.
+                                                  * Keep around for debugging. */
+#endif
+      }
+
+      pDHCPObjectPtr->uDHCPRebootReqs++;
+      pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
+      return REQUEST;   /* skip DHCPDiscover message */
     } else {
-      /* on success */
-      pDHCPObjectPtr->uDHCPTx++;
+      if (uDHCPBuildMessage(pIFObjectPtr, DHCPDISCOVER, (1<<flagDHCP_MSG_DHCP_VENDID | 1<<flagDHCP_MSG_DHCP_RESET_SEC | 1<<flagDHCP_MSG_DHCP_NEW_XID))){
+        /* on failure */
+        pDHCPObjectPtr->uDHCPErrors++;
+      } else {
+        /* on success */
+        pDHCPObjectPtr->uDHCPTx++;
+      }
+      /* progress to the next state even on failure in order for timeout to catch the error */
+      /* this prevents us getting stuck in this state */
+      pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
+      return SELECT;
     }
-    /* progress to the next state even on failure in order for timeout to catch the error */
-    /* this prevents us getting stuck in this state */
-    pDHCPObjectPtr->uDHCPTimeout = 0;       /* reset timeout counter  */
-    return SELECT;
   }
 
   pDHCPObjectPtr->uDHCPRandomWait--;
@@ -892,6 +982,29 @@ static typeDHCPState wait_dhcp_state(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPRandomWait--;
   return WAIT;
 }
+
+#if 0
+//=================================================================================
+//  reboot_dhcp_state
+//---------------------------------------------------------------------------------
+//  This method implements the rebooting state of RFC 2131. It attempts to
+//  re-acquire the last lease received after a reboot / reconfigure.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//   (enumerated typeDHCPState, the next state to be entered)
+//=================================================================================
+static typeDHCPState reboot_dhcp_state(struct sIFObject *pIFObjectPtr){
+}
+#endif /* REBOOTING STATE:
+        * this state would have the same logic as REQUEST state - TODO: should
+        * we separate it though for better flexibility when implementing
+        * changes? For now, just go to REQUEST state
+        */
 
 //=================================================================================
 //  request_dhcp_state
@@ -1346,13 +1459,11 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   uPseudoHdr[9] = pBuffer[IP_FRAME_BASE + IP_PROT_OFFSET];
   memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
-#ifdef TRACE_PRINT
-  xil_printf("DHCP: UDP pseudo header: \r\n");
-  for (int i=0; i< 12; i++){
-    xil_printf(" %02x", uPseudoHdr[i]);
+  trace_printf("DHCP: UDP pseudo header: \r\n");
+  for (int i = 0; i < 12; i++){
+    trace_printf(" %02x", uPseudoHdr[i]);
   }
-  xil_printf("\r\n");
-#endif
+  trace_printf("\r\n");
 
   RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0);
   if(RetVal){
@@ -1365,9 +1476,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     return DHCP_RETURN_FAIL;
   }
 
-#ifdef TRACE_PRINT
-  xil_printf("DHCP: UDP checksum value = %04x\r\n", uCheckTemp);
-#endif
+  trace_printf("DHCP: UDP checksum value = %04x\r\n", uCheckTemp);
 
   pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET    ] = (u8) ((uCheckTemp & 0xff00) >> 8);
   pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET + 1] = (u8) (uCheckTemp & 0xff);
@@ -1383,7 +1492,11 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 
   /* TODO: set a message ready flag */
 
-  /* invoke a callback once the message successfully */
+  debug_printf("DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
+      (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
+      dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
+
+  /* invoke a callback once the message successfully built */
   if (pDHCPObjectPtr->callbackOnMsgBuilt != NULL){
     (*(pDHCPObjectPtr->callbackOnMsgBuilt))(pIFObjectPtr, pDHCPObjectPtr->pMsgDataPtr);
   }

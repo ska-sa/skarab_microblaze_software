@@ -95,8 +95,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
 
     case PMEM_WRITE_BYTE:
     case PMEM_READ_BYTE:
-      Xil_AssertNonvoid(((HMC_RECONFIG_COUNT_BYTE == byte_index) ||
-            (DHCP_RECONFIG_COUNT_BYTE == byte_index)) && (NULL != byte_data));
+      Xil_AssertNonvoid((byte_index >= 0) && (byte_index < PMEM_INDEX_MAX) && (NULL != byte_data));
       break;
 
     case SKIP:

@@ -1603,6 +1603,7 @@ int main()
     always_printf("[Memory Test] expected value {@0x%08x}: 0x%08x\r\n", &_location_checksum_, _location_checksum_);
     always_printf("[Memory Test] computed value              : 0x%08x\r\n", uMemTest);
     always_printf("[Memory Test] %s\r\n", (uMemTest == _location_checksum_) ? "***PASSED***" : "***FAILED***");
+    /* TODO: do not allow failure to go unnoticed - perhaps Assert()! */
   } else {
     always_printf("[Memory Test] Error - could not execute\r\n");
   }
@@ -1721,7 +1722,9 @@ int main()
   PMemState = PersistentMemory_Check();
   if (PMemState == PMEM_RETURN_DEFAULT){
     /* if the memory in it's default state, we're safe to proceed and clear
-     * the memory */
+     * the memory. This is an indication that 1) the FLASH location has not been
+     * set for the board and following this 2) the board has been hard power
+     * cycled. */
     debug_printf("[INIT] persistent memory contains default value. Clearing...\r\n");
     PMemState = PersistentMemory_Clear();
   }
@@ -1778,7 +1781,7 @@ int main()
 
   always_printf("[INIT] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
-  PersistentMemory_ReadByte(HMC_RECONFIG_COUNT_BYTE, &uHMCReconfigCount);
+  PersistentMemory_ReadByte(HMC_RECONFIG_COUNT_INDEX, &uHMCReconfigCount);
 
   if (uTimeoutCounter == 0){
     error_printf("[HMC] all HMCs did not init within %d ms\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
@@ -1786,7 +1789,7 @@ int main()
       if (uHMCReconfigCount < HMC_MAX_RECONFIG_COUNT){
         /* for each reconfigure, increment count and write back to register */
         uHMCReconfigCount = uHMCReconfigCount + 1;
-        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_BYTE, uHMCReconfigCount);
+        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, uHMCReconfigCount);
         error_printf("[HMC] invoking reconfigure of FPGA\r\n");
         SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
         ResetSdramReadAddress();
@@ -1801,7 +1804,7 @@ int main()
          * fresh on the next reset. Otherwise the only way to clear it would be via
          * hard reset or explicitly writing to it via casperfpga (fan_ctrl/i2c commands)
          */
-        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_BYTE, 0);
+        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, 0);
       }
     } else {
       error_printf("[HMC] error accessing persistent memory register\r\n");
@@ -1855,10 +1858,12 @@ int main()
 
   uTempHostNameString[12] = '-';
 
-  /* read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
-     -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
-     -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
+  /*
+   * read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
+   * -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
+   * -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
    */
+  /* FIXME: move declarartions up */
   u16 rom[8];
   u16 data[4];
   u16 dhcp_wait = 0;
@@ -1872,7 +1877,6 @@ int main()
       dhcp_set = 1;
     }
   } /* else run with the default values automatically set when interface initialized */
-
 
   for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
 
@@ -1896,15 +1900,44 @@ int main()
     /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
        We thus want to delay the start of dhcp till these transitions have settled.
        The delay is determined by the DHCP_SM_WAIT macro. */
-    //if (uEthernetId == 0){
+    //if (uEthernetId == 0){  /* comment out since we now want it on all links */
     uDHCPSetWaitOnInitFlag(&(IFContext[uEthernetId]));
     if (dhcp_set){
       uDHCPSetRetryInterval(&(IFContext[uEthernetId]), (u32) dhcp_retry);
       uDHCPSetInitWait(&(IFContext[uEthernetId]), (u32) dhcp_wait);
     }
     //}
-    /* uDHCPSetStateMachineEnable(&DHCPContextState[uEthernetId], TRUE); */
-    //uICMPInit(&ICMPContextState[uEthernetId], (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4));
+
+    /*
+     * NOTE: specifically for site - try to request the previous ip from the
+     * server in an attempt to reduce dhcp traffic at init. On site, only one
+     * 40gbe link is connected (i/f 1) and provision is currently only made
+     * for this one ip to persist between reconfig's.
+     * TODO: perhaps expand for all links - will require more persistent memory
+     */
+    if (uEthernetId == 1){
+      /*
+       * check if we have cached the ip from the previous reconfigure cycle. if so,
+       * pre-load state machine to attempt to request the same lease
+       */
+      /* FIXME: move declarartions up */
+      u8 byte;
+      u32 tempIP = 0;
+
+      PersistentMemory_ReadByte(DHCP_CACHED_IP_STATE_INDEX, &byte);
+      if (byte == 1){
+        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT0_INDEX, &byte);
+        tempIP = tempIP | ((u32) byte << 24);
+        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT1_INDEX, &byte);
+        tempIP = tempIP | ((u32) byte << 16);
+        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT2_INDEX, &byte);
+        tempIP = tempIP | ((u32) byte << 8);
+        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT3_INDEX, &byte);
+        tempIP = tempIP | ((u32) byte);
+
+        uDHCPSetRequestCachedIP(&(IFContext[uEthernetId]), tempIP);
+      }
+    }
   }
 
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
@@ -2461,7 +2494,7 @@ static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
   uLocalSize = uLocalSize >> 1;   /*  32-bit words */
   uReturnValue = TransmitHostPacket(uLocalEthernetId, (u32 *) pLocalBuffer, uLocalSize);
   if (uReturnValue == XST_SUCCESS){
-    info_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\r\n", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
+    /* info_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\r\n", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached); */
     pIFObjectPtr->uTxUdpDhcpOk++;
   } else {
     error_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\r\n", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
@@ -2552,6 +2585,18 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
   EnableFabricInterface(id, 1);
   uFlagRunTask_LLDP = 1;
+
+  /* cache the ip in persistent memory for DHCP request on next reconfigure cycle */
+  /* TODO: should we check the state of persistent memory again (?) - perhaps a
+   * partial check of the following byte indices only...
+   */
+  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[0]);
+  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[1]);
+  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[2]);
+  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
+
+  PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
+
   return 0;
 }
 

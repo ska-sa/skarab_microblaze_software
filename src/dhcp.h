@@ -146,17 +146,36 @@ typedef enum {flagDHCP_SM_AUTO_REDISCOVER=0,
               flagDHCP_SM_GOT_MESSAGE,
               flagDHCP_SM_STATE_MACHINE_EN,
               flagDHCP_MSG_REQ_HOST_NAME,
-              flagDHCP_SM_SHORT_CIRCUIT_RENEW,    /* The flag used to short circuit the renewal step and move back to the discover step.
-                                                     This was implemented to circumvent the case where a relay agent has appended
-                                                     tags during the inital lease acquisition step and these tags were used to issue
-                                                     the lease. Upon renewal, the client unicasts a message directly to the dhcp server
-                                                     (in line with RFC 2131) thus bypassing the relay agent and in turn the tags are not
-                                                     appended. This may cause issues resulting in the lease not being successfully renewed.
-                                                     This flag bypasses the renew step altogether, and allows the client to re-discover
-                                                     the lease. */
-              flagDHCP_SM_INIT_WAIT_EN,           /* this flag determines if the state machine must wait a
-                                                     fixed amount of time (DHCP_SM_WAIT) at init before running */
-              flagDHCP_RESERVED_1
+              flagDHCP_SM_SHORT_CIRCUIT_RENEW,
+              /*
+               * flagDHCP_SM_SHORT_CIRCUIT_RENEW:
+               * The next flag is used to short circuit the renewal step and
+               * move back to the discover step.
+               * This was implemented to circumvent the case where a relay agent
+               * has appended tags during the initial lease acquisition step and
+               * these tags were used to issue the lease. Upon renewal, the
+               * client unicasts a message directly to the dhcp server (in line
+               * with RFC 2131) thus bypassing the relay agent and in turn the
+               * tags are not appended. This may cause issues resulting in the
+               * lease not being successfully renewed.  This flag bypasses the
+               * renew step altogether, and allows the client to re-discover the
+               * lease.
+               */
+              flagDHCP_SM_INIT_WAIT_EN,
+              /*
+               * flagDHCP_SM_INIT_WAIT_EN:
+               * this flag determines if the state machine must wait a
+               * fixed amount of time (DHCP_SM_WAIT) at init before running
+               */
+              flagDHCP_SM_USE_CACHED_IP
+                /*
+                 * flagDHCP_SM_USE_CACHED_IP:
+                 * this flag was added to allow the state machine to try and
+                 * re-acquire the ip it previously held. This has the potential
+                 * to "half" the DHCP transactions by sending out a request
+                 * message with this "cached" ip, thereby skipping the discover
+                 * step
+                 */
 } typeDHCPRegisterFlags;
 
 typedef enum {flagDHCP_MSG_UNICAST=0,
@@ -187,6 +206,10 @@ typedef int (*tcallUserFunction)(struct sIFObject *pIFObjectPtr, void *pUserData
 #define SM_FALSE  0
 #define SM_TRUE   1
 
+#define DHCP_REBOOTING_REQS_MAX 3  /* maximum amount of DHCPRequest messages
+                                    * to send after reboot when attempting to
+                                    * re-acquire previous lease (cached IP) */
+
 /* object which holds the current context/state */
 struct sDHCPObject{
   u32 uDHCPMagic;
@@ -210,7 +233,12 @@ struct sDHCPObject{
   u8  uDHCPErrors;
   u8  uDHCPInvalid;
   u8  uDHCPRetries;
-  u8  uDHCPTimeoutStatus;   /* indicates that the DHCP process has failed after <DHCP_SM_RETRIES> attempts */
+  u8  uDHCPTimeoutStatus;   /* indicates that the DHCP process has failed after
+                             * <DHCP_SM_RETRIES> attempts */
+
+  u8  uDHCPRebootReqs;      /* count of the requests sent at reboot if using a
+                             * cached IP to attempt to re-aquire a previous
+                             * lease */
 
   /* internal states and variables */
   u16 uDHCPTimeout;         /* counter used to timeout if "stuck" in a state */
@@ -268,6 +296,12 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr);
 u8 uDHCPSetWaitOnInitFlag(struct sIFObject *pIFObjectPtr);
 u8 uDHCPSetInitWait(struct sIFObject *pIFObjectPtr, u32 uInitWait);
 u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval);
+
+/*
+ * request a specific lease on startup - in line with INIT-REBOOTING state of
+ * RFC 2131.
+ */
+u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP);
 
 #if 0
 /*TODO*/u8 uDHCPSetAutoRediscoverEnable(struct sDHCPObject *pDHCPObjectPtr, u8 uEnable);
