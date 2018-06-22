@@ -49,13 +49,14 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
 
-  // sensor reads
-  // automatically populates the fields for the reponse packet
-  GetAllFanSpeeds(Response); // fan speed rpm
-  GetAllFanSpeedsPWM(Response); // fan speed pwm
-  GetAllTempSensors(Response); // temperature sensors (excl. mezzanine sites)
-  GetAllVoltages(Response); // psu voltages
-  GetAllCurrents(Response); // psu currents
+	// sensor reads
+	// automatically populates the fields for the reponse packet
+	GetAllFanSpeeds(Response); // fan speed rpm
+	GetAllFanSpeedsPWM(Response); // fan speed pwm
+	GetAllTempSensors(Response); // temperature sensors (excl. mezzanine sites)
+	GetAllVoltages(Response); // psu voltages
+	GetAllCurrents(Response); // psu currents
+	GetAllMezzanineTempSensors(Response); // mezzanine temperatures
 
   // add padding to 64-bit boundary
   for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++)
@@ -831,7 +832,93 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
   */
 }
 //=================================================================================
-//  ConfigureSwitch
+//	ReadMezzanineTemperature
+//--------------------------------------------------------------------------------
+//	This method reads a temperature from the MAX31785 Fan Controller
+//
+//	---------	---		-----------
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//  ReadBytes			OUT Read bytes (temperature)
+//	TempSensorPage		IN	Desired messanine temperature
+//	OpenSwitch			IN	True if the PCA9546 I2C switch needs to be opened first
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch)
+{
+	u16 WriteBytes[3];
+	u16 Mez3WriteBytes[3];
+
+	WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
+	WriteBytes[1] = MezzaninePage;
+
+	if (OpenSwitch)
+	{
+		ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+	}
+
+	// request temperature read
+	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+
+	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
+	if (MezzaninePage == MEZZANINE_3_TEMP_ADC_PAGE)
+	{
+		Mez3WriteBytes[0] = 0x7D;
+		Mez3WriteBytes[1] = 0x00;
+
+		// configure the QSFP to have it's temperature read
+		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, Mez3WriteBytes, 2);
+
+		//Delay(5000000);
+		
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+	}
+	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
+	if ((MezzaninePage == MEZZANINE_0_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_1_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_2_TEMP_ADC_PAGE))
+	{
+		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+
+	}
+}
+
+//=================================================================================
+//	GetAllMezzanineTempSensors
+//--------------------------------------------------------------------------------
+//	This method reads all the temperature sensors on the SKARAB motherboard
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	Response	IN		Pointer to the response packet structure
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
+{
+		u16 ReadBytes[3];
+		u16 temperature;
+		int i;
+
+		unsigned MezzanineSensorPages[4] = {MEZZANINE_0_TEMP_ADC_PAGE,
+											MEZZANINE_1_TEMP_ADC_PAGE,
+											MEZZANINE_2_TEMP_ADC_PAGE,
+											MEZZANINE_3_TEMP_ADC_PAGE};
+
+
+		for (i = 0; i<4; i++)
+		{
+			ReadMezzanineTemperature(ReadBytes, MezzanineSensorPages[i], true);			
+			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
+			Response->uSensorData[i+91] = temperature; // offset of 91 to account for previous sensor data
+		}
+}
+
+//=================================================================================
+//	ConfigureSwitch
 //--------------------------------------------------------------------------------
 //  This method is used to configure the PCA9546 I2C Switch
 //

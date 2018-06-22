@@ -140,9 +140,9 @@ typedef struct sGetSensorDataReq {
 } sGetSensorDataReqT;
 
 typedef struct sGetSensorDataResp {
-  sCommandHeaderT Header;
-  u16       uSensorData[91];
-  u16       uPadding[2];
+	sCommandHeaderT Header;
+	u16				uSensorData[95];
+	u16				uPadding[2];
 } sGetSensorDataRespT;
 
 // SetFanSpeed

@@ -35,6 +35,9 @@ void GetAllVoltages(sGetSensorDataRespT *Response);
 void ReadCurrent(u16 * ReadBytes, unsigned Current, bool OpenSwitch);
 void GetAllCurrents(sGetSensorDataRespT *Response);
 void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch);
+void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch);
+void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response);
+
 
 // auxiliary functions
 void ConfigureSwitch(unsigned SwitchSelection);

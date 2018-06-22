@@ -1082,6 +1082,9 @@ typedef struct sGetDHCPTuningDebugResp {
 #define MEZZANINE_2_I2C_BUS_ID    0x3
 #define MEZZANINE_3_I2C_BUS_ID    0x4
 
+//STM I2C DEFINES
+#define STM_I2C_DEVICE_ADDRESS    0x0C    // 0x18 shifted down by 1 bit
+  
 #define PCA9546_I2C_DEVICE_ADDRESS  0x70  // Address without read/write bit
 #define FAN_CONT_SWITCH_SELECT    0x01
 #define MONITOR_SWITCH_SELECT   0x02
