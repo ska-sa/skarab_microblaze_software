@@ -5,17 +5,17 @@
 # This will generate the Makefile.inc file                      #
 #################################################################
 
--include Makefile.inc
+-include Makefile.inc Makefile.config
 
 #version info
-VERSION=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+GIT_BRANCH=$(shell git rev-parse --verify -q --abbrev-ref HEAD 2>/dev/null || echo unknown)
+GIT_DESCRIBE=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+
+VERSION=$(GIT_DESCRIBE)-$(GIT_BRANCH)
 
 #Additional build flags
 
 LDFLAGS +=
-
-#Compile in consistency checks?
-CPPFLAGS += -DDO_SANITY_CHECKS
 
 CFLAGS += -DGITVERSION=\"$(VERSION)\" -DGITVERSION_SIZE=$(shell echo -n $(VERSION) | wc -c)
 
@@ -39,6 +39,9 @@ SRC := $(shell  cd $(SRCDIR); find . -name '*.c' -printf "%f ")
 QUIET := $(shell test -d output || mkdir output)
 OBJDIR := output/
 
+QUIET := $(shell test -d elf || mkdir elf)
+ELFDIR := elf/
+
 #OBJ := $(patsubst %.c,%.o,$(SRC))
 OBJ := $(SRC:.c=.o)
 
@@ -47,6 +50,8 @@ OBJ := $(SRC:.c=.o)
 MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul -mno-xl-soft-div
 #common flags
 CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
+#some extra flags to check switch statements (not automatically enabled by -Wall)
+CFLAGS += -Wswitch-enum -Wswitch-default
 #optimization flags
 
 #CFLAGS += -Os
@@ -62,13 +67,19 @@ CFLAGS += $(MBFLAGS) -MMD -MP $(INC)
 #linker flags
 LDLIBS := -Wl,--start-group,$(LIBS),--end-group
 LDSCRIPT := $(SRCDIR)lscript.ld
-LDSYM := -Wl,--defsym,CRC_VALUE=0
-LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax $(LDSYM)
+LDSYM1 := -Wl,--defsym,CRC_VALUE=0
+LDFLAGS += -Wl,-T -Wl,$(LDSCRIPT) -L$(LIBDIR) $(MBFLAGS) -Wl,--no-relax
 
 #optimizations: use with \-ffunction-sections -fdata-sections\ above
 #LDFLAGS += -Wl,--gc-sections
 
 EXISTS := $(shell test -f Makefile.inc || echo 'NO')
+
+ADLER32 := utils/adler32/adler32
+
+#some decorative stuff
+RED_COLOUR ="\033[0;31m"
+END_COLOUR = "\033[0m"
 
 all: check .build
 
@@ -81,12 +92,24 @@ endif
 
 .build: $(ELF)
 
-$(ELF): $(addprefix $(OBJDIR), $(OBJ))
+#link second time to insert checksum into elf
+$(ELF): $(addprefix $(OBJDIR), $(OBJ)) .temp.elf $(ADLER32)
 	@echo 'Building target: $@'
 	@echo 'Invoking: MicroBlaze gcc linker'
-	$(CC) $(LDFLAGS) -o "$@" $? $(LDLIBS)
-	@echo 'Finished building: $@'
-	@echo ' '
+	$(eval CALC = $(shell $(CCPATH)/mb-objcopy --only-section .text .temp.elf -O binary temp.bin 2>/dev/null; ./$(ADLER32) -f temp.bin 2>/dev/null | grep \^checksum | cut -f3 -d' '))
+	@$(RM) .temp.elf temp.bin
+	@test $(CALC)
+	$(eval CALC_FMT = $(shell printf 0x%08x 0x$(CALC)))
+	$(eval LDSYM2 = -Wl,--defsym,CRC_VALUE=$(CALC_FMT))
+	$(eval DEPS = $(filter-out .temp.elf $(ADLER32), $?))
+	$(CC) $(LDFLAGS) $(LDSYM2) -o "$(ELFDIR)$@" $(DEPS) $(LDLIBS)
+	@echo $(RED_COLOUR)
+	@echo 'Finished building: $@ in $(ELFDIR) directory'
+	@echo $(END_COLOUR)
+
+#link first time to compile elf in order to calculate adler checksum
+.temp.elf: $(addprefix $(OBJDIR), $(OBJ))
+	$(CC) $(LDFLAGS) $(LDSYM1) -o "$@" $? $(LDLIBS)
 
 $(OBJDIR)%.o: $(SRCDIR)%.c .FORCE
 	@echo 'Compiling file: $<'
@@ -95,15 +118,21 @@ $(OBJDIR)%.o: $(SRCDIR)%.c .FORCE
 	@echo 'Finished building: $@'
 	@echo ' '
 
+$(ADLER32):
+	@echo ' '
+	$(MAKE) -w -C utils/adler32/
+	@echo ' '
+
 copy: $(ELF)
 	@echo 'Copying file: $< to $(BUILD_ELF_DIR)'
-	$(shell cp $(ELF) $(BUILD_ELF_DIR))
+	$(shell cp $(ELFDIR)/$(ELF) $(BUILD_ELF_DIR))
 
 clean-all: clean
-	$(RM) *.elf
+	$(RM) $(ELFDIR)*.elf
 
 clean:
-	$(RM) $(OBJDIR)*.o $(OBJDIR)*.d $(ELF)
+	$(MAKE) -C utils/adler32/ clean
+	$(RM) $(OBJDIR)*.o $(OBJDIR)*.d $(ELFDIR)$(ELF)
 
 .PHONY: all clean copy check clean-all
 

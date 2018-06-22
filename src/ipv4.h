@@ -15,6 +15,10 @@
 
 #include "eth.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IP_FRAME_BASE               (ETH_FRAME_BASE + ETH_FRAME_TOTAL_LEN)
 #define IP_V_HIL_OFFSET             0
 #define IP_V_HIL_LEN                1
@@ -39,4 +43,7 @@
 
 #define IP_FRAME_TOTAL_LEN          (IP_DST_OFFSET + IP_DST_LEN)  /* ip length = 20 */
 
+#ifdef __cplusplus
+}
+#endif
 #endif

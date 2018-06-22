@@ -17,6 +17,10 @@
 
 #include "eth.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* define return values */
 #ifndef ARP_RETURN_OK
 #define ARP_RETURN_OK (0)
@@ -80,4 +84,7 @@ struct sIFObject;
 u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr);
 u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, u8 *arrTargetIP);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

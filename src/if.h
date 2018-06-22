@@ -3,6 +3,10 @@
 
 #include "dhcp.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define IF_MAGIC 0xAABBCCDD
 
 #define IF_RETURN_OK    (0)
@@ -60,7 +64,8 @@ struct sIFObject{
         u32 uRxUdpDhcp;     /* dhcp reply */
           u32 uRxDhcpInvalid;   /* these are packets destined for us but failed validation (problems with xid, etc.). 
                                    These include dhcp server bcast replies meant for other nodes */
-        u32 uRxUdpUnknown;  /* packets dropped at UDP layer (includes dhcp requests from other nodes) */
+          u32 uRxDhcpUnknown;   /* possible dhcp broadcasts from other nodes destined for the dhcp server */
+        u32 uRxUdpUnknown;  /* packets dropped at UDP layer */
       u32 uRxIpUnknown;     /* packets dropped at IP layer */
     u32 uRxEthUnknown;      /* packets dropped at Ethernet layer */
 
@@ -89,4 +94,8 @@ struct sIFObject{
 };
 
 u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr, u8 uEthernetId);
+
+#ifdef __cplusplus
+}
+#endif
 #endif

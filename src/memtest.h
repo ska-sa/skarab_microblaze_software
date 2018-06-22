@@ -1,7 +1,7 @@
 #ifndef _MEMTEST_H_
 #define _MEMTEST_H_
 
-#include "xil_types.h"
+#include <xil_types.h>
 
 #ifdef __cplusplus
 extern "C" {

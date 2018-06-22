@@ -1,16 +1,16 @@
 /**---------------------------------------------------------------------------- 
-*   FILE:       net_utils.c
-*   BRIEF:      Network utility functions.
-*   
-*   DATE:       AUG 2017
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   REFERENCES: RFC 791
-*
-*   [vim settings: "set sw=2 ts=2 expandtab autoindent"]
-*------------------------------------------------------------------------------*/
+ *   FILE:       net_utils.c
+ *   BRIEF:      Network utility functions.
+ *   
+ *   DATE:       AUG 2017
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   REFERENCES: RFC 791
+ *
+ *   [vim settings: "set sw=2 ts=2 expandtab autoindent"]
+ *------------------------------------------------------------------------------*/
 
 #include <xil_types.h>
 #include <xenv_standalone.h>
@@ -25,8 +25,8 @@
 //---------------------------------------------------------------------------------
 //  This method calculates a 16-bit word checksum.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  pDataPtr        IN    pointer to buffer with data to be "checksummed"
 //  uIndexStart     IN    starting index in the data buffer (zero indexed)
 //  uIndexEnd       IN    ending index in the data buffer
@@ -158,8 +158,8 @@ int uIPChecksumCalc(u8 *pDataPtr, u16 *pChecksumPtr){
 //---------------------------------------------------------------------------------
 //  This method converts an IP address from a 32-bit word to a dotted notation string.
 //
-//  Parameter	      Dir   Description
-//  ---------	      ---	  -----------
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
 //  stringIP        IN    pointer to a user provided string buffer (at least 16 bytes wide)
 //                        where IP string will be stored.
 //  uIP32           IN    IP address as a 32-bit unsigned integer.
@@ -182,7 +182,7 @@ int uIPV4_ntoa(char *stringIP, u32 uIP32){
   for (i = 0; i < 4; i++){
     /* get each octet of the 32-bit ip word */
     octet = (uIP32 >> (8 * (3 - i))) & 0xff;
-    
+
     /* now convert octet to ascii representation: */
 
     /* how many digits in this octet? (base 10) 3, 2 or 1? */
