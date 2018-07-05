@@ -67,7 +67,7 @@ void UnalignedAccessException(void *Data);
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
 static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
-//static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
+static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
 static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
@@ -149,7 +149,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   uFlagRunTask_DHCP = 1;
 
-  //  uFlagRunTask_CheckDHCPBound = 1;
+  uFlagRunTask_CheckDHCPBound = 1;
 
   // DHCP every 10 seconds (timer every 100 ms)
   if (uDHCPTimerCounter == 0x64)
@@ -1555,8 +1555,8 @@ int main()
   XWdtTb WatchdogTimer;
   u32 uIGMPGroupAddress;
   u8 uOKToReboot;
-  /* u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0}; */
-  /* u8 uDHCPBoundTimeout = 0; */
+  u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0};
+  u8 uDHCPBoundTimeout = 0;
 #ifdef DO_40GBE_LOOPBACK_TEST
   u32 uTemp40GBEIPAddress = 0x0A000802;
   u8 uConfig40GBE[4];
@@ -2358,7 +2358,6 @@ int main()
       uFlagRunTask_LLDP = 0;  
     }
 
-#if 0
     //----------------------------------------------------------------------------//
     //  CHECK DHCP BOUND TASK                                                     //
     //  Triggered on timer interrupt                                              //
@@ -2380,16 +2379,22 @@ int main()
           uDHCPBoundTimeout++;
         }
       }
-      /* if we timeout on all the interfaces, line up a reset and reload the image in SDRAM */
+      /*
+       * if we timeout on all the interfaces, line up a reset (...and reload the
+       * image in SDRAM if in toolflow image)
+       */
       if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
-        SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-        ResetSdramReadAddress();
+        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+          /* if it's a toolflow image */
+          SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
+          ResetSdramReadAddress();
+          warn_printf("REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+        }
         AboutToBootFromSdram();
         uDoReboot = REBOOT_REQUESTED;
-        warn_printf("DHCP: RESET - All I/F's timed out!\r\n");
+        warn_printf("REBOOT - DHCP timed out on all interfaces!\r\n");
       }
     }
-#endif
 
     //----------------------------------------------------------------------------//
     //  DUMP INTERFACE COUNTERS                                                   //

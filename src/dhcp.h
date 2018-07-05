@@ -206,9 +206,12 @@ typedef int (*tcallUserFunction)(struct sIFObject *pIFObjectPtr, void *pUserData
 #define SM_FALSE  0
 #define SM_TRUE   1
 
-#define DHCP_REBOOTING_REQS_MAX 3  /* maximum amount of DHCPRequest messages
-                                    * to send after reboot when attempting to
-                                    * re-acquire previous lease (cached IP) */
+/*
+ * maximum amount of DHCPRequest messages
+ * to send after reboot when attempting to
+ * re-acquire previous lease (cached IP)
+ */
+#define DHCP_REBOOTING_REQS_MAX 10
 
 /* object which holds the current context/state */
 struct sDHCPObject{
