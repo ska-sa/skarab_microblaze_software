@@ -171,7 +171,7 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   }
 
   memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
-  memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 6);
+  memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4);
 
 
   if (tARPMsgType == ARP_OPCODE_REPLY){
