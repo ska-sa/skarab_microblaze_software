@@ -16,16 +16,26 @@ typedef enum {
 
 /* indexing map of persistent memory usage */
 typedef enum {
+  /* start of byte-block 0 */
   HMC_RECONFIG_COUNT_INDEX = 0, /* count the HMC triggered reconfigurations */
   DHCP_RECONFIG_COUNT_INDEX,    /* count the DHCP triggered reconfigurations */
-  DHCP_CACHED_IP_STATE_INDEX,   /* indicates whether ip has been cached previously */
+  DHCP_CACHED_IP_STATE_INDEX,   /* indicates whether ip lease has been cached previously */
   DHCP_CACHED_IP_OCT0_INDEX,    /* next four indices store ip between reconfigs */
   DHCP_CACHED_IP_OCT1_INDEX,    /* cached ip => {oct1}.{oct2}.{oct3}.{oct4} */
   DHCP_CACHED_IP_OCT2_INDEX,
   DHCP_CACHED_IP_OCT3_INDEX,
-  PMEM_RESERVED,
-  PMEM_INDEX_MAX = 8
-  /* NOTE: only 8-byte storage block implemented */
+  PMEM_BLOCK0_RESERVED_0,
+  /* start of byte-block 1 */
+  DHCP_CACHED_MASK_OCT0_INDEX,    /* next four indices store netmask between reconfigs */
+  DHCP_CACHED_MASK_OCT1_INDEX,    /* cached netmask => {oct1}.{oct2}.{oct3}.{oct4} */
+  DHCP_CACHED_MASK_OCT2_INDEX,
+  DHCP_CACHED_MASK_OCT3_INDEX,
+  DHCP_CACHED_GW_OCT0_INDEX,    /* next four indices store gateway between reconfigs */
+  DHCP_CACHED_GW_OCT1_INDEX,    /* cached gateway => {oct1}.{oct2}.{oct3}.{oct4} */
+  DHCP_CACHED_GW_OCT2_INDEX,
+  DHCP_CACHED_GW_OCT3_INDEX,
+  PMEM_INDEX_MAX = 16
+  /* NOTE: 16 byte (2 x 8-byte) storage block implemented */
 } tPMemByteIndex;
 
 tPMemReturn PersistentMemory_Check(void);

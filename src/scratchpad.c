@@ -10,10 +10,9 @@
  * this register can be read and states will persist. Upon reset, the states
  * will be cleared. We do not want to write to FLASH as not to add to the
  * FLASH wear-out.
- * The 8 bytes of memory will be allocated as follows:
- * byte[0]    => counter for reconfigurations caused by HMC timeouts
- * byte[1]    => counter for reconfigurations caused by DHCP timeouts
- * byte[2-8]  => reserved for future use
+ *
+ * Extended this implementation by using the MFR_DATE registers as well.
+ * => now 16 byte (2 x 8-byte) storage block implemented.
  */
 
 #include <xparameters.h>
@@ -25,8 +24,9 @@
 #include "print.h"
 #include "scratchpad.h"
 
-#define MFR_LOCATION_CMD 0x9c
-#define MFR_LOCATION_LEN 8
+#define MFR_LOCATION_CMD  0x9c
+#define MFR_DATE_CMD    0x9d
+#define MFR_REGISTER_LEN  8
 
 /*
  * Check whether this memory has been set up for our use. The reason we need to
@@ -75,12 +75,19 @@ tPMemReturn PersistentMemory_Clear(void){
  */
 static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index, u8 *byte_data){
   const u16 wr_bytes_page[2] = {PAGE_CMD, 255};
-  const u16 MFR_LOCATION_default_values[8] = {0x30, 0x31, 0x30, 0x31, 0x30,
-    0x31, 0x30, 0x31};
-  u16 rd_bytes[8] = {0x0};
-  u16 wr_bytes_data[MFR_LOCATION_LEN + 1] = {0};
+  const u16 MFR_registers_default_values[2][8] = {
+    {0x30, 0x31, 0x30, 0x31, 0x30, 0x31, 0x30, 0x31},
+    {0x30, 0x31, 0x30, 0x31, 0x30, 0x31, 0x30, 0x31}
+  };
+  static const u16 lookup_cmd[2] = {MFR_LOCATION_CMD, MFR_DATE_CMD};
+  u16 rd_bytes[2][8] = {0x0};
+  u16 wr_bytes_data[2][MFR_REGISTER_LEN + 1] = {0}; /* plus one for command id */
   u8 index;
+  u8 block;
+  u8 relative_index;
   u8 ret = PMEM_RETURN_OK;
+  u16 mfr_cmd;
+  u8 byte_block;
 
   /* 
    * operations which require sanity checks:
@@ -107,6 +114,27 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
       break;
   }
 
+#if 0
+  /* determine with MFR register to use */
+  if ((byte_index / 8) == 0){
+    /* byte-block 0 */
+    byte_block = 0;
+    mfr_cmd = MFR_LOCATION_CMD;
+  } else if ((byte_index / 8) == 1){
+    /* byte-block 1 */
+    byte_block = 1;
+    mfr_cmd = MFR_DATE_CMD;
+  } else {
+    /* assert above should ensure this condition never occurs, */
+    /* but for completeness sake */
+    return PMEM_RETURN_ERROR;
+  }
+#endif
+
+  /* now get the block index and the relative byte-block index */
+  byte_block = (byte_index / 8);
+  relative_index = (byte_index % 8);
+
   ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
 
   /* minor FIXME: the next line contains a cast to (u16 *) to silence compiler -
@@ -124,11 +152,15 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
     case PMEM_CHECK_REG:
     case PMEM_WRITE_BYTE:
     case PMEM_READ_BYTE:
-      ret = PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
-          MFR_LOCATION_CMD, rd_bytes, MFR_LOCATION_LEN);
-      if (ret != XST_SUCCESS){
-        ret = PMEM_RETURN_ERROR;
-        op = SKIP;
+      for (block = 0; block < 2; block++){
+        mfr_cmd = lookup_cmd[block];
+        ret = PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
+            mfr_cmd, rd_bytes[block], MFR_REGISTER_LEN);
+        if (ret != XST_SUCCESS){
+          ret = PMEM_RETURN_ERROR;
+          op = SKIP;
+          break;
+        }
       }
       break;
 
@@ -140,41 +172,46 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
       break;
   }
 
-  wr_bytes_data[0] = MFR_LOCATION_CMD;
-
   /* final steps depending on operation */
   switch(op){ 
     case PMEM_WRITE_BYTE:
-      /* copy register and set relevant byte */
-      for (index = 0; index < MFR_LOCATION_LEN; index++){
-        wr_bytes_data[index + 1] = rd_bytes[index];
+      /* copy registers and set relevant byte */
+      for (block = 0; block < 2; block++){
+        for (index = 0; index < MFR_REGISTER_LEN; index++){
+          wr_bytes_data[block][index + 1] = rd_bytes[block][index];
+        }
+        wr_bytes_data[byte_block][relative_index + 1] = *byte_data;
       }
-      wr_bytes_data[byte_index + 1] = *byte_data;
       /* Note: fall-through i.e. no break */
 
     case PMEM_CLEAR_ALL:
-      /* wr_bytes_data already initialized with zeros */
-      ret = WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
-          wr_bytes_data, 9);
-      if (ret != XST_SUCCESS){
-        ret = PMEM_RETURN_ERROR;
-        op = SKIP;
+      for(block = 0; block < 2; block++){
+        wr_bytes_data[block][0] = lookup_cmd[block];
+        ret = WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
+            wr_bytes_data[block], 9);
+        if (ret != XST_SUCCESS){
+          ret = PMEM_RETURN_ERROR;
+          op = SKIP;
+          break;
+        }
       }
       break;
 
     case PMEM_CHECK_REG:
-      for (index = 0; index < MFR_LOCATION_LEN; index++){
-        if (rd_bytes[index] != MFR_LOCATION_default_values[index]){
-          ret = PMEM_RETURN_NON_DEFAULT;
-          break;
-        } else {
-          ret = PMEM_RETURN_DEFAULT;
+      for (block = 0; block < 2; block++){
+        for (index = 0; index < MFR_REGISTER_LEN; index++){
+          if (rd_bytes[block][index] != MFR_registers_default_values[block][index]){
+            ret = PMEM_RETURN_NON_DEFAULT;
+            break;
+          } else {
+            ret = PMEM_RETURN_DEFAULT;
+          }
         }
       }
       break;
 
     case PMEM_READ_BYTE:
-      *byte_data = rd_bytes[byte_index];
+      *byte_data = rd_bytes[byte_block][relative_index];
       break;
 
     case SKIP:
