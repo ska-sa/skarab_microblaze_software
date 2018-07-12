@@ -52,6 +52,7 @@
 #include "scratchpad.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
+#define DHCP_MAX_RECONFIG_COUNT 2
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
@@ -67,7 +68,9 @@ void UnalignedAccessException(void *Data);
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
 static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
+#ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
+#endif
 static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
@@ -149,7 +152,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   uFlagRunTask_DHCP = 1;
 
+#ifdef RECONFIG_UPON_NO_DHCP
   uFlagRunTask_CheckDHCPBound = 1;
+#endif
 
   // DHCP every 10 seconds (timer every 100 ms)
   if (uDHCPTimerCounter == 0x64)
@@ -1555,8 +1560,11 @@ int main()
   XWdtTb WatchdogTimer;
   u32 uIGMPGroupAddress;
   u8 uOKToReboot;
+#ifdef RECONFIG_UPON_NO_DHCP
   u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0};
   u8 uDHCPBoundTimeout = 0;
+  u8 uDHCPReconfigCount = DHCP_MAX_RECONFIG_COUNT;
+#endif
 #ifdef DO_40GBE_LOOPBACK_TEST
   u32 uTemp40GBEIPAddress = 0x0A000802;
   u8 uConfig40GBE[4];
@@ -2362,7 +2370,12 @@ int main()
     //  CHECK DHCP BOUND TASK                                                     //
     //  Triggered on timer interrupt                                              //
     //----------------------------------------------------------------------------//
-    /* keep track of how long we have been "unbound" w.r.t. dhcp - if too long, reset and reload image from sdram */
+    /*
+     * keep track of how long we have been "unbound" w.r.t. dhcp - this could be
+     * an indication that the link did not come up cleanly and the only way to
+     * fix this is through a reset
+     */
+#ifdef RECONFIG_UPON_NO_DHCP
     if(uFlagRunTask_CheckDHCPBound){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
@@ -2381,9 +2394,10 @@ int main()
       }
       /*
        * if we timeout on all the interfaces, line up a reset (...and reload the
-       * image in SDRAM if in toolflow image)
+       * image in SDRAM if running a toolflow image)
        */
       if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
+        error_printf("REBOOT - DHCP timed out on all interfaces!\r\n");
         if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
           /* if it's a toolflow image */
           SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
@@ -2392,9 +2406,17 @@ int main()
         }
         AboutToBootFromSdram();
         uDoReboot = REBOOT_REQUESTED;
-        warn_printf("REBOOT - DHCP timed out on all interfaces!\r\n");
+
+        /* Keep track of the number of DHCP caused reboots */
+        if (PMemState != PMEM_RETURN_ERROR){
+          PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
+          uDHCPReconfigCount = uDHCPReconfigCount + 1;
+          PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
+          debug_printf("REBOOT - increment count\r\n");
+        }
       }
     }
+#endif
 
     //----------------------------------------------------------------------------//
     //  DUMP INTERFACE COUNTERS                                                   //
