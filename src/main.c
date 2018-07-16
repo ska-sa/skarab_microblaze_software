@@ -1924,26 +1924,79 @@ int main()
      * TODO: perhaps expand for all links - will require more persistent memory
      */
     if (uEthernetId == 1){
-      /*
-       * check if we have cached the ip from the previous reconfigure cycle. if so,
-       * pre-load state machine to attempt to request the same lease
-       */
       /* FIXME: move declarartions up */
       u8 byte;
       u32 tempIP = 0;
 
+      /* check if we have cached the ip from the previous reconfigure cycle. */
       PersistentMemory_ReadByte(DHCP_CACHED_IP_STATE_INDEX, &byte);
       if (byte == 1){
+        /* set the IP to cached IP */
         PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT0_INDEX, &byte);
         tempIP = tempIP | ((u32) byte << 24);
+        IFContext[uEthernetId].arrIFAddrIP[0] = byte;
         PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT1_INDEX, &byte);
         tempIP = tempIP | ((u32) byte << 16);
+        IFContext[uEthernetId].arrIFAddrIP[1] = byte;
         PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT2_INDEX, &byte);
         tempIP = tempIP | ((u32) byte << 8);
+        IFContext[uEthernetId].arrIFAddrIP[2] = byte;
         PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT3_INDEX, &byte);
         tempIP = tempIP | ((u32) byte);
+        IFContext[uEthernetId].arrIFAddrIP[3] = byte;
 
+        debug_printf("[INIT] setting cached IP %x\r\n", tempIP);
+        /* pre-load state machine to attempt to request the same lease */
         uDHCPSetRequestCachedIP(&(IFContext[uEthernetId]), tempIP);
+        /*
+         * Some more site-specific stuff:
+         * Also set the fabric interface parameters "preemptively" with the
+         * knowledge that we will always receive the same dhcp ip lease for the
+         * same switch interface on site. These settings only persist between
+         * "warm" reboots and thus will not have an impact after power-down.
+         * FIXME: add functionality to clear fabric interface parameters upon
+         * DHCP NAK receipt - this will add another safety check that the
+         * interface was not somehow configured with incorrect lease parameters.
+         * Background: this feature added to help overcome the DHCP "bottleneck"
+         * issue currently experienced on site. This allows us to communicate
+         * with the skarab before DHCP actually completes. Use of this feature
+         * together with the RECONFIG_UPON_NO_DHCP feature is strongly
+         * discouraged.
+         */
+#ifdef PREEMPT_CONFIGURE_FABRIC_IF
+        u32 tempMask = 0;
+
+        SetFabricSourceIPAddress(uEthernetId, tempIP);
+        ProgramARPCacheEntry(uEthernetId, byte,
+            uEthernetFabricMacHigh[uEthernetId],
+            ((uEthernetFabricMacMid[uEthernetId] << 16) |
+             uEthernetFabricMacLow[uEthernetId]));
+        uEthernetFabricIPAddress[uEthernetId] = tempIP;
+
+        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT0_INDEX, &byte);
+        tempMask = tempMask | ((u32) byte << 24);
+        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT1_INDEX, &byte);
+        tempMask = tempMask | ((u32) byte << 16);
+        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT2_INDEX, &byte);
+        tempMask = tempMask | ((u32) byte << 8);
+        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT3_INDEX, &byte);
+        tempMask = tempMask | ((u32) byte);
+
+        debug_printf("[INIT] setting cached netmask %x\r\n", tempMask);
+        SetFabricNetmask(uEthernetId, tempMask);
+
+        PersistentMemory_ReadByte(DHCP_CACHED_GW_OCT3_INDEX, &byte);
+
+        debug_printf("[INIT] setting cached gateway %x\r\n", byte);
+        SetFabricGatewayARPCacheAddress(uEthernetId, byte);
+
+        uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
+        uEnableArpRequests[uEthernetId] = ARP_REQUESTS_ENABLE;
+
+        /* legacy dhcp states */
+        uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
+        EnableFabricInterface(uEthernetId, 1);
+#endif
       }
     }
   }
@@ -2621,6 +2674,18 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
   PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[1]);
   PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[2]);
   PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
+
+  /* also cache the netmask */
+  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[0]);
+  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[1]);
+  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[2]);
+  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[3]);
+
+  /* and cache the gateway */
+  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[0]);
+  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[1]);
+  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[2]);
+  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
   PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
 
