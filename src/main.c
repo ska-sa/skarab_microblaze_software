@@ -681,7 +681,9 @@ void ArpRequestHandler()
 //  None
 //=================================================================================
 void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
-  u32 uReg, uMask;
+  u32 uReg;
+  u32 uMask = 0;
+  u32 uActivityMask = 0;
   u8 uId;
 
   /* TODO: pIFObjectPtr sanity checks - is it necessary? */
@@ -708,6 +710,21 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         vDHCPStateMachineReset(&IFContext[uId]);
         uDHCPSetStateMachineEnable(&IFContext[uId], SM_TRUE);
 #endif
+      }
+    }
+
+    /* check for link activity - only available on 40gbe links */
+    if (uId != 0){
+      /*
+       * report the first time link rx activity is detected - this gives us a
+       * fairly good indication of when the switch's link becomes ready.
+       */
+      if (pIFObjectPtr->uIFLinkRxActive == 0){
+        uActivityMask = 1 << (15 + (4*uId));
+        if (uReg & uActivityMask){
+          pIFObjectPtr->uIFLinkRxActive = 1;
+          xil_printf("LINK %x RX ACTIVITY!\r\n",uId);
+        }
       }
     }
 
@@ -738,6 +755,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
 
         /* legacy dhcp states */
         uDHCPState[uId] = DHCP_STATE_IDLE;
+        pIFObjectPtr->uIFLinkRxActive = 0;
 #endif
       }
     }
