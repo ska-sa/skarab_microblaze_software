@@ -51,6 +51,7 @@
 #include "diagnostics.h"
 #include "scratchpad.h"
 #include "qsfp.h"
+#include "wdt.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -1233,60 +1234,7 @@ int main()
       EMBEDDED_SOFTWARE_VERSION_PATCH);
   xil_printf("Running ELF version: %s\r\n", VENDOR_ID);
 
-  XWdtTb_Config *WatchdogTimerConfig;
-
-
-  /* perhaps move this wdt init to a function to reduce all these nested conditionals -> can return upon failure rather */
-  /* Lookup the WDT configuration */
-  WatchdogTimerConfig = XWdtTb_LookupConfig(XPAR_WDTTB_0_DEVICE_ID);
-  if (WatchdogTimerConfig == NULL){
-    always_printf("WDT  [..] failed to find wdt config\r\n");
-  } else {
-    always_printf("WDT  [..] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-    always_printf("WDT  [..] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-    always_printf("WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
-
-    /* Initialize the AXI Timebase Watchdog Timer core */
-    iStatus = XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
-    if (iStatus == XST_DEVICE_IS_STARTED){
-      always_printf("WDT  [..]failed to initialize the wdt since it is already running\r\n");
-
-      /* check the WRS & WDS bits then restart */
-      /* must check this before next stop/re-configure cycle */
-      if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-        always_printf("WDT  [..] previous reset was a result of a watchdog timeout!\r\n");
-      }
-
-      iStatus = XWdtTb_Stop(&WatchdogTimer);
-      if (iStatus == XST_NO_FEATURE){
-        always_printf("WDT  [..] the watchdog timer cannot be stopped, possibly due to 'enable-once' setting\r\n");
-      } else if (iStatus == XST_SUCCESS){
-        always_printf("WDT  [..] watchdog stopped\r\n");
-        XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
-      }
-
-      //XWdtTb_RestartWdt(& WatchdogTimer);
-      XWdtTb_Start(&WatchdogTimer);
-      always_printf("WDT  [..] restart watchdog timer!\r\n");
-    } else {
-      if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-        always_printf("WDT  [..] previous reset was a result of a watchdog timeout!\r\n");
-      }
-      /* perform a wdt self-test to ensure the timebase is incrementing */
-      iStatus = XWdtTb_SelfTest(&WatchdogTimer);
-      if (iStatus != XST_SUCCESS){
-        always_printf("WDT  [..] self-test failed\r\n");
-      } else {
-        /* finally, start the watchdog. The timebase automatically reset*/
-        XWdtTb_Start(&WatchdogTimer);
-        always_printf("WDT  [..] starting the watchdog timer...\r\n");
-      }
-    }
-  }
-
-  /* read wdt registers after setup */
-  always_printf("WDT  [..] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TWCSR0_OFFSET));
-  always_printf("WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TBR_OFFSET));
+  init_wdt(&WatchdogTimer);
 
   error_printf("INIT [..] Interrupts, exceptions and timers ");
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
