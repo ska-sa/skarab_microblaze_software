@@ -598,6 +598,13 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
 
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
 
+  debug_printf("DHCP [%02x] setting cached IP to %d.%d.%d.%d\r\n",
+      pIFObjectPtr->uIFEthernetId,
+      pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
+      pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
+      pDHCPObjectPtr->arrDHCPAddrYIPCached[2],
+      pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
+
   return DHCP_RETURN_OK;
 }
 
@@ -1652,6 +1659,10 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
         break;
     }
   }
+
+  debug_printf("DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",
+      (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
+      dhcp_msg_string_lookup[tDHCPMsgType], uDHCPTmpXid);
 
   return tDHCPMsgType;
 }

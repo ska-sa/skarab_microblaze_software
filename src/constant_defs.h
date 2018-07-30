@@ -104,16 +104,15 @@ volatile u8 uCurrentArpEthernetInterface;
 volatile u8 uUpdateArpRequests;
 volatile u8 uEnableArpRequests[NUM_ETHERNET_INTERFACES];
 volatile u8 uCurrentArpRequest;
-//volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES];
-volatile u8 uEthernetNeedsReset[NUM_ETHERNET_INTERFACES];
+/* volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES]; */
+/* volatile u8 uEthernetNeedsReset[NUM_ETHERNET_INTERFACES]; */
 
 volatile u32 uLLDPTimerCounter;
 volatile u8 uLLDPRetryTimer[NUM_ETHERNET_INTERFACES];
 
 volatile u32 uDHCPTimerCounter;
-volatile u32 uDHCPTransactionID[NUM_ETHERNET_INTERFACES];
 volatile u8 uDHCPState[NUM_ETHERNET_INTERFACES];
-volatile u8 uDHCPRetryTimer[NUM_ETHERNET_INTERFACES];
+/* volatile u8 uDHCPRetryTimer[NUM_ETHERNET_INTERFACES]; */
 
 volatile u8 uIGMPTimerCounter;
 volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
@@ -126,19 +125,12 @@ volatile u8 uDoReboot;
 
 volatile u8 uQSFPMezzanineLocation;
 volatile u8 uQSFPMezzaninePresent;
-volatile u32 uQSFPMezzanineCurrentTxLed;
-volatile u32 uQSFPMezzanineCurrentRxLed;
 volatile u32 uQSFPCtrlReg;
 volatile u8 uQSFPUpdateStatusEnable;
-volatile u8 uQSFPUpdateState;
+/* volatile u8 uQSFPUpdateState; */
 volatile u8 uQSFPI2CMicroblazeAccess;
-volatile u32 uQSFPStateCounter;
-volatile u8 uQSFPState;
-
-volatile u8 uFrontPanelLeds;
-volatile u8 uFrontPanelLedsValue;
-volatile u8 uDHCPCompleteSetLeds;
-volatile u32 uFrontPanelTimerCounter;
+/* volatile u32 uQSFPStateCounter; */
+/* volatile u8 uQSFPState; */
 
 // SPECIAL CODE TO HANDLE ONE OF PROTOTYPE SYSTEMS HAS FAULTY I2C ON MEZZANINE SITE 1
 volatile u32 uPxSerialNumber;

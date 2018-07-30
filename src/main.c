@@ -50,6 +50,7 @@
 #include "memtest.h"
 #include "diagnostics.h"
 #include "scratchpad.h"
+#include "qsfp.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -92,6 +93,7 @@ extern u32 _location_checksum_;
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
+static struct sQSFPObject QSFPContext;
 
 //=================================================================================
 //  TimerHandler
@@ -118,6 +120,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   u8 u40GbE2_Link_Up = 0;
   u8 u40GbE3_Link_Up = 0;
   u8 u40GbE4_Link_Up = 0;
+  u8 uFrontPanelLedsValue;
 
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
@@ -134,11 +137,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
     uPrintStatsCounter++;
   }
 
-  /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
-  //uFlagRunTask_LLDP = 1;
-
-  // LLDP every 10 seconds (timer every 100 ms)
-  if(uLLDPTimerCounter == 0x258)
+  // LLDP every 15 seconds (timer every 100 ms)
+  if(uLLDPTimerCounter == 150)
   {
     uLLDPTimerCounter = 0x0;
     uFlagRunTask_LLDP = 1;
@@ -163,10 +163,6 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
     for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
     {
-      /* TODO verify if we can remove these */
-      //uDHCPRetryTimer[uIndex] = DHCP_RETRY_ENABLED;
-      //uEthernetNeedsReset[uIndex] = NEEDS_RESET;
-
       // Send out ARP requests every 60 seconds
       if (uIGMPTimerCounter == 0x5)
       {
@@ -187,33 +183,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
 
-  if (uQSFPStateCounter == 0x1)
-  {
-    if (uQSFPState == QSFP_STATE_RESET)
-    {
-      uQSFPStateCounter++;
-      uQSFPState = QSFP_STATE_BOOTLOADER_VERSION_WRITE_MODE;
-    }
-  }
-  // Allow 3 seconds for QSFP+ to be ready
-  //else if (uQSFPStateCounter == 0x1E)
-  /* TODO: FIXME is there a better way to check for QSFP+ readiness?
-     This current mechanism is dependent on the init time
-     of main() and any changes / reordering of initialization
-     (e.g. initializing timers earlier) may result in this value
-     having to change. This may result in error messages if the
-     time allowed is too short */
-  else if (uQSFPStateCounter == 100)
-  {
-    if (uQSFPState == QSFP_STATE_STARTING_APPLICATION_MODE)
-    {
-      uQSFPState = QSFP_STATE_APPLICATION_MODE;
-    }
-  }
-  else
-    uQSFPStateCounter++;
-
-  /* TODO: move the following code to main() rather */
+  /* FIXME TODO: move the following code to main() as a task rather in order to
+   * keep timer ISR short */
   /* use macros for now to get rid of potential bugs and compiler warnings since
      the following code indexes the array above the array bounds if all possible
      40gbe i/f are not enabled */
@@ -309,39 +280,6 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   uFrontPanelLedsValue = u40GbE4_Link_Up <<7 | u40GbE4_Dhcp_En <<6 | u40GbE3_Link_Up <<5 | u40GbE3_Dhcp_En <<4 | u40GbE2_Link_Up<<3 | u40GbE2_Dhcp_En<<2 | u40GbE1_Link_Up<<1 | u40GbE1_Dhcp_En;
   WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
 
-  /*  // Flash front panel LEDS until 1GBE has completed DHCP
-      if (uDHCPState[0] != DHCP_STATE_COMPLETE)
-      {
-      uDHCPCompleteSetLeds = FALSE;
-      if (uFrontPanelTimerCounter == 0xA)
-      {
-      if (uFrontPanelLeds == LED_OFF)
-      {
-      uFrontPanelLeds = LED_ON;
-      WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 0xFF);
-      }
-      else
-      {
-      uFrontPanelLeds = LED_OFF;
-      WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 0x00);
-      }
-
-      uFrontPanelTimerCounter = 0x0;
-      }
-      else
-      uFrontPanelTimerCounter++;
-      }
-      else
-      {
-      if (uDHCPCompleteSetLeds == FALSE)
-      {
-      uDHCPCompleteSetLeds = TRUE;
-      uFrontPanelLeds = LED_ON;
-      WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 0xFF);
-      }
-      }
-   */
-
 }
 
 
@@ -408,6 +346,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
   uL3PktLen = uL2PktLen - sizeof(struct sEthernetHeader);
 
   // TO DO: HANDLE ALL NON-IP/UDP PACKETS HERE
+#if 0
   if (EthHdr->uEthernetType == ETHERNET_TYPE_ARP){
     iStatus = CheckArpRequest(uId, uEthernetFabricIPAddress[uId], uL3PktLen, pL3Ptr);
     if (iStatus == XST_SUCCESS){
@@ -420,6 +359,8 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
       return XST_FAILURE;
     }
   } else if (EthHdr->uEthernetType == ETHERNET_TYPE_IPV4) {
+#endif
+  if (EthHdr->uEthernetType == ETHERNET_TYPE_IPV4) {
     trace_printf("IP packet received!\r\n");
     iStatus = CheckIPV4Header(uEthernetFabricIPAddress[uId], uEthernetFabricSubnetMask[uId], uL3PktLen, pL3Ptr);
     if (iStatus == XST_SUCCESS){
@@ -696,7 +637,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   if ((uReg & uMask) != LINK_DOWN){
     // Check if the link was previously down
     if (pIFObjectPtr->uIFLinkStatus == LINK_DOWN){
-      xil_printf("LINK %x HAS COME UP!\r\n",uId);
+      xil_printf("I/F  [%02x] LINK %x HAS COME UP!\r\n", uId, uId);
 
       if (uId == 0){  /* 1gbe i/f */
         /* do not enable dhcp in loopback mode */
@@ -723,7 +664,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uActivityMask = 1 << (15 + (4*uId));
         if (uReg & uActivityMask){
           pIFObjectPtr->uIFLinkRxActive = 1;
-          xil_printf("LINK %x RX ACTIVITY!\r\n",uId);
+          xil_printf("I/F  [%02x] LINK %x RX ACTIVITY!\r\n", uId, uId);
         }
       }
     }
@@ -732,7 +673,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   } else {
     // Check if the link was previously up
     if (pIFObjectPtr->uIFLinkStatus == LINK_UP){
-      xil_printf("LINK %x HAS GONE DOWN!\r\n", uId);
+      xil_printf("I/F  [%02x] LINK %x HAS GONE DOWN!\r\n", uId, uId);
 
       if (uId == 0){  /* 1gbe i/f */
         /* do not set in loopback mode */
@@ -767,326 +708,6 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   }
 }
 
-//=================================================================================
-//  UpdateQSFPStatus
-//--------------------------------------------------------------------------------
-//  This method updates the status of modules present and LEDs.
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void UpdateQSFPStatus()
-{
-  u16 uWriteBytes[7];
-  u16 uReadBytes[3];
-  int iStatus = XST_SUCCESS;
-  u32 uReg;
-  u8 uId = 0x0;
-  u32 uLedTxReg = 0x0;
-  u32 uLedRxReg = 0x0;
-  u32 uLinkMask = 0x10000;
-  u32 uActivityMask = 0x20000;
-
-  if ((uPxSerialNumber == 93121)&&(uQSFPMezzanineLocation == 1))
-  {
-    // ONE OF THE PROTOTYPE SYSTEMS HAS A PROBLEM WITH I2C ON MEZZANINE SITE 1
-    // BRING ALL CHANNELS OUT OF RESET
-    // DON'T TRY TO ACCESS I2C
-    uQSFPCtrlReg = 0x0;
-    WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-  }
-  else
-  {
-    if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS)
-    {
-      uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-
-      if (uQSFPState == QSFP_STATE_BOOTLOADER_VERSION_WRITE_MODE)
-      {
-        // Need to read and store QSFP+ bootloader version before exit bootloader mode
-        uWriteBytes[0] = QSFP_BOOTLOADER_READ_OPCODE;
-        uWriteBytes[1] = ((QSFP_BOOTLOADER_VERSION_ADDRESS >> 24) & 0xFF);
-        uWriteBytes[2] = ((QSFP_BOOTLOADER_VERSION_ADDRESS >> 16) & 0xFF);
-        uWriteBytes[3] = ((QSFP_BOOTLOADER_VERSION_ADDRESS >> 8) & 0xFF);
-        uWriteBytes[4] = (QSFP_BOOTLOADER_VERSION_ADDRESS & 0xFF);
-        uWriteBytes[5] = 0x01; // Reading 1 byte
-        //xil_printf("QSFP+ Mezzanine writing version address.\r\n");
-
-        iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 6);
-
-        if (iStatus != XST_SUCCESS)
-          xil_printf("BOOTLOADER I2C WRITE FAILED\r\n");
-
-        uQSFPState = QSFP_STATE_BOOTLOADER_VERSION_READ_MODE;
-      }
-      else if (uQSFPState == QSFP_STATE_BOOTLOADER_VERSION_READ_MODE)
-      {
-        //xil_printf("QSFP+ Mezzanine reading bootloader version.\r\n");
-
-        iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uReadBytes, 1);
-
-        if (iStatus != XST_SUCCESS)
-          xil_printf("BOOTLOADER I2C READ FAILED\r\n");
-
-        uQSFPBootloaderVersionMajor = (uReadBytes[0] >> 4) & 0xF;
-        uQSFPBootloaderVersionMinor = uReadBytes[0] & 0xF;
-
-        xil_printf("QSFP+ Mezzanine bootloader version: %x.%x\r\n", uQSFPBootloaderVersionMajor, uQSFPBootloaderVersionMinor);
-
-        uQSFPState = QSFP_STATE_INITIAL_BOOTLOADER_MODE;
-      }
-      else if(uQSFPState == QSFP_STATE_INITIAL_BOOTLOADER_MODE)
-      {
-        uWriteBytes[0] = QSFP_LEAVE_BOOTLOADER_MODE;
-        xil_printf("QSFP+ Mezzanine leaving bootloader mode.\r\n");
-
-        iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 1);
-
-        if (iStatus != XST_SUCCESS)
-          xil_printf("BOOTLOADER I2C WRITE FAILED\r\n");
-
-        uQSFPState = QSFP_STATE_STARTING_APPLICATION_MODE;
-        //uQSFPStateCounter = 0;
-      }
-      else if (uQSFPState == QSFP_STATE_APPLICATION_MODE)
-      {
-        if (uQSFPI2CMicroblazeAccess == QSFP_I2C_MICROBLAZE_ENABLE)
-        {
-          if (uQSFPUpdateState == QSFP_UPDATING_TX_LEDS)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_RX_LEDS;
-
-            uReg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
-            //xil_printf("uReg: %x\r\n", uReg);
-
-#ifdef SKARAB_BSP
-            for (uId = 0x0; uId < 0x4; uId++)
-#else
-              for (uId = 0x0; uId < (NUM_ETHERNET_INTERFACES - 1); uId++)
-#endif
-              {
-                // Check TX link
-                if ((uReg & uLinkMask) != 0x0)
-                {
-                  // Check if activity as well
-                  if ((uReg & uActivityMask) != 0x0)
-                    uLedTxReg = uLedTxReg | (LED_FLASHING << (uId * 2));
-                  else
-                    uLedTxReg = uLedTxReg | (LED_ON << (uId * 2));
-                }
-                else
-                  uLedTxReg = uLedTxReg | (LED_OFF << (uId * 2));
-
-                uLinkMask = uLinkMask << 2;
-                uActivityMask = uActivityMask << 2;
-
-                // Check RX link
-                if ((uReg & uLinkMask) != 0x0)
-                {
-                  // Check if activity as well
-                  if ((uReg & uActivityMask) != 0x0)
-                    uLedRxReg = uLedRxReg | (LED_FLASHING << (uId * 2));
-                  else
-                    uLedRxReg = uLedRxReg | (LED_ON << (uId * 2));
-                }
-                else
-                  uLedRxReg = uLedRxReg | (LED_OFF << (uId * 2));
-
-                uLinkMask = uLinkMask << 2;
-                uActivityMask = uActivityMask << 2;
-              }
-
-            // GT 04/06/2015 CHANGE TO ALWAYS WRITE if (uLedTxReg != uQSFPMezzanineCurrentTxLed)
-            //{
-            uWriteBytes[0] = QSFP_LED_TX_REG_ADDRESS;
-            uWriteBytes[1] = uLedTxReg;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 2);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("TX LED MEZ I2C WRITE FAILED\r\n");
-
-            //xil_printf("uLedTxReg: %x\r\n", uLedTxReg);
-            uQSFPMezzanineCurrentTxLed = uLedTxReg;
-            //}
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_RX_LEDS)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_0_WRITE;
-
-            uReg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
-
-#ifdef SKARAB_BSP
-            for (uId = 0x0; uId < 0x4; uId++)
-#else
-              for (uId = 0x0; uId < (NUM_ETHERNET_INTERFACES - 1); uId++)
-#endif
-              {
-                // Check TX link
-                if ((uReg & uLinkMask) != 0x0)
-                {
-                  // Check if activity as well
-                  if ((uReg & uActivityMask) != 0x0)
-                    uLedTxReg = uLedTxReg | (LED_FLASHING << (uId * 2));
-                  else
-                    uLedTxReg = uLedTxReg | (LED_ON << (uId * 2));
-                }
-                else
-                  uLedTxReg = uLedTxReg | (LED_OFF << (uId * 2));
-
-                uLinkMask = uLinkMask << 2;
-                uActivityMask = uActivityMask << 2;
-
-                // Check RX link
-                if ((uReg & uLinkMask) != 0x0)
-                {
-                  // Check if activity as well
-                  if ((uReg & uActivityMask) != 0x0)
-                    uLedRxReg = uLedRxReg | (LED_FLASHING << (uId * 2));
-                  else
-                    uLedRxReg = uLedRxReg | (LED_ON << (uId * 2));
-                }
-                else
-                  uLedRxReg = uLedRxReg | (LED_OFF << (uId * 2));
-
-                uLinkMask = uLinkMask << 2;
-                uActivityMask = uActivityMask << 2;
-              }
-
-            // GT 04/06/2015 CHANGE TO ALWAYS WRITE if (uLedRxReg != uQSFPMezzanineCurrentRxLed)
-            //{
-            uWriteBytes[0] = QSFP_LED_RX_REG_ADDRESS;
-            uWriteBytes[1] = uLedRxReg;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 2);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("RX LED MEZ I2C WRITE FAILED\r\n");
-
-            //xil_printf("uLedRxReg: %x\r\n", uLedRxReg);
-            uQSFPMezzanineCurrentRxLed = uLedRxReg;
-            //}
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_0_WRITE)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_0_READ;
-
-            uWriteBytes[0] = QSFP_MODULE_0_PRESENT_REG_ADDRESS;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 0 MEZ I2C WRITE FAILED\r\n");
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_0_READ)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_1_WRITE;
-
-            iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 0 MEZ I2C READ FAILED\r\n");
-
-            if (uReadBytes[0] != 0x0)
-              // If a module is present, take out of reset
-              uQSFPCtrlReg = uQSFPCtrlReg & (~ QSFP0_RESET);
-            else
-              // If a module is not present, put in reset
-              uQSFPCtrlReg = uQSFPCtrlReg | QSFP0_RESET;
-
-            WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_1_WRITE)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_1_READ;
-
-            uWriteBytes[0] = QSFP_MODULE_1_PRESENT_REG_ADDRESS;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 1 MEZ I2C WRITE FAILED\r\n");
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_1_READ)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_2_WRITE;
-
-            iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 1 MEZ I2C READ FAILED\r\n");
-
-            if (uReadBytes[0] != 0x0)
-              // If a module is present, take out of reset
-              uQSFPCtrlReg = uQSFPCtrlReg & (~ QSFP1_RESET);
-            else
-              // If a module is not present, put in reset
-              uQSFPCtrlReg = uQSFPCtrlReg | QSFP1_RESET;
-
-            WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_2_WRITE)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_2_READ;
-
-            uWriteBytes[0] = QSFP_MODULE_2_PRESENT_REG_ADDRESS;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 2 MEZ I2C WRITE FAILED\r\n");
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_2_READ)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_3_WRITE;
-
-            iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 2 MEZ I2C READ FAILED\r\n");
-
-            if (uReadBytes[0] != 0x0)
-              // If a module is present, take out of reset
-              uQSFPCtrlReg = uQSFPCtrlReg & (~ QSFP2_RESET);
-            else
-              // If a module is not present, put in reset
-              uQSFPCtrlReg = uQSFPCtrlReg | QSFP2_RESET;
-
-            WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_3_WRITE)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_MOD_PRSNT_3_READ;
-
-            uWriteBytes[0] = QSFP_MODULE_3_PRESENT_REG_ADDRESS;
-            iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 3 MEZ I2C WRITE FAILED\r\n");
-          }
-          else if (uQSFPUpdateState == QSFP_UPDATING_MOD_PRSNT_3_READ)
-          {
-            uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
-
-            iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
-
-            if (iStatus != XST_SUCCESS)
-              xil_printf("MOD 3 MEZ I2C READ FAILED\r\n");
-
-            if (uReadBytes[0] != 0x0)
-              // If a module is present, take out of reset
-              uQSFPCtrlReg = uQSFPCtrlReg & (~ QSFP3_RESET);
-            else
-              // If a module is not present, put in reset
-              uQSFPCtrlReg = uQSFPCtrlReg | QSFP3_RESET;
-
-            WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-          }
-        }
-      }
-    }
-  }
-}
 
 //=================================================================================
 //  InitialiseEthernetInterfaceParameters
@@ -1116,31 +737,25 @@ void InitialiseEthernetInterfaceParameters()
   uCurrentArpEthernetInterface = 0;
   uCurrentArpRequest = 1;
   uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
-  uDHCPCompleteSetLeds = FALSE;
   uPreviousAsyncSdramRead = 0;
   uPreviousSequenceNumber = 0;
 
   iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
 
-  if (iSuccess == XST_SUCCESS)
-  {
+  if (iSuccess == XST_SUCCESS){
     // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
     uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-    if (uRomCRC != uRom[7])
-    {
+    if (uRomCRC != uRom[7]){
       xil_printf("MB 1-wire CRC incorrect.\r\n");
       uSerial[0] = 0xFF;
       uSerial[1] = 0xFF;
       uSerial[2] = 0xFF;
       uSerial[3] = 0xFF;
-    }
-    else
-    {
+    } else {
       // Read the serial number
       iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
 
-      if (iSuccess == XST_FAILURE)
-      {
+      if (iSuccess == XST_FAILURE){
         xil_printf("Failed to read serial number.\r\n");
         uSerial[0] = 0xFF;
         uSerial[1] = 0xFF;
@@ -1148,9 +763,7 @@ void InitialiseEthernetInterfaceParameters()
         uSerial[3] = 0xFF;
       }
     }
-  }
-  else
-  {
+  } else {
     xil_printf("Failed to read serial number.\r\n");
     uSerial[0] = 0xFF;
     uSerial[1] = 0xFF;
@@ -1159,31 +772,25 @@ void InitialiseEthernetInterfaceParameters()
   }
 
   // GT 04/06/2015 BASIC SANITY CHECK, IF FAILS TRY TO READ ONE MORE TIME
-  if (uSerial[0] != 0x50) // CHECK FOR 'P'
-  {
+  if (uSerial[0] != 0x50){    /* CHECK FOR 'P' */
     xil_printf("Trying again to read serial number.\r\n");
 
     iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
 
-    if (iSuccess == XST_SUCCESS)
-    {
+    if (iSuccess == XST_SUCCESS){
       // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
       uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-      if (uRomCRC != uRom[7])
-      {
+      if (uRomCRC != uRom[7]){
         xil_printf("MB 1-wire CRC incorrect.\r\n");
         uSerial[0] = 0xFF;
         uSerial[1] = 0xFF;
         uSerial[2] = 0xFF;
         uSerial[3] = 0xFF;
-      }
-      else
-      {
+      } else {
         // Read the serial number
         iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
 
-        if (iSuccess == XST_FAILURE)
-        {
+        if (iSuccess == XST_FAILURE){
           xil_printf("Failed to read serial number.\r\n");
           uSerial[0] = 0xFF;
           uSerial[1] = 0xFF;
@@ -1191,9 +798,7 @@ void InitialiseEthernetInterfaceParameters()
           uSerial[3] = 0xFF;
         }
       }
-    }
-    else
-    {
+    } else {
       xil_printf("Failed to read serial number.\r\n");
       uSerial[0] = 0xFF;
       uSerial[1] = 0xFF;
@@ -1206,8 +811,7 @@ void InitialiseEthernetInterfaceParameters()
   uFabricMacHigh = 0x0600 | uSerial[0];
   uFabricMacMid = (uSerial[1] << 8) | uSerial[2];
 
-  for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++)
-  {
+  for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++){
     uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
     //uEthernetLinkUp[uId] = LINK_DOWN;
     uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
@@ -1217,10 +821,11 @@ void InitialiseEthernetInterfaceParameters()
 
 #ifdef DO_40GBE_LOOPBACK_TEST
     xil_printf("Setting all 40GBE MAC addresses same so can test in loopback!\r\n");
-    if (uId == 0)
+    if (uId == 0){
       uFabricMacLow = (uSerial[3] << 8) | uId;
-    else
+    } else {
       uFabricMacLow = (uSerial[3] << 8) | 0x1;
+    }
 #else
     uFabricMacLow = (uSerial[3] << 8) | uId;
 #endif
@@ -1229,34 +834,26 @@ void InitialiseEthernetInterfaceParameters()
     uEthernetFabricMacMid[uId] = uFabricMacMid;
     uEthernetFabricMacLow[uId] = uFabricMacLow;
 
-    xil_printf("Setting MAC for IF %x TO %x %x %x\r\n", uId, uFabricMacHigh, uFabricMacMid, uFabricMacLow);
+    always_printf("I/F  [%02x] Setting MAC for IF %d to %04x %04x %04x\r\n", uId, uId, uFabricMacHigh, uFabricMacMid, uFabricMacLow);
     SetFabricSourceMACAddress(uId, uEthernetFabricMacHigh[uId], ((uEthernetFabricMacMid[uId] << 16) | (uEthernetFabricMacLow[uId])));
     //SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
-
-    uDHCPTransactionID[uId] = uId;
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
     uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
     uCurrentIGMPMessage[uId] = 0x0;
 
-    uEthernetNeedsReset[uId] = NEEDS_RESET;
-
     iSuccess = SoftReset(uId);
-
-#ifdef DEBUG_PRINT
-    if (iSuccess == XST_FAILURE)
-      xil_printf("ID: %x Failed to do soft reset\r\n", uId);
-    else
-      xil_printf("ID: %x Soft reset successful.\r\n", uId);
-#endif
-
+    if (iSuccess == XST_FAILURE){
+      debug_printf("I/F  [%02x] Failed to do soft reset\r\n", uId);
+    } else {
+      debug_printf("I/F  [%02x] Soft reset successful.\r\n", uId);
+    }
   }
 
   // PERALEX SERIAL NUMBER
   iSuccess = DS2433ReadMem(uRom, 0, uPxSerial, 3, 7, 0, MB_ONE_WIRE_PORT);
 
-  if (iSuccess == XST_FAILURE)
-  {
+  if (iSuccess == XST_FAILURE){
     xil_printf("Failed to read Px serial number.\r\n");
     uPxSerial[0] = 0xFF;
     uPxSerial[1] = 0xFF;
@@ -1264,9 +861,8 @@ void InitialiseEthernetInterfaceParameters()
   }
 
   uPxSerialNumber = uPxSerial[2] + (uPxSerial[1] << 8) + (uPxSerial[0] << 16);
-#ifdef DEBUG_PRINT
-  xil_printf("Motherboard Px Serial Number: %d\r\n", uPxSerialNumber);
-#endif
+
+  debug_printf("INIT [..] Motherboard Px Serial Number: %d\r\n", uPxSerialNumber);
 
 }
 
@@ -1345,7 +941,7 @@ void UpdateGBEPHYConfiguration()
     xil_printf("UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
 
   uCurrentControlReg = ((uReadBytes[0] << 8) | uReadBytes[1]);
-  xil_printf("Current 1GBE PHY configuration: 0x%x.\r\n", uCurrentControlReg);
+  xil_printf("1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", uCurrentControlReg);
 
   // Trigger a soft reset of 1GBE PHY to update configuration
   // Do a soft reset
@@ -1393,71 +989,56 @@ void InitialiseQSFPMezzanineLocation()
 
   uQSFPMezzanineLocation = 0x0;
   uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
-  uQSFPMezzanineCurrentTxLed = 0x0;
-  uQSFPMezzanineCurrentRxLed = 0x0;
-  uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
   uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
   uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
-  uQSFPStateCounter = 0;
-  uQSFPState = QSFP_STATE_RESET;
 
   uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
   WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
   uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
 
-  while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4))
-  {
+  while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4)){
     uMezzanineMask = 0x1 << uQSFPMezzanineLocation;
     uOneWirePort = uQSFPMezzanineLocation + 0x1;
 
-    debug_printf("[MEZZ %d] ", uQSFPMezzanineLocation);
+    debug_printf("MEZZ [%02d] ", uQSFPMezzanineLocation);
 
-    // Check if a mezzanine is preset
-    if ((uReg & uMezzanineMask) != 0x0)
-    {
+    /* Check if a mezzanine is preset */
+    if ((uReg & uMezzanineMask) != 0x0){
       debug_printf("PRESENT\r\n");
 
-      // Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board
+      /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
       iStatus = OneWireReadRom(uDeviceRom, uOneWirePort);
 
-      debug_printf("[MEZZ %d] MFR:", uQSFPMezzanineLocation); /* manufacturer */
+      debug_printf("MEZZ [%02d] MFR:", uQSFPMezzanineLocation); /* manufacturer */
 
-      if (iStatus == XST_SUCCESS)
-      {
+      if (iStatus == XST_SUCCESS){
         debug_printf("Peralex\r\n");
 
-        // Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board
+        /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
         iStatus = DS2433ReadMem(uDeviceRom, 0x0, uReadBytes, 0x1, 0x0, 0x0, uOneWirePort);
 
-        debug_printf("[MEZZ %d] is ", uQSFPMezzanineLocation);
-        if ((iStatus == XST_SUCCESS)&&(uReadBytes[0] == 0x50)) // Check if read 'P'
-        {
+        debug_printf("MEZZ [%02d] is ", uQSFPMezzanineLocation);
+        if ((iStatus == XST_SUCCESS)&&(uReadBytes[0] == 0x50)){ /* Check if read 'P' */
           debug_printf("a QSFP+ MEZZANINE\r\n", uQSFPMezzanineLocation);
           uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-        }
-        else
-        {
+        } else {
           debug_printf("not a QSFP+ MEZZANINE...[SKIP]\r\n", uQSFPMezzanineLocation);
           uQSFPMezzanineLocation++;
         }
-      }
-      else
-      {
+      } else {
         debug_printf("unknown...[SKIP]\r\n");
         uQSFPMezzanineLocation++;
       }
-    }
-    else
-    {
+    } else {
       debug_printf("NONE...[SKIP]\r\n");
       uQSFPMezzanineLocation++;
     }
-
   }
 
-  if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)
+  if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
     error_printf("Failed to find a QSFP+ MEZZANINE!\r\n");
+  }
 }
 
 //=================================================================================
@@ -1543,7 +1124,7 @@ void ReadAndPrintFPGADNA()
   u32 uNibble;
 
   // Print out each nibble in hex format
-  xil_printf("FPGA DNA: 0x");
+  xil_printf("FPGA [..] DNA: 0x");
 
   for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
   {
@@ -1638,9 +1219,6 @@ int main()
   //Xil_ICacheEnable();
   //Xil_DCacheEnable();
 
-  uFrontPanelTimerCounter = 0x0;
-  uFrontPanelLeds = LED_OFF;
-
   uDoReboot = NO_REBOOT;
 
   InitI2C(0x0, SPEED_100kHz);
@@ -1662,55 +1240,55 @@ int main()
   /* Lookup the WDT configuration */
   WatchdogTimerConfig = XWdtTb_LookupConfig(XPAR_WDTTB_0_DEVICE_ID);
   if (WatchdogTimerConfig == NULL){
-    always_printf("[WDT] failed to find wdt config\r\n");
+    always_printf("WDT  [..] failed to find wdt config\r\n");
   } else {
-    always_printf("[WDT] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-    always_printf("[WDT] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-    always_printf("[WDT] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
+    always_printf("WDT  [..] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
+    always_printf("WDT  [..] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
+    always_printf("WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
 
     /* Initialize the AXI Timebase Watchdog Timer core */
     iStatus = XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
     if (iStatus == XST_DEVICE_IS_STARTED){
-      always_printf("[WDT] failed to initialize the wdt since it is already running\r\n");
+      always_printf("WDT  [..]failed to initialize the wdt since it is already running\r\n");
 
       /* check the WRS & WDS bits then restart */
       /* must check this before next stop/re-configure cycle */
       if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-        always_printf("[WDT] previous reset was a result of a watchdog timeout!\r\n");
+        always_printf("WDT  [..] previous reset was a result of a watchdog timeout!\r\n");
       }
 
       iStatus = XWdtTb_Stop(&WatchdogTimer);
       if (iStatus == XST_NO_FEATURE){
-        always_printf("[WDT] the watchdog timer cannot be stopped, possibly due to 'enable-once' setting\r\n");
+        always_printf("WDT  [..] the watchdog timer cannot be stopped, possibly due to 'enable-once' setting\r\n");
       } else if (iStatus == XST_SUCCESS){
-        always_printf("[WDT] watchdog stopped\r\n");
+        always_printf("WDT  [..] watchdog stopped\r\n");
         XWdtTb_CfgInitialize(&WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
       }
 
       //XWdtTb_RestartWdt(& WatchdogTimer);
       XWdtTb_Start(&WatchdogTimer);
-      always_printf("[WDT] restart watchdog timer!\r\n");
+      always_printf("WDT  [..] restart watchdog timer!\r\n");
     } else {
       if (XWdtTb_IsWdtExpired(&WatchdogTimer) == TRUE){
-        always_printf("[WDT] previous reset was a result of a watchdog timeout!\r\n");
+        always_printf("WDT  [..] previous reset was a result of a watchdog timeout!\r\n");
       }
       /* perform a wdt self-test to ensure the timebase is incrementing */
       iStatus = XWdtTb_SelfTest(&WatchdogTimer);
       if (iStatus != XST_SUCCESS){
-        always_printf("[WDT] self-test failed\r\n");
+        always_printf("WDT  [..] self-test failed\r\n");
       } else {
         /* finally, start the watchdog. The timebase automatically reset*/
         XWdtTb_Start(&WatchdogTimer);
-        always_printf("[WDT] starting the watchdog timer...\r\n");
+        always_printf("WDT  [..] starting the watchdog timer...\r\n");
       }
     }
   }
 
   /* read wdt registers after setup */
-  always_printf("[WDT] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TWCSR0_OFFSET));
-  always_printf("[WDT] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TBR_OFFSET));
+  always_printf("WDT  [..] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TWCSR0_OFFSET));
+  always_printf("WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer.Config.BaseAddr, XWT_TBR_OFFSET));
 
-  error_printf("[INIT] Interrupts, exceptions and timers ");
+  error_printf("INIT [..] Interrupts, exceptions and timers ");
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_DIV_BY_ZERO, &DivByZeroException, NULL);
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_I_EXCEPTION, &IBusException, NULL);
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
@@ -1725,7 +1303,7 @@ int main()
   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
   UpdateGBEPHYConfiguration();
 
-  error_printf("[INIT] Waiting for 1GBE SGMII to come out of reset ");
+  error_printf("INIT [..] Waiting for 1GBE SGMII to come out of reset ");
 
 #define SGMII_1GBE_TIMEOUT 2000000  /* tweaked by experimentation -> about 3 - 4 seconds */
   /* max value determined by watchdog timer */
@@ -1742,8 +1320,21 @@ int main()
   error_printf("%s", uTimeoutCounter == 0 ? "[TIMED OUT]" : "[OK]");
   error_printf("\r\n"); /* for formatting */
 
-  error_printf("[INIT] Mezzanine locations\r\n");
+  error_printf("INIT [..] Mezzanine locations\r\n");
   InitialiseQSFPMezzanineLocation();
+
+  uQSFPInit(&QSFPContext);
+
+  /*
+   * call the qsfp+ state machine 4 times - this will set up the mezzanine cards
+   * early in the init process - before hmc
+   */
+
+  for (uIndex = 0; uIndex < 4; uIndex++){
+        QSFPStateMachine(&QSFPContext);
+        Delay(100000);  /* 100ms */
+  }
+
 
   PMemState = PersistentMemory_Check();
   if (PMemState == PMEM_RETURN_DEFAULT){
@@ -1751,16 +1342,16 @@ int main()
      * the memory. This is an indication that 1) the FLASH location has not been
      * set for the board and following this 2) the board has been hard power
      * cycled. */
-    debug_printf("[INIT] persistent memory contains default value. Clearing...\r\n");
+    debug_printf("INIT [..] persistent memory contains default value. Clearing...\r\n");
     PMemState = PersistentMemory_Clear();
   }
 
   /* catch any errors */
   if (PMemState == PMEM_RETURN_ERROR){
-    error_printf("[INIT] error setting up persistent memory.\r\n");
+    error_printf("INIT [..] error setting up persistent memory.\r\n");
   }
 
-  error_printf("[INIT] Waiting for HMC(s) to complete init...\r\n");
+  error_printf("INIT [..] Waiting for HMC(s) to complete init...\r\n");
 
   /*
    *  - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
@@ -1788,7 +1379,7 @@ int main()
   uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
   for (uIndex = 0; uIndex < 4; uIndex++){
     if ((uReadReg & (0xF << (uIndex*8))) == (BYTE_MASK_HMC_PRESENT << (uIndex*8))){
-      debug_printf("[HMC] MEZZ %d has an HMC present\r\n", uIndex);
+      debug_printf("HMC  [..] MEZZ %d has an HMC present\r\n", uIndex);
       uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
     }
   }
@@ -1805,25 +1396,25 @@ int main()
     }
   }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
 
-  always_printf("[INIT] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
+  always_printf("INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
   PersistentMemory_ReadByte(HMC_RECONFIG_COUNT_INDEX, &uHMCReconfigCount);
 
   if (uTimeoutCounter == 0){
-    error_printf("[HMC] all HMCs did not init within %d ms\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
+    error_printf("HMC  [..] all HMCs did not init within %d ms\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
     if (PMemState != PMEM_RETURN_ERROR){
       if (uHMCReconfigCount < HMC_MAX_RECONFIG_COUNT){
         /* for each reconfigure, increment count and write back to register */
         uHMCReconfigCount = uHMCReconfigCount + 1;
         PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, uHMCReconfigCount);
-        error_printf("[HMC] invoking reconfigure of FPGA\r\n");
+        error_printf("HMC  [..] invoking reconfigure of FPGA\r\n");
         SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
         ResetSdramReadAddress();
         AboutToBootFromSdram();
         Delay(100000);
         IcapeControllerInSystemReconfiguration();
       } else {
-        error_printf("[HMC] maximum reconfiguration count reached [%d]\r\n",
+        error_printf("HMC  [..] maximum reconfiguration count reached [%d]\r\n",
             HMC_MAX_RECONFIG_COUNT);
         /*
          * clear the persistent memory register here so that the reconfig cycle starts
@@ -1833,14 +1424,14 @@ int main()
         PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, 0);
       }
     } else {
-      error_printf("[HMC] error accessing persistent memory register\r\n");
+      error_printf("HMC  [..] error accessing persistent memory register\r\n");
     }
   } else {
     /* if we haven't TIMED OUT then we're OK */
-    always_printf("[HMC] all HMCs initialized within %d ms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
+    always_printf("HMC  [..] all HMCs initialized within %d ms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
   }
 
-  error_printf("[INIT] Interface parameters\r\n");
+  error_printf("INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
 
   /* set bit#1 in C_WR_BRD_CTL_STAT_1_ADDR to 1 to connect 40gbe to user fabric */
@@ -1963,7 +1554,6 @@ int main()
         tempIP = tempIP | ((u32) byte);
         IFContext[uEthernetId].arrIFAddrIP[3] = byte;
 
-        debug_printf("[INIT] setting cached IP %x\r\n", tempIP);
         /* pre-load state machine to attempt to request the same lease */
         uDHCPSetRequestCachedIP(&(IFContext[uEthernetId]), tempIP);
         /*
@@ -2000,12 +1590,12 @@ int main()
         PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT3_INDEX, &byte);
         tempMask = tempMask | ((u32) byte);
 
-        debug_printf("[INIT] setting cached netmask %x\r\n", tempMask);
+        debug_printf("IF   [%02x] setting cached netmask %x\r\n", uEthernetId, tempMask);
         SetFabricNetmask(uEthernetId, tempMask);
 
         PersistentMemory_ReadByte(DHCP_CACHED_GW_OCT3_INDEX, &byte);
 
-        debug_printf("[INIT] setting cached gateway %x\r\n", byte);
+        debug_printf("IF   [%02x] setting cached gateway %x\r\n", uEthernetId, byte);
         SetFabricGatewayARPCacheAddress(uEthernetId, byte);
 
         uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
@@ -2022,8 +1612,13 @@ int main()
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
   {
-    if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)
-      UpdateQSFPStatus();
+    if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT){
+      //UpdateQSFPStatus();
+      if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
+        uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+        QSFPStateMachine(&QSFPContext);
+      }
+    }
 
     for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
     {
@@ -2688,24 +2283,26 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
   /* TODO: should we check the state of persistent memory again (?) - perhaps a
    * partial check of the following byte indices only...
    */
-  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[0]);
-  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[1]);
-  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[2]);
-  PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
+  if (id == 1){
+    PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[0]);
+    PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[1]);
+    PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[2]);
+    PersistentMemory_WriteByte(DHCP_CACHED_IP_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrYIPCached[3]);
 
-  /* also cache the netmask */
-  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[0]);
-  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[1]);
-  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[2]);
-  PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[3]);
+    /* also cache the netmask */
+    PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[0]);
+    PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[1]);
+    PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[2]);
+    PersistentMemory_WriteByte(DHCP_CACHED_MASK_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrSubnetMask[3]);
 
-  /* and cache the gateway */
-  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[0]);
-  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[1]);
-  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[2]);
-  PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
+    /* and cache the gateway */
+    PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT0_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[0]);
+    PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT1_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[1]);
+    PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT2_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[2]);
+    PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
-  PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
+    PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
+  }
 
   return 0;
 }

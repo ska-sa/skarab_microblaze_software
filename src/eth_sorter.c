@@ -39,6 +39,7 @@
 #include "dhcp.h"
 #include "one_wire.h"
 #include "print.h"
+#include "qsfp.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -755,7 +756,8 @@ int WriteI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
   if ((uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)&&((uQSFPMezzanineLocation + 1) == Command->uId))
   {
     // If we are accessing the QSFP module, set the QSFP monitoring state back to start
-    uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+    //uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+    uQSFPResetApp();
 
     // If doing a single write then we can expect a read will follow so disable the QSFP monitoring
     // so it doesn't interfere with the I2C address pointer
@@ -840,7 +842,8 @@ int ReadI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
   if ((uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)&&((uQSFPMezzanineLocation + 1) == Command->uId))
   {
     // If we are accessing the QSFP module, set the QSFP monitoring state back to start
-    uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+    //uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+    uQSFPResetApp();
 
     // If doing a read then we are finished accessing
     uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
@@ -1880,6 +1883,8 @@ int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRe
   return XST_SUCCESS;
 }
 
+/* TODO: verify that it's safe to remove this function */
+#if 0 
 //=================================================================================
 //  CheckArpRequest
 //--------------------------------------------------------------------------------
@@ -1951,6 +1956,7 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
 
   return XST_SUCCESS;
 }
+#endif
 
 //=================================================================================
 //  ArpHandler
@@ -2311,66 +2317,62 @@ int DebugLoopbackTestCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
 //=================================================================================
 int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
+  /*
+   * FIXME: currently this cmd only makes provision to reset one mezzanine card.
+   * A change to this cmd will have to be made if multiple qsfp+ modules are to
+   * be supported.
+   */
+  static u8 btldr_programming = 0;
+
   sQSFPResetAndProgramReqT *Command = (sQSFPResetAndProgramReqT *) pCommand;
   sQSFPResetAndProgramRespT *Response = (sQSFPResetAndProgramRespT *) uResponsePacketPtr;
   u8 uPaddingIndex;
   u32 uReg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
 
-  if (uCommandLength < sizeof(sQSFPResetAndProgramReqT))
+  if (uCommandLength < sizeof(sQSFPResetAndProgramReqT)){
     return XST_FAILURE;
+  }
 
-  if (Command->uReset == 0x1)
-  {
-#ifdef DEBUG_PRINT
-    xil_printf("Resetting QSFP+ Mezzanine.\r\n");
-#endif
+  if (Command->uReset == 0x1){
+    debug_printf("QSFP+[%02x] Resetting Mezzanine.\r\n", uQSFPMezzanineLocation);
+
     uReg = uReg | (QSFP_MEZZANINE_RESET << uQSFPMezzanineLocation);
     WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
     Delay(100);
     uReg = uReg & (~ (QSFP_MEZZANINE_RESET << uQSFPMezzanineLocation));
     WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
 
-    uQSFPMezzanineCurrentTxLed = 0x0;
-    uQSFPMezzanineCurrentRxLed = 0x0;
-    uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+    uQSFPResetInit();
+    /* global variable "task" flag in main - will be set again on next timer
+     * interrupt */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+
+    debug_printf("QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-    if (Command->uProgram == 0x1)
-    {
-#ifdef DEBUG_PRINT
-      xil_printf("QSFP+ Mezzanine entering bootloader programming mode.\r\n");
-#endif
-      uQSFPState = QSFP_STATE_BOOTLOADER_PROGRAMMING_MODE;
-    }
-    else
-    {
-      // Start 5 second timer
-      uQSFPStateCounter = 0x0;
-      uQSFPState = QSFP_STATE_RESET;
+    if (Command->uProgram == 0x1){
+      debug_printf("QSFP+[%02x] Mezzanine entering bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+      btldr_programming = 1;
+      uQSFPStateMachinePause();
     }
   }
 
-  if ((Command->uProgram == 0x0)&&(uQSFPState == QSFP_STATE_BOOTLOADER_PROGRAMMING_MODE))
-  {
-    // If we were in programming mode and programming is now finished
-    // Start 5 second timer and put in bootloader mode
-    uQSFPStateCounter = 0x0;
-    uQSFPState = QSFP_STATE_INITIAL_BOOTLOADER_MODE;
-
-    uQSFPMezzanineCurrentTxLed = 0x0;
-    uQSFPMezzanineCurrentRxLed = 0x0;
-    uQSFPUpdateState = QSFP_UPDATING_TX_LEDS;
+  if ((Command->uProgram == 0x0)&&(btldr_programming == 1)){
+    /* If we were in programming mode and notified via cmd that programming is
+     now finished */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+
+    debug_printf("QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-#ifdef DEBUG_PRINT
-    xil_printf("QSFP+ Mezzanine leaving bootloader programming mode.\r\n");
-#endif
+    uQSFPStateMachineResume();
+
+    debug_printf("QSFP+[%02x] Mezzanine leaving bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+    btldr_programming = 0;
   }
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
