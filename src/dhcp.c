@@ -1059,6 +1059,13 @@ static typeDHCPState request_dhcp_state(struct sIFObject *pIFObjectPtr){
       }
 
       return BOUND;
+    } else if (tDHCPMsgType == DHCPNAK){
+      /*
+       * else if receive a DHCPNAK, should probably stop trying to request cached lease!
+       * This should cause the state machine to attempt to rediscover the lease on the
+       * next cycle
+       */
+      vDHCPAuxClearFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
     } else {
       pDHCPObjectPtr->uDHCPErrors++;
     } 
@@ -1596,9 +1603,6 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
   /* get mac address of the "next-hop" server/router which sent us this packet */
   memcpy(pDHCPObjectPtr->arrDHCPNextHopMacCached, pBuffer + ETH_SRC_OFFSET, 6);
 
-  /* get the offered ip addr */
-  memcpy(pDHCPObjectPtr->arrDHCPAddrYIPCached, pBuffer + uIPLen + BOOTP_FRAME_BASE + BOOTP_YIPADDR_OFFSET, 4);
-
   /* add 4 to jump past dhcp magic cookie in data buffer */
   uOptionIndex = uIPLen + DHCP_OPTIONS_BASE + 4;
 
@@ -1658,6 +1662,11 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
         uOptionIndex = uOptionIndex + pBuffer[uOptionIndex + 1] + 2;
         break;
     }
+  }
+
+  if (DHCPNAK != tDHCPMsgType){
+    /* get the offered ip addr */
+    memcpy(pDHCPObjectPtr->arrDHCPAddrYIPCached, pBuffer + uIPLen + BOOTP_FRAME_BASE + BOOTP_YIPADDR_OFFSET, 4);
   }
 
   debug_printf("DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",

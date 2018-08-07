@@ -1,7 +1,7 @@
 /**---------------------------------------------------------------------------- 
 *   FILE:       dhcp.h
 *   BRIEF:      API of DHCP client functionality to obtain and renew IPv4 leases.
-*   
+*
 *   DATE:       MAY 2017
 *
 *   COMPANY:    SKA SA
@@ -17,6 +17,7 @@
 
 /* Xilinx lib includes */
 #include <xstatus.h>
+#include <xil_types.h>
 
 //#include "if.h"
 //#include "eth.h"
