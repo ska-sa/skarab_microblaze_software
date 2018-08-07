@@ -80,6 +80,7 @@ static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
+static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
 
 static volatile u8 uTimeoutCounter = 255;
 
@@ -560,54 +561,6 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
   return uReturnType;
 }
 
-//=================================================================================
-//  ArpRequestHandler
-//--------------------------------------------------------------------------------
-//  This method constucts ARP requests to populate the ARP caches in the fabric
-//  Ethernet interfaces.
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void ArpRequestHandler()
-{
-  u32 uCurrentArpRequestIPAddress;
-  u32 uResponseLength;
-  int iStatus;
-
-  uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
-
-  if (uEnableArpRequests[uCurrentArpEthernetInterface] == ARP_REQUESTS_ENABLE)
-  {
-    // Create an ARP request
-    uCurrentArpRequestIPAddress = uEthernetSubnet[uCurrentArpEthernetInterface] | uCurrentArpRequest;
-    ArpHandler(uCurrentArpEthernetInterface, ARP_REQUEST, (u8*) &(uReceiveBuffer[uCurrentArpEthernetInterface][0]), (u8*) uTransmitBuffer, & uResponseLength, uCurrentArpRequestIPAddress);
-    uResponseLength = (uResponseLength >> 2);
-    iStatus = TransmitHostPacket(uCurrentArpEthernetInterface, & uTransmitBuffer[0], uResponseLength);
-    if (iStatus != XST_SUCCESS){
-      IFContext[uCurrentArpEthernetInterface].uTxEthArpErr++;
-    } else {
-      IFContext[uCurrentArpEthernetInterface].uTxEthArpRequestOk++;
-    }
-  }
-
-  if (uCurrentArpRequest == 254)
-  {
-    uCurrentArpRequest = 1;
-
-    if ((uCurrentArpEthernetInterface + 1) == NUM_ETHERNET_INTERFACES)
-      uCurrentArpEthernetInterface = 0;
-    else
-      uCurrentArpEthernetInterface++;
-  }
-  else
-    uCurrentArpRequest++;
-}
 
 //=================================================================================
 //  UpdateEthernetLinkUpStatus
@@ -685,6 +638,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+        pIFObjectPtr->uIFEthernetSubnet = 0;
 
         /* legacy dhcp states */
         uDHCPState[uId] = DHCP_STATE_IDLE;
@@ -696,6 +650,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+        pIFObjectPtr->uIFEthernetSubnet = 0;
 
         /* legacy dhcp states */
         uDHCPState[uId] = DHCP_STATE_IDLE;
@@ -705,7 +660,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
     }
 
     pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
-    uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
+    pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
   }
@@ -736,9 +691,6 @@ void InitialiseEthernetInterfaceParameters()
   u16 uFabricMacLow;
   u8 status;
 
-  uCurrentArpEthernetInterface = 0;
-  uCurrentArpRequest = 1;
-  uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
   uPreviousAsyncSdramRead = 0;
   uPreviousSequenceNumber = 0;
 
@@ -758,7 +710,7 @@ void InitialiseEthernetInterfaceParameters()
   uFabricMacMid = (uSerial[1] << 8) | uSerial[2];
 
   for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++){
-    uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
+    //uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
     //uEthernetLinkUp[uId] = LINK_DOWN;
     uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
     uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
@@ -796,9 +748,8 @@ void InitialiseEthernetInterfaceParameters()
     }
   }
 
-  uPxSerialNumber = uPxSerial[2] + (uPxSerial[1] << 8) + (uPxSerial[0] << 16);
-
-  debug_printf("INIT [..] Motherboard Px Serial Number: %d\r\n", uPxSerialNumber);
+  debug_printf("INIT [..] Motherboard Px Serial Number: %02x%02x%02x\r\n",
+      uPxSerial[0], uPxSerial[1], uPxSerial[2]);
 
 }
 
@@ -1482,7 +1433,8 @@ int main()
         SetFabricGatewayARPCacheAddress(uEthernetId, byte);
 
         uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
-        uEnableArpRequests[uEthernetId] = ARP_REQUESTS_ENABLE;
+        IFContext[uEthernetId].uIFEthernetSubnet = (ip & netmask);
+        IFContext[uEthernetId].uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
         /* legacy dhcp states */
         uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
@@ -1885,9 +1837,12 @@ int main()
     //----------------------------------------------------------------------------//
     //  ARP REQUEST TASK                                                          //
     //----------------------------------------------------------------------------//
-    if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
-      ArpRequestHandler();
-    }
+      if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
+        uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          ArpRequestHandler(&(IFContext[uEthernetId]));
+        }
+      }
 
     //----------------------------------------------------------------------------//
     //  LLDP TASK                                                                 //
@@ -2140,6 +2095,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
   uEthernetSubnet[id] = (ip & netmask);
+  pIFObjectPtr->uIFEthernetSubnet = (ip & netmask);
 
   uEthernetGatewayIPAddress[id] = (pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24) |
     (pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16) |
@@ -2154,7 +2110,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
   SetFabricGatewayARPCacheAddress(id, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
-  uEnableArpRequests[id] = ARP_REQUESTS_ENABLE;
+  pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
   /* legacy dhcp states */
   uDHCPState[id] = DHCP_STATE_COMPLETE;

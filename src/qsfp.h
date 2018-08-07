@@ -30,7 +30,6 @@ typedef enum {
   QSFP_STATE_APP_UPDATING_MOD_PRSNT_3_RD
 } typeQSFPAppState;
 
-
 struct sQSFPObject {
   /* uQSFPMezzanineLocation; */
   unsigned int uWaitCount;

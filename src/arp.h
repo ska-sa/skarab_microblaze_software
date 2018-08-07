@@ -82,7 +82,8 @@ typedef enum {ARP_OPCODE_REQUEST=1,
 struct sIFObject;
 
 u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr);
-u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, u8 *arrTargetIP);
+u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, u32 uTargetIP);
+void ArpRequestHandler(struct sIFObject *pIFObjectPtr);
 
 #ifdef __cplusplus
 }

@@ -100,10 +100,6 @@ volatile u16 uIPIdentification[NUM_ETHERNET_INTERFACES];
 volatile u32 uEthernetSubnet[NUM_ETHERNET_INTERFACES];
 volatile u32 uEthernetGatewayIPAddress[NUM_ETHERNET_INTERFACES];
 
-volatile u8 uCurrentArpEthernetInterface;
-volatile u8 uUpdateArpRequests;
-volatile u8 uEnableArpRequests[NUM_ETHERNET_INTERFACES];
-volatile u8 uCurrentArpRequest;
 /* volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES]; */
 /* volatile u8 uEthernetNeedsReset[NUM_ETHERNET_INTERFACES]; */
 
@@ -131,9 +127,6 @@ volatile u8 uQSFPUpdateStatusEnable;
 volatile u8 uQSFPI2CMicroblazeAccess;
 /* volatile u32 uQSFPStateCounter; */
 /* volatile u8 uQSFPState; */
-
-// SPECIAL CODE TO HANDLE ONE OF PROTOTYPE SYSTEMS HAS FAULTY I2C ON MEZZANINE SITE 1
-volatile u32 uPxSerialNumber;
 
 volatile u16 uQSFPBootloaderVersionMajor;
 volatile u16 uQSFPBootloaderVersionMinor;
@@ -313,44 +306,13 @@ volatile u16 uPreviousSequenceNumber;
 #define IGMP_SEND_MESSAGE     0x1
 #define IGMP_DONE_SENDING_MESSAGE 0x2
 
-// DHCP OPTIONS AND CODES
-#define DHCP_MAGIC_COOKIE   0x63825363
-
-#define DHCP_SERVER_UDP_PORT  67
-#define DHCP_CLIENT_UDP_PORT  68
-
-#define DHCP_MESSAGE_OPTION   53
-
-#define DHCP_MESSAGE_DISCOVER 1
-#define DHCP_MESSAGE_OFFER    2
-#define DHCP_MESSAGE_REQUEST  3
-#define DHCP_MESSAGE_DECLINE  4
-#define DHCP_MESSAGE_ACK    5
-#define DHCP_MESSAGE_NAK    6
-#define DHCP_MESSAGE_RELEASE  7
-#define DHCP_MESSAGE_INFORM   8
-
-#define DHCP_PARAMETER_REQUEST_OPTION 55
-
-#define DHCP_PARAMETER_ROUTER     3
-
-//dhcp option macros
-#define DHCP_ROUTER_OPTION          3
-#define DHCP_HOST_NAME_OPTION       12
-#define DHCP_SERVER_OPTION          54
-#define DHCP_REQUESTED_IP_OPTION    50
-#define DHCP_VENDOR_CLASS_ID_OPTION 60
-
-#define DHCP_END_OPTION             255
-#define DHCP_PAD_OPTION             0
-
 #define DHCP_STATE_IDLE   0
-#define DHCP_STATE_DISCOVER 1
-#define DHCP_STATE_REQUEST  2
+/* #define DHCP_STATE_DISCOVER 1 */
+/* #define DHCP_STATE_REQUEST  2 */
 #define DHCP_STATE_COMPLETE 3
 
-#define DHCP_RETRY_ENABLED  0x1
-#define DHCP_RETRY_DISABLED 0x0
+//#define DHCP_RETRY_ENABLED  0x1
+//#define DHCP_RETRY_DISABLED 0x0
 
 #define LLDP_RETRY_ENABLED      0X1
 #define LLDP_RETRY_DISABLED     0X0
@@ -436,6 +398,7 @@ typedef struct sEthernetHeader {
   u16 uEthernetType;
 } sEthernetHeaderT;
 
+#if 0
 typedef struct sArpPacket {
   u16 uHardwareType;
   u16 uProtocolType;
@@ -461,6 +424,7 @@ typedef struct sArpPacket {
 
   u16 uPadding[11];
 } sArpPacketT;
+#endif
 
 typedef struct sIPV4Header {
   u8   uTypeOfService;
@@ -486,6 +450,7 @@ typedef struct sIPV4HeaderOptions {
   u16  uOptionsLow;
 } sIPV4HeaderOptionsT;
 
+#if 0
 typedef struct sICMPHeader {
   u8  uCode;
   u8  uType;
@@ -493,6 +458,7 @@ typedef struct sICMPHeader {
   u16 uIdentifier;
   u16 uSequenceNumber;
 } sICMPHeaderT;
+#endif
 
 typedef struct sIGMPHeader {
   u8 uMaximumResponseTime;
@@ -513,6 +479,7 @@ typedef struct sUDPHeader {
   u16  uChecksum;
 } sUDPHeaderT;
 
+#if 0
 typedef struct sDHCPHeader {
   u8  uHardwareType;
   u8  uOpCode;
@@ -544,6 +511,7 @@ typedef struct sDHCPHeader {
   u16 uMagicCookieHigh;
   u16 uMagicCookieLow;
 } sDHCPHeaderT;
+#endif
 
 typedef struct sCommandHeader {
     u16  uCommandType;

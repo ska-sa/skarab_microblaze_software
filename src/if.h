@@ -15,6 +15,8 @@ extern "C" {
 #define IF_RX_MIN_BUFFER_SIZE 1500   /*mtu*/
 #define IF_TX_MIN_BUFFER_SIZE 1024
 
+  /*TODO: note the order of the following may introduce stuct padding - perhaps
+   * reorder for better ram usage */
 struct sIFObject{
   u32 uIFMagic;
 
@@ -40,9 +42,13 @@ struct sIFObject{
   u8 stringIFAddrNetmask[16];
 
   u8 uIFEthernetId;
+  u32 uIFEthernetSubnet;
 
   struct sDHCPObject DHCPContextState;    /* holds the dhcp states for this interface */
 //  struct sICMPObject ICMPContextState;    /* holds the icmp states for this interface */
+
+  u8 uIFEnableArpRequests;  /* enable arp requests on this interface */
+  u8 uIFCurrentArpRequest;  /* keep a counter to cycle through arp request IP's */
 
   /* RX Packet Counters */
   u32 uRxTotal; /* total packets received */
