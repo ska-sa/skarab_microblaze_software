@@ -23,6 +23,7 @@
 #include <xparameters.h>
 #include <xil_cache.h>
 #include <xil_assert.h>
+#include <xil_io.h>
 #include <xintc.h>
 #include <xwdttb.h>
 #include <xtmrctr.h>
@@ -52,6 +53,7 @@
 #include "scratchpad.h"
 #include "qsfp.h"
 #include "wdt.h"
+#include "id.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -726,14 +728,13 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
 void InitialiseEthernetInterfaceParameters()
 {
   u8 uId;
-  u16 uRom[8];
-  u16 uSerial[4];
+  u8 uSerial[ID_SK_SERIAL_LEN];
+  u8 uPxSerial[ID_PX_SERIAL_LEN];
+
   u16 uFabricMacHigh;
   u16 uFabricMacMid;
   u16 uFabricMacLow;
-  u16 uPxSerial[3];
-  int iSuccess;
-  u16 uRomCRC;
+  u8 status;
 
   uCurrentArpEthernetInterface = 0;
   uCurrentArpRequest = 1;
@@ -741,71 +742,15 @@ void InitialiseEthernetInterfaceParameters()
   uPreviousAsyncSdramRead = 0;
   uPreviousSequenceNumber = 0;
 
-  iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
-
-  if (iSuccess == XST_SUCCESS){
-    // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
-    uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-    if (uRomCRC != uRom[7]){
-      xil_printf("MB 1-wire CRC incorrect.\r\n");
-      uSerial[0] = 0xFF;
-      uSerial[1] = 0xFF;
-      uSerial[2] = 0xFF;
-      uSerial[3] = 0xFF;
-    } else {
-      // Read the serial number
-      iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
-
-      if (iSuccess == XST_FAILURE){
-        xil_printf("Failed to read serial number.\r\n");
-        uSerial[0] = 0xFF;
-        uSerial[1] = 0xFF;
-        uSerial[2] = 0xFF;
-        uSerial[3] = 0xFF;
-      }
-    }
-  } else {
-    xil_printf("Failed to read serial number.\r\n");
-    uSerial[0] = 0xFF;
-    uSerial[1] = 0xFF;
-    uSerial[2] = 0xFF;
-    uSerial[3] = 0xFF;
+  status = get_skarab_serial(uSerial, ID_SK_SERIAL_LEN);
+  if (status == XST_FAILURE){
+    error_printf("INIT [..] Failed to read SKARAB serial number.\r\n");
+    /* from here on in the mac address will be incorrect (ff:ff:ff...) */
   }
 
-  // GT 04/06/2015 BASIC SANITY CHECK, IF FAILS TRY TO READ ONE MORE TIME
-  if (uSerial[0] != 0x50){    /* CHECK FOR 'P' */
-    xil_printf("Trying again to read serial number.\r\n");
-
-    iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
-
-    if (iSuccess == XST_SUCCESS){
-      // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
-      uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-      if (uRomCRC != uRom[7]){
-        xil_printf("MB 1-wire CRC incorrect.\r\n");
-        uSerial[0] = 0xFF;
-        uSerial[1] = 0xFF;
-        uSerial[2] = 0xFF;
-        uSerial[3] = 0xFF;
-      } else {
-        // Read the serial number
-        iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
-
-        if (iSuccess == XST_FAILURE){
-          xil_printf("Failed to read serial number.\r\n");
-          uSerial[0] = 0xFF;
-          uSerial[1] = 0xFF;
-          uSerial[2] = 0xFF;
-          uSerial[3] = 0xFF;
-        }
-      }
-    } else {
-      xil_printf("Failed to read serial number.\r\n");
-      uSerial[0] = 0xFF;
-      uSerial[1] = 0xFF;
-      uSerial[2] = 0xFF;
-      uSerial[3] = 0xFF;
-    }
+  status = get_peralex_serial(uPxSerial, ID_PX_SERIAL_LEN);
+  if (status == XST_FAILURE){
+    error_printf("INIT [..] Failed to read Peralex serial number.\r\n");
   }
 
   // TO DO: NOT SURE WHAT TO DO HERE FOR MULTICAST
@@ -843,22 +788,12 @@ void InitialiseEthernetInterfaceParameters()
     uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
     uCurrentIGMPMessage[uId] = 0x0;
 
-    iSuccess = SoftReset(uId);
-    if (iSuccess == XST_FAILURE){
-      debug_printf("I/F  [%02x] Failed to do soft reset\r\n", uId);
+    status = SoftReset(uId);
+    if (status == XST_FAILURE){
+      error_printf("I/F  [%02x] Failed to do soft reset\r\n", uId);
     } else {
       debug_printf("I/F  [%02x] Soft reset successful.\r\n", uId);
     }
-  }
-
-  // PERALEX SERIAL NUMBER
-  iSuccess = DS2433ReadMem(uRom, 0, uPxSerial, 3, 7, 0, MB_ONE_WIRE_PORT);
-
-  if (iSuccess == XST_FAILURE){
-    xil_printf("Failed to read Px serial number.\r\n");
-    uPxSerial[0] = 0xFF;
-    uPxSerial[1] = 0xFF;
-    uPxSerial[2] = 0xFF;
   }
 
   uPxSerialNumber = uPxSerial[2] + (uPxSerial[1] << 8) + (uPxSerial[0] << 16);
