@@ -163,7 +163,7 @@ static typeQSFPInitState qsfp_init_bootloader_version_rd_state(struct sQSFPObjec
 
 
 static typeQSFPInitState qsfp_init_bootloader_state(struct sQSFPObject *pQSFPObject){
-  u16 uWriteBytes[7] = {0};
+  u16 uWriteBytes[1] = {0};
   int iStatus;
 
   uWriteBytes[0] = QSFP_LEAVE_BOOTLOADER_MODE;
