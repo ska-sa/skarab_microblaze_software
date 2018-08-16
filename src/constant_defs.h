@@ -134,6 +134,13 @@ volatile u16 uQSFPBootloaderVersionMinor;
 volatile u32 uPreviousAsyncSdramRead;
 volatile u16 uPreviousSequenceNumber;
 
+volatile u8 uADC32RF45X2MezzanineLocation;
+volatile u8 uADC32RF45X2MezzaninePresent;
+volatile u8 uADC32RF45X2UpdateStatusEnable;
+
+volatile u16 uADC32RF45X2BootloaderVersionMajor;
+volatile u16 uADC32RF45X2BootloaderVersionMinor;
+
 /* <major>.<minor>.<patch> */
 #define EMBEDDED_SOFTWARE_VERSION_MAJOR   3
 #define EMBEDDED_SOFTWARE_VERSION_MINOR   9
@@ -384,6 +391,19 @@ volatile u16 uPreviousSequenceNumber;
 
 #define QSFP_BOOTLOADER_READ_OPCODE           0x03
 #define QSFP_BOOTLOADER_VERSION_ADDRESS         0x08007000
+
+
+#define ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS  0x08
+#define ADC32RF45X2_LEAVE_BOOTLOADER_MODE             0x77
+
+#define ADC32RF45X2_MEZZANINE_PRESENT     0x1
+#define ADC32RF45X2_MEZZANINE_NOT_PRESENT 0x0
+
+#define UPDATE_ADC32RF45X2_STATUS         0x1
+#define DO_NOT_UPDATE_ADC32RF45X2_STATUS  0x0
+
+#define ADC32RF45X2_BOOTLOADER_READ_OPCODE        0x03
+#define ADC32RF45X2_BOOTLOADER_VERSION_ADDRESS    0x0800F000
 
 typedef struct sEthernetHeader {
   u16 uDestMacHigh;

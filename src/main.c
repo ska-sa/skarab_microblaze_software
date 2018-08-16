@@ -54,6 +54,8 @@
 #include "qsfp.h"
 #include "wdt.h"
 #include "id.h"
+#include "adc.h"
+#include "mezz.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -98,6 +100,9 @@ extern u32 _location_checksum_;
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
 static struct sQSFPObject QSFPContext;
+static struct sAdcObject AdcContext;
+
+static struct sMezzObject MezzContext[4];   /* holds the state of each mezzanine card*/
 
 //=================================================================================
 //  TimerHandler
@@ -186,6 +191,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
     uDHCPTimerCounter++;
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
+
+  uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
   /* FIXME TODO: move the following code to main() as a task rather in order to
    * keep timer ISR short */
@@ -853,9 +860,9 @@ void UpdateGBEPHYConfiguration()
 }
 
 //=================================================================================
-//  InitialiseEthernetInterfaceParameters
+//  InitialiseMezzanineLocation
 //--------------------------------------------------------------------------------
-//  This method configures the Ethernet interfaces with some default values.
+//  This method detects the Mezzanine cards (QSFP+, ADC or HMC).
 //
 //  Parameter Dir   Description
 //  --------- ---   -----------
@@ -865,8 +872,9 @@ void UpdateGBEPHYConfiguration()
 //  ------
 //  None
 //=================================================================================
-void InitialiseQSFPMezzanineLocation()
+void InitialiseMezzanineLocation()
 {
+#if 0
   u32 uReg;
   u32 uMezzanineMask;
   u16 uDeviceRom[8];
@@ -879,6 +887,7 @@ void InitialiseQSFPMezzanineLocation()
   uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
   uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
 
+  /* should this not move to the interface init? */
   uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
   WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
@@ -922,11 +931,98 @@ void InitialiseQSFPMezzanineLocation()
       uQSFPMezzanineLocation++;
     }
   }
+#endif
+
+  u32 uReg;
+  u32 mezz_mask;
+  u32 mezz_ctl_shadow_reg;
+  u16 device_rom[8];
+  u16 read_bytes[32];
+  int ret = XST_SUCCESS;
+  u16 one_wire_port;
+  u8 mezz;
+
+  /* globals */
+  uQSFPMezzanineLocation = 0x0;
+  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
+  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
+
+	uADC32RF45X2MezzanineLocation = 0x0;
+	uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
+	uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+
+  /* should this not move to the interface init? */
+  uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
+  WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
+
+  uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
+
+  for (mezz = 0; mezz < 4; mezz++){
+    mezz_mask = 1 << mezz;        /* shift to relevant mezz position */
+    one_wire_port = mezz + 1;
+
+    if ((uReg & mezz_mask) != 0x0){    /* corresponding mezz present */
+      mezz_ctl_shadow_reg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
+      mezz_ctl_shadow_reg = mezz_ctl_shadow_reg | mezz_mask;
+      WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, mezz_ctl_shadow_reg);
+
+      ret = OneWireReadRom(device_rom, one_wire_port);
+      if (ret == XST_SUCCESS){
+        ret = DS2433ReadMem(device_rom, 0x0, read_bytes, 0x7, 0x0, 0x0, one_wire_port);
+        if (ret == XST_SUCCESS){
+          info_printf("MEZZ [%02x] ", mezz);
+
+          if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0x99)){
+            info_printf("QSFP+ MEZZANINE\r\n");
+            if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
+              uQSFPMezzanineLocation = mezz;     /* need to get rid of global scope and place within local scope of obj */
+            }
+            uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
+            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_QSPF;
+
+          } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
+            info_printf("QSFP+ PHY MEZZANINE\r\n");
+            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_QSFP_PHY;
+
+          } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&(read_bytes[0x6] == 0xE5)){
+            info_printf("ADC32RF45X2 MEZZANINE\r\n");
+            if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
+              uADC32RF45X2MezzanineLocation = mezz;
+            }
+            uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
+            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;
+
+          } else if ((read_bytes[0x0] == 0x53)&&(read_bytes[0x4] == 0xFF)&&(read_bytes[0x5] == 0x00)&&(read_bytes[0x6] == 0x01)){
+            info_printf("HMC R1000-0005 MEZZANINE\r\n");
+            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_HMC_R1000_0005;
+
+          } else {
+            info_printf("UNKNOWN - Unsupported PX number and manufacturer ID.\r\n");
+            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
+          }
+        } else {
+          /* one wire read bytes failed */
+          info_printf("UNKNOWN - Failed to read ID bytes from one-wire EEPROM.\r\n");
+          MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
+        }
+      } else {
+        /* one wire read rom failed */
+        info_printf("UNKNOWN - Failed to read device-rom from one-wire EEPROM.\r\n");
+        MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
+      }
+    } else {
+      MezzContext[mezz].m_type = MEZ_BOARD_TYPE_OPEN;
+      info_printf("NOT PRESENT\r\n");
+    }
+  }
 
   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
     error_printf("Failed to find a QSFP+ MEZZANINE!\r\n");
   }
 }
+
+
 
 //=================================================================================
 //  InitialiseInterruptControllerAndTimer
@@ -1155,7 +1251,7 @@ int main()
   error_printf("\r\n"); /* for formatting */
 
   error_printf("INIT [..] Mezzanine locations\r\n");
-  InitialiseQSFPMezzanineLocation();
+  InitialiseMezzanineLocation();
 
   uQSFPInit(&QSFPContext);
 
@@ -1188,19 +1284,29 @@ int main()
   error_printf("INIT [..] Waiting for HMC(s) to complete init...\r\n");
 
   /*
-   *  - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
-   *  - each byte represents the status of a Mezz slot
+   *  Register C_RD_MEZZANINE_STAT_1_ADDR contains the firmware status of the 4 Mezz slots.
+   *  Each byte represents the status of a Mezzanine sight and indicates what functionality
+   *  has been compiled in in firmware.
    *
    *  31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
    *  +-------+--------+--------+--------+
    *  | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
    *  +-------+--------+--------+--------+
+   *                            /         \
+   *                           /           \
+   *      +-------------------+             +----------------------+
+   *      |                                                        |
    *
-   *  bit 7 & 6 => reserved
-   *  bit 5     => HMC post ok
-   *  bit 4     => HMC init ok
-   *  bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
-   *  bit 0     => Present
+   *       b7       b6       b5        b4        b3-b1    b0
+   *      +--------+--------+---------+---------+--------+---------+
+   * QSFP | IF3 EN | IF2 EN | IF1 EN  | IF0 EN  | ID=001 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   * HMC  | unused | unused | POST OK | INIT OK | ID=010 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   * ADC  | unused | unused | unused  | unused  | ID=011 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   *
+   *      bit position in each of the above bytes (Mezz3...Mezz0)
    */
 
 #define HMC_INIT_TIMEOUT    100    /* x 100ms */
@@ -1452,6 +1558,13 @@ int main()
       if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
         uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
         QSFPStateMachine(&QSFPContext);
+      }
+    }
+
+    if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_PRESENT){
+      if (uADC32RF45X2UpdateStatusEnable == UPDATE_ADC32RF45X2_STATUS){
+        uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+        AdcStateMachine(&AdcContext);
       }
     }
 
