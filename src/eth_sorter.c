@@ -1958,6 +1958,7 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
 }
 #endif
 
+#if 0
 //=================================================================================
 //  ArpHandler
 //--------------------------------------------------------------------------------
@@ -2045,6 +2046,7 @@ void ArpHandler(u8 uId, u8 uType, u8 *pReceivedArp, u8 *pTransmitBuffer, u32 * u
   * uResponseLength = sizeof(sEthernetHeaderT) + sizeof(sArpPacketT);
 
 }
+#endif
 
 //=================================================================================
 //  CreateIGMPPacket

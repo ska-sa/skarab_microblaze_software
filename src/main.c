@@ -23,6 +23,7 @@
 #include <xparameters.h>
 #include <xil_cache.h>
 #include <xil_assert.h>
+#include <xil_io.h>
 #include <xintc.h>
 #include <xwdttb.h>
 #include <xtmrctr.h>
@@ -52,6 +53,9 @@
 #include "scratchpad.h"
 #include "qsfp.h"
 #include "wdt.h"
+#include "id.h"
+#include "adc.h"
+#include "mezz.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -78,6 +82,7 @@ static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
+static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
 
 static volatile u8 uTimeoutCounter = 255;
 
@@ -95,6 +100,9 @@ extern u32 _location_checksum_;
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
 static struct sQSFPObject QSFPContext;
+static struct sAdcObject AdcContext;
+
+//static struct sMezzObject MezzContext[4];   /* holds the state of each mezzanine card*/
 
 //=================================================================================
 //  TimerHandler
@@ -183,6 +191,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
     uDHCPTimerCounter++;
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
+
+  uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
   /* FIXME TODO: move the following code to main() as a task rather in order to
    * keep timer ISR short */
@@ -558,54 +568,6 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
   return uReturnType;
 }
 
-//=================================================================================
-//  ArpRequestHandler
-//--------------------------------------------------------------------------------
-//  This method constucts ARP requests to populate the ARP caches in the fabric
-//  Ethernet interfaces.
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void ArpRequestHandler()
-{
-  u32 uCurrentArpRequestIPAddress;
-  u32 uResponseLength;
-  int iStatus;
-
-  uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
-
-  if (uEnableArpRequests[uCurrentArpEthernetInterface] == ARP_REQUESTS_ENABLE)
-  {
-    // Create an ARP request
-    uCurrentArpRequestIPAddress = uEthernetSubnet[uCurrentArpEthernetInterface] | uCurrentArpRequest;
-    ArpHandler(uCurrentArpEthernetInterface, ARP_REQUEST, (u8*) &(uReceiveBuffer[uCurrentArpEthernetInterface][0]), (u8*) uTransmitBuffer, & uResponseLength, uCurrentArpRequestIPAddress);
-    uResponseLength = (uResponseLength >> 2);
-    iStatus = TransmitHostPacket(uCurrentArpEthernetInterface, & uTransmitBuffer[0], uResponseLength);
-    if (iStatus != XST_SUCCESS){
-      IFContext[uCurrentArpEthernetInterface].uTxEthArpErr++;
-    } else {
-      IFContext[uCurrentArpEthernetInterface].uTxEthArpRequestOk++;
-    }
-  }
-
-  if (uCurrentArpRequest == 254)
-  {
-    uCurrentArpRequest = 1;
-
-    if ((uCurrentArpEthernetInterface + 1) == NUM_ETHERNET_INTERFACES)
-      uCurrentArpEthernetInterface = 0;
-    else
-      uCurrentArpEthernetInterface++;
-  }
-  else
-    uCurrentArpRequest++;
-}
 
 //=================================================================================
 //  UpdateEthernetLinkUpStatus
@@ -683,6 +645,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+        pIFObjectPtr->uIFEthernetSubnet = 0;
 
         /* legacy dhcp states */
         uDHCPState[uId] = DHCP_STATE_IDLE;
@@ -694,6 +657,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uEthernetFabricIPAddress[uId] = 0;
         uEthernetGatewayIPAddress[uId] = 0;
         uEthernetSubnet[uId] = 0;
+        pIFObjectPtr->uIFEthernetSubnet = 0;
 
         /* legacy dhcp states */
         uDHCPState[uId] = DHCP_STATE_IDLE;
@@ -703,7 +667,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
     }
 
     pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
-    uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
+    pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
   }
@@ -726,86 +690,26 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
 void InitialiseEthernetInterfaceParameters()
 {
   u8 uId;
-  u16 uRom[8];
-  u16 uSerial[4];
+  u8 uSerial[ID_SK_SERIAL_LEN];
+  u8 uPxSerial[ID_PX_SERIAL_LEN];
+
   u16 uFabricMacHigh;
   u16 uFabricMacMid;
   u16 uFabricMacLow;
-  u16 uPxSerial[3];
-  int iSuccess;
-  u16 uRomCRC;
+  u8 status;
 
-  uCurrentArpEthernetInterface = 0;
-  uCurrentArpRequest = 1;
-  uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
   uPreviousAsyncSdramRead = 0;
   uPreviousSequenceNumber = 0;
 
-  iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
-
-  if (iSuccess == XST_SUCCESS){
-    // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
-    uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-    if (uRomCRC != uRom[7]){
-      xil_printf("MB 1-wire CRC incorrect.\r\n");
-      uSerial[0] = 0xFF;
-      uSerial[1] = 0xFF;
-      uSerial[2] = 0xFF;
-      uSerial[3] = 0xFF;
-    } else {
-      // Read the serial number
-      iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
-
-      if (iSuccess == XST_FAILURE){
-        xil_printf("Failed to read serial number.\r\n");
-        uSerial[0] = 0xFF;
-        uSerial[1] = 0xFF;
-        uSerial[2] = 0xFF;
-        uSerial[3] = 0xFF;
-      }
-    }
-  } else {
-    xil_printf("Failed to read serial number.\r\n");
-    uSerial[0] = 0xFF;
-    uSerial[1] = 0xFF;
-    uSerial[2] = 0xFF;
-    uSerial[3] = 0xFF;
+  status = get_skarab_serial(uSerial, ID_SK_SERIAL_LEN);
+  if (status == XST_FAILURE){
+    error_printf("INIT [..] Failed to read SKARAB serial number.\r\n");
+    /* from here on in the mac address will be incorrect (ff:ff:ff...) */
   }
 
-  // GT 04/06/2015 BASIC SANITY CHECK, IF FAILS TRY TO READ ONE MORE TIME
-  if (uSerial[0] != 0x50){    /* CHECK FOR 'P' */
-    xil_printf("Trying again to read serial number.\r\n");
-
-    iSuccess = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
-
-    if (iSuccess == XST_SUCCESS){
-      // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
-      uRomCRC = OneWireCrc8(& uRom[0], 0x7);
-      if (uRomCRC != uRom[7]){
-        xil_printf("MB 1-wire CRC incorrect.\r\n");
-        uSerial[0] = 0xFF;
-        uSerial[1] = 0xFF;
-        uSerial[2] = 0xFF;
-        uSerial[3] = 0xFF;
-      } else {
-        // Read the serial number
-        iSuccess = DS2433ReadMem(uRom, 0, uSerial, 4, 0, 0, MB_ONE_WIRE_PORT);
-
-        if (iSuccess == XST_FAILURE){
-          xil_printf("Failed to read serial number.\r\n");
-          uSerial[0] = 0xFF;
-          uSerial[1] = 0xFF;
-          uSerial[2] = 0xFF;
-          uSerial[3] = 0xFF;
-        }
-      }
-    } else {
-      xil_printf("Failed to read serial number.\r\n");
-      uSerial[0] = 0xFF;
-      uSerial[1] = 0xFF;
-      uSerial[2] = 0xFF;
-      uSerial[3] = 0xFF;
-    }
+  status = get_peralex_serial(uPxSerial, ID_PX_SERIAL_LEN);
+  if (status == XST_FAILURE){
+    error_printf("INIT [..] Failed to read Peralex serial number.\r\n");
   }
 
   // TO DO: NOT SURE WHAT TO DO HERE FOR MULTICAST
@@ -813,7 +717,7 @@ void InitialiseEthernetInterfaceParameters()
   uFabricMacMid = (uSerial[1] << 8) | uSerial[2];
 
   for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++){
-    uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
+    //uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
     //uEthernetLinkUp[uId] = LINK_DOWN;
     uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
     uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
@@ -843,27 +747,16 @@ void InitialiseEthernetInterfaceParameters()
     uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
     uCurrentIGMPMessage[uId] = 0x0;
 
-    iSuccess = SoftReset(uId);
-    if (iSuccess == XST_FAILURE){
-      debug_printf("I/F  [%02x] Failed to do soft reset\r\n", uId);
+    status = SoftReset(uId);
+    if (status == XST_FAILURE){
+      error_printf("I/F  [%02x] Failed to do soft reset\r\n", uId);
     } else {
       debug_printf("I/F  [%02x] Soft reset successful.\r\n", uId);
     }
   }
 
-  // PERALEX SERIAL NUMBER
-  iSuccess = DS2433ReadMem(uRom, 0, uPxSerial, 3, 7, 0, MB_ONE_WIRE_PORT);
-
-  if (iSuccess == XST_FAILURE){
-    xil_printf("Failed to read Px serial number.\r\n");
-    uPxSerial[0] = 0xFF;
-    uPxSerial[1] = 0xFF;
-    uPxSerial[2] = 0xFF;
-  }
-
-  uPxSerialNumber = uPxSerial[2] + (uPxSerial[1] << 8) + (uPxSerial[0] << 16);
-
-  debug_printf("INIT [..] Motherboard Px Serial Number: %d\r\n", uPxSerialNumber);
+  debug_printf("INIT [..] Motherboard Px Serial Number: %02x%02x%02x\r\n",
+      uPxSerial[0], uPxSerial[1], uPxSerial[2]);
 
 }
 
@@ -967,9 +860,9 @@ void UpdateGBEPHYConfiguration()
 }
 
 //=================================================================================
-//  InitialiseEthernetInterfaceParameters
+//  InitialiseMezzanineLocation
 //--------------------------------------------------------------------------------
-//  This method configures the Ethernet interfaces with some default values.
+//  This method detects the Mezzanine cards (QSFP+, ADC or HMC).
 //
 //  Parameter Dir   Description
 //  --------- ---   -----------
@@ -979,68 +872,24 @@ void UpdateGBEPHYConfiguration()
 //  ------
 //  None
 //=================================================================================
-void InitialiseQSFPMezzanineLocation()
+static void InitialiseMezzanineLocation()
 {
-  u32 uReg;
-  u32 uMezzanineMask;
-  u16 uDeviceRom[8];
-  u16 uReadBytes[32];
-  int iStatus = XST_SUCCESS;
-  u16 uOneWirePort;
+  u8 mezz;
 
-  uQSFPMezzanineLocation = 0x0;
-  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
-  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
-
+  /* should this not move to the interface init? */
   uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
   WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-  uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
-
-  while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4)){
-    uMezzanineMask = 0x1 << uQSFPMezzanineLocation;
-    uOneWirePort = uQSFPMezzanineLocation + 0x1;
-
-    debug_printf("MEZZ [%02d] ", uQSFPMezzanineLocation);
-
-    /* Check if a mezzanine is preset */
-    if ((uReg & uMezzanineMask) != 0x0){
-      debug_printf("PRESENT\r\n");
-
-      /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
-      iStatus = OneWireReadRom(uDeviceRom, uOneWirePort);
-
-      debug_printf("MEZZ [%02d] MFR:", uQSFPMezzanineLocation); /* manufacturer */
-
-      if (iStatus == XST_SUCCESS){
-        debug_printf("Peralex\r\n");
-
-        /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
-        iStatus = DS2433ReadMem(uDeviceRom, 0x0, uReadBytes, 0x1, 0x0, 0x0, uOneWirePort);
-
-        debug_printf("MEZZ [%02d] is ", uQSFPMezzanineLocation);
-        if ((iStatus == XST_SUCCESS)&&(uReadBytes[0] == 0x50)){ /* Check if read 'P' */
-          debug_printf("a QSFP+ MEZZANINE\r\n", uQSFPMezzanineLocation);
-          uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-        } else {
-          debug_printf("not a QSFP+ MEZZANINE...[SKIP]\r\n", uQSFPMezzanineLocation);
-          uQSFPMezzanineLocation++;
-        }
-      } else {
-        debug_printf("unknown...[SKIP]\r\n");
-        uQSFPMezzanineLocation++;
-      }
-    } else {
-      debug_printf("NONE...[SKIP]\r\n");
-      uQSFPMezzanineLocation++;
-    }
+  for (mezz = 0; mezz < 4; mezz++){
+    init_mezz_location(mezz);
   }
 
   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
     error_printf("Failed to find a QSFP+ MEZZANINE!\r\n");
   }
 }
+
+
 
 //=================================================================================
 //  InitialiseInterruptControllerAndTimer
@@ -1150,6 +999,16 @@ void ReadAndPrintFPGADNA()
 
 int main() 
 {
+  /* initialise globals TODO: narrow down scope */
+  uQSFPMezzanineLocation = 0x0;
+  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
+  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
+
+  uADC32RF45X2MezzanineLocation = 0x0;
+  uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
+  uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+
   int iStatus;
   u32 uReadReg;
   u8 uEthernetId;
@@ -1269,7 +1128,7 @@ int main()
   error_printf("\r\n"); /* for formatting */
 
   error_printf("INIT [..] Mezzanine locations\r\n");
-  InitialiseQSFPMezzanineLocation();
+  InitialiseMezzanineLocation();
 
   uQSFPInit(&QSFPContext);
 
@@ -1302,19 +1161,29 @@ int main()
   error_printf("INIT [..] Waiting for HMC(s) to complete init...\r\n");
 
   /*
-   *  - register C_RD_MEZZANINE_STAT_1_ADDR contains the status of the 4 Mezz slots
-   *  - each byte represents the status of a Mezz slot
+   *  Register C_RD_MEZZANINE_STAT_1_ADDR contains the firmware status of the 4 Mezz slots.
+   *  Each byte represents the status of a Mezzanine site and indicates what functionality
+   *  has been compiled in in firmware.
    *
    *  31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
    *  +-------+--------+--------+--------+
    *  | Mezz3 | Mezz 2 | Mezz 1 | Mezz 0 |
    *  +-------+--------+--------+--------+
+   *                            /         \
+   *                           /           \
+   *      +-------------------+             +----------------------+
+   *      |                                                        |
    *
-   *  bit 7 & 6 => reserved
-   *  bit 5     => HMC post ok
-   *  bit 4     => HMC init ok
-   *  bit 3 - 1 => ID [001 = qsfp+ | 010 = hmc | 011 = adc ...]
-   *  bit 0     => Present
+   *       b7       b6       b5        b4        b3-b1    b0
+   *      +--------+--------+---------+---------+--------+---------+
+   * QSFP | IF3 EN | IF2 EN | IF1 EN  | IF0 EN  | ID=001 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   * HMC  | unused | unused | POST OK | INIT OK | ID=010 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   * ADC  | unused | unused | unused  | unused  | ID=011 | Present |
+   *      +--------+--------+---------+---------+--------+---------+
+   *
+   *      bit position in each of the above bytes (Mezz3...Mezz0)
    */
 
 #define HMC_INIT_TIMEOUT    100    /* x 100ms */
@@ -1547,7 +1416,8 @@ int main()
         SetFabricGatewayARPCacheAddress(uEthernetId, byte);
 
         uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
-        uEnableArpRequests[uEthernetId] = ARP_REQUESTS_ENABLE;
+        IFContext[uEthernetId].uIFEthernetSubnet = (ip & netmask);
+        IFContext[uEthernetId].uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
         /* legacy dhcp states */
         uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
@@ -1565,6 +1435,13 @@ int main()
       if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
         uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
         QSFPStateMachine(&QSFPContext);
+      }
+    }
+
+    if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_PRESENT){
+      if (uADC32RF45X2UpdateStatusEnable == UPDATE_ADC32RF45X2_STATUS){
+        uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+        AdcStateMachine(&AdcContext);
       }
     }
 
@@ -1950,9 +1827,12 @@ int main()
     //----------------------------------------------------------------------------//
     //  ARP REQUEST TASK                                                          //
     //----------------------------------------------------------------------------//
-    if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
-      ArpRequestHandler();
-    }
+      if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
+        uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
+        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+          ArpRequestHandler(&(IFContext[uEthernetId]));
+        }
+      }
 
     //----------------------------------------------------------------------------//
     //  LLDP TASK                                                                 //
@@ -2205,6 +2085,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
   uEthernetSubnet[id] = (ip & netmask);
+  pIFObjectPtr->uIFEthernetSubnet = (ip & netmask);
 
   uEthernetGatewayIPAddress[id] = (pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24) |
     (pDHCPObjectPtr->arrDHCPAddrRoute[1] << 16) |
@@ -2219,7 +2100,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
   SetFabricGatewayARPCacheAddress(id, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
-  uEnableArpRequests[id] = ARP_REQUESTS_ENABLE;
+  pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
   /* legacy dhcp states */
   uDHCPState[id] = DHCP_STATE_COMPLETE;

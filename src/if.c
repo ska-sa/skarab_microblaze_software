@@ -71,7 +71,10 @@ u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBuffe
   if (uDHCPInit(pIFObjectPtr) != DHCP_RETURN_OK){
     return IF_RETURN_FAIL;
   }
+  pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
+  pIFObjectPtr->uIFCurrentArpRequest = 1;
 
+  pIFObjectPtr->uIFEthernetSubnet = 0;
   pIFObjectPtr->uIFEthernetId = uEthernetId;
   pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
   pIFObjectPtr->uIFLinkRxActive = 0;
