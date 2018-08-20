@@ -102,7 +102,7 @@ static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
 static struct sQSFPObject QSFPContext;
 static struct sAdcObject AdcContext;
 
-static struct sMezzObject MezzContext[4];   /* holds the state of each mezzanine card*/
+//static struct sMezzObject MezzContext[4];   /* holds the state of each mezzanine card*/
 
 //=================================================================================
 //  TimerHandler
@@ -872,149 +872,16 @@ void UpdateGBEPHYConfiguration()
 //  ------
 //  None
 //=================================================================================
-void InitialiseMezzanineLocation()
+static void InitialiseMezzanineLocation()
 {
-#if 0
-  u32 uReg;
-  u32 uMezzanineMask;
-  u16 uDeviceRom[8];
-  u16 uReadBytes[32];
-  int iStatus = XST_SUCCESS;
-  u16 uOneWirePort;
-
-  uQSFPMezzanineLocation = 0x0;
-  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
-  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
-
-  /* should this not move to the interface init? */
-  uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
-  WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
-
-  uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
-
-  while ((uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT)&&(uQSFPMezzanineLocation < 0x4)){
-    uMezzanineMask = 0x1 << uQSFPMezzanineLocation;
-    uOneWirePort = uQSFPMezzanineLocation + 0x1;
-
-    debug_printf("MEZZ [%02d] ", uQSFPMezzanineLocation);
-
-    /* Check if a mezzanine is preset */
-    if ((uReg & uMezzanineMask) != 0x0){
-      debug_printf("PRESENT\r\n");
-
-      /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
-      iStatus = OneWireReadRom(uDeviceRom, uOneWirePort);
-
-      debug_printf("MEZZ [%02d] MFR:", uQSFPMezzanineLocation); /* manufacturer */
-
-      if (iStatus == XST_SUCCESS){
-        debug_printf("Peralex\r\n");
-
-        /* Mezzanine present here, read manufacturer code in 1-wire to see if Peralex board */
-        iStatus = DS2433ReadMem(uDeviceRom, 0x0, uReadBytes, 0x1, 0x0, 0x0, uOneWirePort);
-
-        debug_printf("MEZZ [%02d] is ", uQSFPMezzanineLocation);
-        if ((iStatus == XST_SUCCESS)&&(uReadBytes[0] == 0x50)){ /* Check if read 'P' */
-          debug_printf("a QSFP+ MEZZANINE\r\n", uQSFPMezzanineLocation);
-          uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-        } else {
-          debug_printf("not a QSFP+ MEZZANINE...[SKIP]\r\n", uQSFPMezzanineLocation);
-          uQSFPMezzanineLocation++;
-        }
-      } else {
-        debug_printf("unknown...[SKIP]\r\n");
-        uQSFPMezzanineLocation++;
-      }
-    } else {
-      debug_printf("NONE...[SKIP]\r\n");
-      uQSFPMezzanineLocation++;
-    }
-  }
-#endif
-
-  u32 uReg;
-  u32 mezz_mask;
-  u32 mezz_ctl_shadow_reg;
-  u16 device_rom[8];
-  u16 read_bytes[32];
-  int ret = XST_SUCCESS;
-  u16 one_wire_port;
   u8 mezz;
 
-  /* globals */
-  uQSFPMezzanineLocation = 0x0;
-  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
-  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
-
-	uADC32RF45X2MezzanineLocation = 0x0;
-	uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
-	uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
-
   /* should this not move to the interface init? */
   uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
   WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
-  uReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
-
   for (mezz = 0; mezz < 4; mezz++){
-    mezz_mask = 1 << mezz;        /* shift to relevant mezz position */
-    one_wire_port = mezz + 1;
-
-    if ((uReg & mezz_mask) != 0x0){    /* corresponding mezz present */
-      mezz_ctl_shadow_reg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
-      mezz_ctl_shadow_reg = mezz_ctl_shadow_reg | mezz_mask;
-      WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, mezz_ctl_shadow_reg);
-
-      ret = OneWireReadRom(device_rom, one_wire_port);
-      if (ret == XST_SUCCESS){
-        ret = DS2433ReadMem(device_rom, 0x0, read_bytes, 0x7, 0x0, 0x0, one_wire_port);
-        if (ret == XST_SUCCESS){
-          info_printf("MEZZ [%02x] ", mezz);
-
-          if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0x99)){
-            info_printf("QSFP+ MEZZANINE\r\n");
-            if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
-              uQSFPMezzanineLocation = mezz;     /* need to get rid of global scope and place within local scope of obj */
-            }
-            uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_QSPF;
-
-          } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
-            info_printf("QSFP+ PHY MEZZANINE\r\n");
-            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_QSFP_PHY;
-
-          } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&(read_bytes[0x6] == 0xE5)){
-            info_printf("ADC32RF45X2 MEZZANINE\r\n");
-            if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
-              uADC32RF45X2MezzanineLocation = mezz;
-            }
-            uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
-            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;
-
-          } else if ((read_bytes[0x0] == 0x53)&&(read_bytes[0x4] == 0xFF)&&(read_bytes[0x5] == 0x00)&&(read_bytes[0x6] == 0x01)){
-            info_printf("HMC R1000-0005 MEZZANINE\r\n");
-            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_HMC_R1000_0005;
-
-          } else {
-            info_printf("UNKNOWN - Unsupported PX number and manufacturer ID.\r\n");
-            MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
-          }
-        } else {
-          /* one wire read bytes failed */
-          info_printf("UNKNOWN - Failed to read ID bytes from one-wire EEPROM.\r\n");
-          MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
-        }
-      } else {
-        /* one wire read rom failed */
-        info_printf("UNKNOWN - Failed to read device-rom from one-wire EEPROM.\r\n");
-        MezzContext[mezz].m_type = MEZ_BOARD_TYPE_UNKNOWN;
-      }
-    } else {
-      MezzContext[mezz].m_type = MEZ_BOARD_TYPE_OPEN;
-      info_printf("NOT PRESENT\r\n");
-    }
+    init_mezz_location(mezz);
   }
 
   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
@@ -1132,6 +999,16 @@ void ReadAndPrintFPGADNA()
 
 int main() 
 {
+  /* initialise globals TODO: narrow down scope */
+  uQSFPMezzanineLocation = 0x0;
+  uQSFPMezzaninePresent = QSFP_MEZZANINE_NOT_PRESENT;
+  uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+  uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
+
+  uADC32RF45X2MezzanineLocation = 0x0;
+  uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
+  uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+
   int iStatus;
   u32 uReadReg;
   u8 uEthernetId;
@@ -1285,7 +1162,7 @@ int main()
 
   /*
    *  Register C_RD_MEZZANINE_STAT_1_ADDR contains the firmware status of the 4 Mezz slots.
-   *  Each byte represents the status of a Mezzanine sight and indicates what functionality
+   *  Each byte represents the status of a Mezzanine site and indicates what functionality
    *  has been compiled in in firmware.
    *
    *  31 - 24 | 23 - 16| 15  - 8| 7 -  0 |
