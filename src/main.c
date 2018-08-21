@@ -860,7 +860,7 @@ void UpdateGBEPHYConfiguration()
 }
 
 //=================================================================================
-//  InitialiseMezzanineLocation
+//  InitialiseMezzanineLocations
 //--------------------------------------------------------------------------------
 //  This method detects the Mezzanine cards (QSFP+, ADC or HMC).
 //
@@ -872,7 +872,7 @@ void UpdateGBEPHYConfiguration()
 //  ------
 //  None
 //=================================================================================
-static void InitialiseMezzanineLocation()
+static void InitialiseMezzanineLocations()
 {
   u8 mezz;
 
@@ -1128,7 +1128,7 @@ int main()
   error_printf("\r\n"); /* for formatting */
 
   error_printf("INIT [..] Mezzanine locations\r\n");
-  InitialiseMezzanineLocation();
+  InitialiseMezzanineLocations();
 
   uQSFPInit(&QSFPContext);
 

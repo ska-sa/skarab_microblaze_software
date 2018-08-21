@@ -28,12 +28,24 @@ typedef enum {
   MEZ_BOARD_TYPE_QSFP_PHY,
   MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2,
   MEZ_BOARD_TYPE_HMC_R1000_0005
-} MezzType;
+} MezzHWType;
+
+typedef enum {
+  MEZ_FIRMW_TYPE_OPEN,
+  MEZ_FIRMW_TYPE_UNKNOWN,
+  MEZ_FIRMW_TYPE_QSFP,
+  MEZ_FIRMW_TYPE_QSFP_PHY,
+  MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2,
+  MEZ_FIRMW_TYPE_HMC_R1000_0005
+} MezzFirmwType;
 
 struct sMezzObject {
   u32 m_magic;
   u8 m_site;
-  u8 m_type;
+  u8 m_type;        /* describes the hardware */
+#define FIRMW_SUPPORT_FALSE   0
+#define FIRMW_SUPPORT_TRUE    1
+  u8 m_firmw_support;  /* has support been compiled into firmware */
 
   union {
     struct sQSFPObject QSFPContext;

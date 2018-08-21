@@ -8,15 +8,30 @@
 #include "constant_defs.h"
 #include "print.h"
 
-static MezzType read_mezz_type_id(u8 mezz_site);
+static MezzHWType read_mezz_type_id(u8 mezz_site);
+static MezzFirmwType get_mezz_firmware_type(u8 mezz_site);
+
+/*********** Sanity Checks ***************/
+#ifdef DO_SANITY_CHECKS
+#define SANE_MEZZ_SITE(site) __sanity_check_mezz_site(site);
+#else
+#define SANE_MEZZ_SITE(site)
+#endif
+
+#ifdef DO_SANITY_CHECKS
+void __sanity_check_mezz_site(u8 mezz_site){
+  /* sanity checks */
+  Xil_AssertVoid((mezz_site >= 0) && (mezz_site < 4));    /* API usage error */
+}
+#endif
 
 
 struct sMezzObject *init_mezz_location(u8 mezz_site){
   static struct sMezzObject MezzContext[4];  /* statically allocated memory - but could be dynamic in future */
-  MezzType mt;
+  MezzHWType mt;
+  MezzFirmwType ft;
 
-  /* sanity checks */
-  Xil_AssertNonvoid((mezz_site >= 0) && (mezz_site < 4));    /* API usage error  */
+  SANE_MEZZ_SITE(mezz_site);
 
   if (MEZZ_MAGIC == MezzContext[mezz_site].m_magic){
     error_printf("MEZZ [%02x] Failed - attempted to overwrite previous state.", mezz_site);
@@ -29,26 +44,47 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   mt = read_mezz_type_id(mezz_site);    /* get the type id stored on the mezzanine card */
   MezzContext->m_type = mt;
 
+  ft = get_mezz_firmware_type(mezz_site);   /* get the firmware type compiled
+                                               for this mezz */
+
+  /* preset this value and set if firmware support present */
+  MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_FALSE;
+
   switch(mt){
     case MEZ_BOARD_TYPE_QSFP:
-      if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
-        uQSFPMezzanineLocation = mezz_site;     /* TODO: need to get rid of global scope and place within local scope of obj */
+      if (MEZ_FIRMW_TYPE_QSFP == ft){   /* firmware support? */
+        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+        if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
+          uQSFPMezzanineLocation = mezz_site;     /* TODO: need to get rid of global scope and place within local scope of obj */
+        }
+        uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
+        //ret = init_qsfp_mezz(&(MezzContext[mezz_site].QSFPContext));
+      } else {
+        warn_printf("MEZZ [%02x] WARNING: no firmware support for QSFP!\r\n", mezz_site);
       }
-      uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-      //ret = init_qsfp_mezz(&(MezzContext[mezz_site].QSFPContext));
       break;
 
     case MEZ_BOARD_TYPE_HMC_R1000_0005:
+      if (MEZ_FIRMW_TYPE_HMC_R1000_0005 == ft){   /* firmware support? */
+        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+      } else {
+        warn_printf("MEZZ [%02x] WARNING: no firmware support for HMC!\r\n", mezz_site);
+      }
       //ret = init_hmc_mezz(mezz);
       break;
 
     case MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2:
-      /* TODO globals... */
-      if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
-        uADC32RF45X2MezzanineLocation = mezz_site;
+      if (MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2 == ft){   /* firmware support? */
+        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+        /* TODO globals... */
+        if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
+          uADC32RF45X2MezzanineLocation = mezz_site;
+        }
+        uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
+        //ret = init_adc_mezz(&(MezzContext[mezz_site].AdcContext));
+      } else {
+        warn_printf("MEZZ [%02x] WARNING: no firmware support for ADC!\r\n", mezz_site);
       }
-      uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
-      //ret = init_adc_mezz(&(MezzContext[mezz_site].AdcContext));
       break;
 
     /* unhandled cases */
@@ -65,7 +101,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
 
 
-static MezzType read_mezz_type_id(u8 mezz_site){
+static MezzHWType read_mezz_type_id(u8 mezz_site){
   u32 reg;
   u32 mezz_mask;
   u32 mezz_ctl_shadow_reg;
@@ -74,8 +110,9 @@ static MezzType read_mezz_type_id(u8 mezz_site){
   int ret;
   u16 one_wire_port;
 
-  /* determine if the mezz site is populated with a card */
+  SANE_MEZZ_SITE(mezz_site);
 
+  /* determine if the mezz site is populated with a card */
   mezz_mask = 1 << mezz_site;           /* shift to relevant mezz position */
   one_wire_port = mezz_site + 1;
 
@@ -125,4 +162,59 @@ static MezzType read_mezz_type_id(u8 mezz_site){
     info_printf("UNKNOWN - Unsupported PX number and manufacturer ID.\r\n");
     return MEZ_BOARD_TYPE_UNKNOWN;
   }
+}
+
+
+/*
+ * bit signatures to detect firmware support/presence of the various mezzanine
+ * cards
+ */
+#define BYTE_MASK_NONE_PRESENT  1  /* bxxxx0001 */
+#define BYTE_MASK_QSFP_PRESENT  3  /* bxxxx0011 */
+#define BYTE_MASK_HMC_PRESENT   5  /* bxxxx0101 */
+#define BYTE_MASK_ADC_PRESENT   7  /* bxxxx0111 */
+
+static MezzFirmwType get_mezz_firmware_type(u8 mezz_site){
+  u32 reg;
+  u32 masked_byte;
+  u32 mask;
+  MezzFirmwType firmw_type;
+
+  SANE_MEZZ_SITE(mezz_site);
+
+  reg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+  mask = 0x0f << (mezz_site * 8);
+  masked_byte = reg & mask;
+  masked_byte = masked_byte >> (mezz_site * 8);
+
+  debug_printf("MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
+
+  switch (masked_byte){
+    case BYTE_MASK_NONE_PRESENT:
+      firmw_type = MEZ_FIRMW_TYPE_OPEN;
+      debug_printf("OPEN\r\n");
+      break;
+
+    case BYTE_MASK_QSFP_PRESENT:
+      firmw_type = MEZ_FIRMW_TYPE_QSFP;
+      debug_printf("QSFP\r\n");
+      break;
+
+    case BYTE_MASK_HMC_PRESENT:
+      firmw_type = MEZ_FIRMW_TYPE_HMC_R1000_0005;
+      debug_printf("HMC\r\n");
+      break;
+
+    case BYTE_MASK_ADC_PRESENT:
+      firmw_type = MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2;
+      debug_printf("ADC\r\n");
+      break;
+
+    default:
+      firmw_type = MEZ_FIRMW_TYPE_UNKNOWN;
+      debug_printf("UNKNOWN\r\n");
+      break;
+  }
+
+  return firmw_type;
 }
