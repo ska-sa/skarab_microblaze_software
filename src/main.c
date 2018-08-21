@@ -1416,7 +1416,7 @@ int main()
         SetFabricGatewayARPCacheAddress(uEthernetId, byte);
 
         uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
-        IFContext[uEthernetId].uIFEthernetSubnet = (ip & netmask);
+        IFContext[uEthernetId].uIFEthernetSubnet = (tempIP & tempMask);
         IFContext[uEthernetId].uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
         /* legacy dhcp states */
