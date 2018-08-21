@@ -1048,7 +1048,7 @@ int main()
   u16 uChecksum = 0;
   u32 uHMCBitMask;
 
-#define HMC_MAX_RECONFIG_COUNT 20
+#define HMC_MAX_RECONFIG_COUNT 5
   u8 uHMCReconfigCount = HMC_MAX_RECONFIG_COUNT;
   u8 PMemState = PMEM_RETURN_ERROR;
 
