@@ -42,30 +42,49 @@ extern "C" {
 #define ETH_MAC_RESET_TIMEOUT     1000
 #endif
 
+#ifdef WISHBONE_LEGACY_MAP
+
+/* Legacy Wishbone memory map */
 #define ETH_MAC_REG_SOURCE_MAC_UPPER_16     0x0u
 #define ETH_MAC_REG_SOURCE_MAC_LOWER_32     0x1u
-#define ETH_MAC_REG_GATEWAY           0x3u
-#define ETH_MAC_REG_SOURCE_IP_ADDRESS     0x4u
-#define ETH_MAC_REG_NETMASK         0xEu
-#define ETH_MAC_REG_BUFFER_LEVEL        0x6u
-#define ETH_MAC_REG_SOURCE_PORT_AND_ENABLE    0x8u
-#define ETH_MAC_REG_XAUI_STATUS         0x9u
-#define ETH_MAC_REG_PHY_CONFIGURATION     0xAu
-#define ETH_XAUI_CONFIG             0xBu
-#define ETH_MC_RECV_IP              0xCu
-#define ETH_MC_RECV_IP_MASK           0xDu
+#define ETH_MAC_REG_GATEWAY                 0x3u
+#define ETH_MAC_REG_SOURCE_IP_ADDRESS       0x4u
+#define ETH_MAC_REG_NETMASK                 0xEu
+#define ETH_MAC_REG_BUFFER_LEVEL            0x6u
+#define ETH_MAC_REG_SOURCE_PORT_AND_ENABLE  0x8u
+#define ETH_MAC_REG_XAUI_STATUS             0x9u
+#define ETH_MAC_REG_PHY_CONFIGURATION       0xAu
+#define ETH_XAUI_CONFIG                     0xBu
+#define ETH_MC_RECV_IP                      0xCu
+#define ETH_MC_RECV_IP_MASK                 0xDu
 
-#ifdef WISHBONE_LEGACY_MAP
-#define ETH_MAC_REG_LOW_ADDRESS           0x0000u
-#define ETH_MAC_REG_HIGH_ADDRESS          0x07FFu
+#define ETH_MAC_REG_LOW_ADDRESS                   0x0000u
+#define ETH_MAC_REG_HIGH_ADDRESS                  0x07FFu
 #define ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS   0x1000u
 #define ETH_MAC_CPU_TRANSMIT_BUFFER_HIGH_ADDRESS  0x17FFu
 #define ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS    0x2000u
 #define ETH_MAC_CPU_RECEIVE_BUFFER_HIGH_ADDRESS   0x27FFu
-#define ETH_MAC_ARP_CACHE_LOW_ADDRESS       0x3000u
-#define ETH_MAC_ARP_CACHE_HIGH_ADDRESS        0x37FFu
+#define ETH_MAC_ARP_CACHE_LOW_ADDRESS             0x3000u
+#define ETH_MAC_ARP_CACHE_HIGH_ADDRESS            0x37FFu
+
 #else
-/* Wishbone address map for ethernet mac - in line with CASPER standardization */
+/*
+ * New Wishbone address map for Ethernet Core (in line with CASPER standardization).
+ */
+/*      ETH_MAC_REG_RESERVED_FUTURE_USE     0x00u */
+#define ETH_MAC_REG_BUFFER_LEVEL            0x01u
+/*      ETH_MAC_REG_RESERVED_FUTURE_USE     0x02u */
+#define ETH_MAC_REG_SOURCE_MAC_UPPER_16     0x03u
+#define ETH_MAC_REG_SOURCE_MAC_LOWER_32     0x04u
+#define ETH_MAC_REG_SOURCE_IP_ADDRESS       0x05u
+#define ETH_MAC_REG_GATEWAY                 0x06u
+#define ETH_MC_RECV_IP                      0x07u
+#define ETH_MC_RECV_IP_MASK                 0x08u
+#define ETH_MAC_REG_NETMASK                 0x09u
+/*      ETH_MAC_REG_RESERVED_FUTURE_USE     0x0Au */
+#define ETH_MAC_REG_SOURCE_PORT_AND_ENABLE  0x0Bu
+/*      ETH_MAC_REG_RESERVED_FUTURE_USE     0x0Cu - 0x1Du */
+
 #define ETH_MAC_REG_LOW_ADDRESS                       0x0000u
 #define ETH_MAC_REG_HIGH_ADDRESS                      0x0FFFu
 #define ETH_MAC_ARP_CACHE_LOW_ADDRESS                 0x1000u
@@ -74,6 +93,7 @@ extern "C" {
 #define ETH_MAC_CPU_TRANSMIT_BUFFER_HIGH_ADDRESS      0x7FFFu
 #define ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS        0x8000u
 #define ETH_MAC_CPU_RECEIVE_BUFFER_HIGH_ADDRESS       0xBFFFu
+
 #endif
 
 #ifdef REDUCED_CLK_ARCH
