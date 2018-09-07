@@ -407,13 +407,13 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
   // Must be a multiple of 64 bits
   if ((uNumWords % 2) != 0x0)
   {
-    xil_printf("TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uNumWords);
+    xil_printf("I/F  [%02x] TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
     return XST_FAILURE;
   }
 
   if (uNumWords < 16){
     uPaddingWords = (16 - uNumWords);
-    xil_printf("TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", (uPaddingWords * 4) /* bytes */ );
+    xil_printf("I/F  [%02x] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
   }
 
   // Check that the transmit buffer is ready for a packet
@@ -426,7 +426,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    xil_printf("TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uHostTransmitBufferLevel);
+    xil_printf("I/F  [%02x] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
@@ -461,7 +461,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    xil_printf("TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uHostTransmitBufferLevel);
+    xil_printf("I/F  [%02x] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
@@ -502,7 +502,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   if (uNumWords > RX_BUFFER_MAX)
   {
-    xil_printf("ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", RX_BUFFER_MAX, uNumWords);
+    xil_printf("I/F  [%02x] ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", uId, RX_BUFFER_MAX, uNumWords);
     return XST_FAILURE;
   }
 
@@ -532,7 +532,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
   pktlen = pktlen < 16 ? 16 : pktlen;     /* lowest value is 16 */
 
   if (uNumWords != pktlen){
-    xil_printf("[RECV %02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+    xil_printf("I/F  [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
   }
 
   //debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);

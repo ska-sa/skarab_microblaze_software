@@ -1130,6 +1130,7 @@ int main()
   error_printf("INIT [..] Mezzanine locations\r\n");
   InitialiseMezzanineLocations();
 
+  AdcInit(&AdcContext);
   uQSFPInit(&QSFPContext);
 
   /*
