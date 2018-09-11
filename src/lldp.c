@@ -12,6 +12,7 @@
 #include "lldp.h"
 #include "constant_defs.h"
 #include "register.h"
+#include "if.h"
 
 static char lookup[17] = "0123456789ABCDEF";
 
@@ -32,8 +33,12 @@ static char lookup[17] = "0123456789ABCDEF";
 //  None
 //==================================================================================
 int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
+  struct sIFObject *pIF;
 
-  u32 uIPAddress = uEthernetFabricIPAddress[uId];
+  pIF = lookup_if_handle_by_id(uId);
+
+  /* u32 uIPAddress = uEthernetFabricIPAddress[uId]; */
+  u32 uIPAddress = pIF->uIFAddrIP; 
   u32 version;
   u8 dst_mac_addr[ETH_DST_LEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
 
@@ -92,6 +97,7 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
       memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
       break;
   }
+  /* FIXME: default case */
 
   /* System name  TLV */
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_TYPE_OFFSET] = LLDP_SYSTEM_NAME_TLV;

@@ -91,13 +91,13 @@ volatile u32 uResponseUDPPort;
 volatile u16 uEthernetFabricMacHigh[NUM_ETHERNET_INTERFACES];
 volatile u16 uEthernetFabricMacMid[NUM_ETHERNET_INTERFACES];
 volatile u16 uEthernetFabricMacLow[NUM_ETHERNET_INTERFACES];
-volatile u32 uEthernetFabricIPAddress[NUM_ETHERNET_INTERFACES];
-volatile u32 uEthernetFabricSubnetMask[NUM_ETHERNET_INTERFACES];
-volatile u16 uEthernetFabricPortAddress[NUM_ETHERNET_INTERFACES];
+/* volatile u32 uEthernetFabricIPAddress[NUM_ETHERNET_INTERFACES]; */
+/* volatile u32 uEthernetFabricSubnetMask[NUM_ETHERNET_INTERFACES]; */
+/* volatile u16 uEthernetFabricPortAddress[NUM_ETHERNET_INTERFACES]; */
 volatile u32 uEthernetFabricMultiCastIPAddress[NUM_ETHERNET_INTERFACES];
 volatile u32 uEthernetFabricMultiCastIPAddressMask[NUM_ETHERNET_INTERFACES];
 volatile u16 uIPIdentification[NUM_ETHERNET_INTERFACES];
-volatile u32 uEthernetSubnet[NUM_ETHERNET_INTERFACES];
+//volatile u32 uEthernetSubnet[NUM_ETHERNET_INTERFACES];
 volatile u32 uEthernetGatewayIPAddress[NUM_ETHERNET_INTERFACES];
 
 /* volatile u8 uEthernetLinkUp[NUM_ETHERNET_INTERFACES]; */

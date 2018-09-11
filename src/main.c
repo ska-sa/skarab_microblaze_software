@@ -83,6 +83,7 @@ static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
+static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 
 static volatile u8 uTimeoutCounter = 255;
 
@@ -98,7 +99,7 @@ extern u32 _location_checksum_;
 
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
-static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
+//static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
 static struct sQSFPObject QSFPContext;
 static struct sAdcObject AdcContext;
 
@@ -121,15 +122,6 @@ static struct sAdcObject AdcContext;
 void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 {
   u8 uIndex;
-  u8 u40GbE1_Dhcp_En = 0;
-  u8 u40GbE2_Dhcp_En = 0;
-  u8 u40GbE3_Dhcp_En = 0;
-  u8 u40GbE4_Dhcp_En = 0;
-  u8 u40GbE1_Link_Up = 0;
-  u8 u40GbE2_Link_Up = 0;
-  u8 u40GbE3_Link_Up = 0;
-  u8 u40GbE4_Link_Up = 0;
-  u8 uFrontPanelLedsValue;
 
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
@@ -194,103 +186,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
   uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
-  /* FIXME TODO: move the following code to main() as a task rather in order to
-   * keep timer ISR short */
-  /* use macros for now to get rid of potential bugs and compiler warnings since
-     the following code indexes the array above the array bounds if all possible
-     40gbe i/f are not enabled */
-
-#if NUM_ETHERNET_INTERFACES > 1
-  //if 40GbE link 1 is up enable link else disable link
-  if(IFContext[1].uIFLinkStatus == LINK_UP)
-  {
-    u40GbE1_Link_Up = 0x01;
-    //if 40GbE DHCP is complete then set true else false
-    if (uDHCPState[1] == DHCP_STATE_COMPLETE)
-    {
-      u40GbE1_Dhcp_En = 0x01;
-    }
-    else
-    {
-      u40GbE1_Dhcp_En = 0x00;
-    }
-  }
-  else
-  {
-    u40GbE1_Link_Up = 0x00;
-    u40GbE1_Dhcp_En = 0x00;
-  }
-#endif
-
-#if NUM_ETHERNET_INTERFACES > 2
-  //if 40GbE link 2 is up enable link else disable link
-  if(IFContext[2].uIFLinkStatus == LINK_UP)
-  {
-    u40GbE2_Link_Up = 0x01;
-    //if 40GbE DHCP is complete then set true else false
-    if (uDHCPState[2] == DHCP_STATE_COMPLETE)
-    {
-      u40GbE2_Dhcp_En = 0x01;
-    }
-    else
-    {
-      u40GbE2_Dhcp_En = 0x00;
-    }
-  }
-  else
-  {
-    u40GbE2_Link_Up = 0x00;
-    u40GbE2_Dhcp_En = 0x00;
-  }
-#endif
-
-#if NUM_ETHERNET_INTERFACES > 3
-  //if 40GbE link 3 is up enable link else disable link
-  if(IFContext[3].uIFLinkStatus == LINK_UP)
-  {
-    u40GbE3_Link_Up = 0x01;
-    //if 40GbE DHCP is complete then set true else false
-    if (uDHCPState[3] == DHCP_STATE_COMPLETE)
-    {
-      u40GbE3_Dhcp_En = 0x01;
-    }
-    else
-    {
-      u40GbE3_Dhcp_En = 0x00;
-    }
-  }
-  else
-  {
-    u40GbE3_Link_Up = 0x00;
-    u40GbE3_Dhcp_En = 0x00;
-  }
-#endif
-
-#if NUM_ETHERNET_INTERFACES > 4
-  //if 40GbE link 4 is up enable link else disable link
-  if(IFContext[4].uIFLinkStatus == LINK_UP)
-  {
-    u40GbE4_Link_Up = 0x01;
-    //if 40GbE DHCP is complete then set true else false
-    if (uDHCPState[4] == DHCP_STATE_COMPLETE)
-    {
-      u40GbE4_Dhcp_En = 0x01;
-    }
-    else
-    {
-      u40GbE4_Dhcp_En = 0x00;
-    }
-  }
-  else
-  {
-    u40GbE4_Link_Up = 0x00;
-    u40GbE4_Dhcp_En = 0x00;
-  }
-#endif
-
-  uFrontPanelLedsValue = u40GbE4_Link_Up <<7 | u40GbE4_Dhcp_En <<6 | u40GbE3_Link_Up <<5 | u40GbE3_Dhcp_En <<4 | u40GbE2_Link_Up<<3 | u40GbE2_Dhcp_En<<2 | u40GbE1_Link_Up<<1 | u40GbE1_Dhcp_En;
-  WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
-
+  uFlagRunTask_WriteLEDStatus = 1; 
 }
 
 
@@ -336,6 +232,10 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
   u32 uUdpSrcPort;
   u32 uUdpDstPort;
   int iStatus;
+  struct sIFObject *pIFObjectPtr;
+
+  /* get the handle to the interface context state */
+  pIFObjectPtr = lookup_if_handle_by_id(uId);
 
   // Check we have enough data to proceed: i.e. at least valid Ethernet header
   uL2PktLen = uNumWords * 4;
@@ -373,7 +273,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 #endif
   if (EthHdr->uEthernetType == ETHERNET_TYPE_IPV4) {
     trace_printf("IP packet received!\r\n");
-    iStatus = CheckIPV4Header(uEthernetFabricIPAddress[uId], uEthernetFabricSubnetMask[uId], uL3PktLen, pL3Ptr);
+    iStatus = CheckIPV4Header(pIFObjectPtr->uIFAddrIP, pIFObjectPtr->uIFAddrMask, uL3PktLen, pL3Ptr);
     if (iStatus == XST_SUCCESS){
       pL4Ptr = ExtractIPV4FieldsAndGetPayloadPointer(pL3Ptr, &uL4PktLen, (u32 *) &uResponseIPAddr, &uL3Proto, &uL3TOS);
       if (uL3Proto == IP_PROTOCOL_UDP){
@@ -386,7 +286,7 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
           // Command protocol
           if (uUdpDstPort == ETHERNET_CONTROL_PORT_ADDRESS){
             trace_printf("Control packet received!\r\n");
-            iStatus = CommandSorter(uId, pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength, &(IFContext[uId]) );
+            iStatus = CommandSorter(uId, pL5Ptr, uL5PktLen, uResponsePacketPtr, & uResponseLength);
             if (iStatus == XST_SUCCESS){
               trace_printf("Control packet success\r\n");
               // Create rest of Ethernet packet in transmit buffer for response
@@ -415,263 +315,6 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 
 }
 
-typedef enum {
-  /* these are enumerations for protocols we are expecting */
-  PACKET_FILTER_ARP,
-  PACKET_FILTER_ICMP,
-  PACKET_FILTER_DHCP,
-  PACKET_FILTER_CONTROL,
-  /* these are enumerations to handle unexpected packets or errors */
-  PACKET_FILTER_UNKNOWN,
-  PACKET_FILTER_ERROR,
-  PACKET_FILTER_DROP,
-  PACKET_FILTER_UNKNOWN_UDP,
-  PACKET_FILTER_UNKNOWN_IP,
-  PACKET_FILTER_UNKNOWN_ETH
-} typePacketFilter;
-
-#define ETHER_TYPE_ARP    0x0806
-#define ETHER_TYPE_IPV4   0x0800
-
-#define IPV4_TYPE_ICMP   0x0001
-#define IPV4_TYPE_UDP    0x0011
-
-#define UDP_CONTROL_PORT  0x7778
-#define BOOTP_CLIENT_PORT 0x44
-#define BOOTP_SERVER_PORT 0x43
-
-//=================================================================================
-//  uRecvPacketFilter
-//---------------------------------------------------------------------------------
-//  This method applies the packet filtering per layer.
-//
-//  Parameter       Dir   Description
-//  ---------       ---   -----------
-//  pIFObjectPtr    IN    handle to IF state object
-//
-//  Return
-//  ------
-//  typePacketFilter
-//=================================================================================
-typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
-  u16 uL2Type;    /* implemented: Ethernet Frame Type filtering => ARP, IPv4 */
-  u8 uL3Type;    /* implemented: IPv4 Protocol Type filtering => ICMP, UDP */
-
-  /* implemented: UDP Datagram Port filtering => DHCP, CONTROL */
-  u16 uUDPSrcPort = 0;
-  u16 uUDPDstPort = 0;
-
-  u8 uIPHdrLenAdjust = 0;
-
-  typePacketFilter uReturnType = PACKET_FILTER_UNKNOWN;
-
-  u8 *pRxBuffer = NULL;
-
-  trace_printf("Running packet filter...\r\n");
-
-  if (pIFObjectPtr == NULL){
-    return PACKET_FILTER_ERROR;
-  }
-
-  pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
-  if (pRxBuffer == NULL){
-    return PACKET_FILTER_ERROR;
-  }
-
-  pIFObjectPtr->uRxTotal++;
-
-  /* inspect the ethernet frame type */
-  uL2Type = (pRxBuffer[ETH_FRAME_TYPE_OFFSET] << 8) & 0xff00;
-  uL2Type = uL2Type | (pRxBuffer[ETH_FRAME_TYPE_OFFSET + 1] & 0xff);
-  trace_printf("layer2 type 0x%04x\r\n",uL2Type);
-
-
-  switch(uL2Type){
-    case ETHER_TYPE_ARP:
-      trace_printf("ARP packet received!\r\n");
-      pIFObjectPtr->uRxEthArp++;
-      uReturnType = PACKET_FILTER_ARP;
-      /* no further filtering required */
-      break;
-
-    case ETHER_TYPE_IPV4:
-      /* further filtering required on ip packet */
-      /* inspect the ip header protocol type */
-      trace_printf("IP packet received!\r\n"); 
-      pIFObjectPtr->uRxEthIp++;
-      uL3Type = pRxBuffer[IP_FRAME_BASE + IP_PROT_OFFSET] & 0xff;
-      switch(uL3Type){
-        case IPV4_TYPE_ICMP:
-          trace_printf("ICMP packet received!\r\n");
-          pIFObjectPtr->uRxIpIcmp++;
-          uReturnType = PACKET_FILTER_ICMP;
-          /* no further filtering required */
-          break;
-
-        case IPV4_TYPE_UDP:
-          trace_printf("UDP packet received!\r\n");
-          pIFObjectPtr->uRxIpUdp++;
-          /* further filtering required on udp datagram */
-          /* allow for variable ip header lengths */
-          /* adjust ip base value if ip length greater than 20 bytes. Min header length = 20 bytes; Max header length = 60 bytes */
-          uIPHdrLenAdjust = (((pRxBuffer[IP_FRAME_BASE] & 0x0F) * 4) - 20);
-          if (uIPHdrLenAdjust > 40){
-            error_printf("IP header length adjustment of %d seems incorrect!\r\n", uIPHdrLenAdjust);
-            return PACKET_FILTER_ERROR;
-          }
-
-          /* inspect the udp header port values */
-          uUDPSrcPort = (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_SRC_PORT_OFFSET] << 8) & 0xff00;
-          uUDPSrcPort = uUDPSrcPort | (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_SRC_PORT_OFFSET + 1] & 0xff);
-
-          uUDPDstPort = (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET] << 8) & 0xff00;
-          uUDPDstPort = uUDPDstPort | (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET + 1] & 0xff);
-
-          if (uUDPDstPort == UDP_CONTROL_PORT){
-            trace_printf("CONTROL packet received!\r\n");
-            pIFObjectPtr->uRxUdpCtrl++;
-            uReturnType = PACKET_FILTER_CONTROL;
-          } else if ((uUDPDstPort == BOOTP_CLIENT_PORT) && (uUDPSrcPort == BOOTP_SERVER_PORT)){
-            trace_printf("DHCP packet received!\r\n");
-            pIFObjectPtr->uRxUdpDhcp++;
-            uReturnType = PACKET_FILTER_DHCP;
-          } else if ((uUDPDstPort == BOOTP_SERVER_PORT) && (uUDPSrcPort == BOOTP_CLIENT_PORT)){
-            /* These are probably broadcast DISCOVER / REQUEST packets from other network nodes / SKARABs
-               destined for the dhcp server and can probably safely be dropped */
-            trace_printf("DHCP packet destined for DHCP server received! Can probably safely drop packet!\r\n");
-            pIFObjectPtr->uRxDhcpUnknown++;
-            pIFObjectPtr->uRxUdpDhcp++;   /* increment total dhcp counter too since this is a dhcp packet (even tho not destined for us) */
-            uReturnType = PACKET_FILTER_DROP;
-          } else {
-            debug_printf("UNKNOWN UDP ports: [src] 0x%04x & [dst] 0x%04x!\r\n", uUDPSrcPort, uUDPDstPort);
-            pIFObjectPtr->uRxUdpUnknown++;
-            uReturnType = PACKET_FILTER_UNKNOWN_UDP;
-          }
-          break;
-
-        default:
-          debug_printf("UNKNOWN IP protocol 0x%02x received!\r\n", uL3Type);
-          pIFObjectPtr->uRxIpUnknown++;
-          uReturnType = PACKET_FILTER_UNKNOWN_IP;
-          break;
-      }
-      break;
-
-    default:
-      /* Handle unimplemented / unknown ethernet frames */
-      debug_printf("UNKNOWN ETH type 0x%04x packet received!\r\n", uL2Type);
-      pIFObjectPtr->uRxEthUnknown++;
-      uReturnType = PACKET_FILTER_UNKNOWN_ETH;
-      break;
-  }
-
-  return uReturnType;
-}
-
-
-//=================================================================================
-//  UpdateEthernetLinkUpStatus
-//--------------------------------------------------------------------------------
-//  This method updates the Ethernet link up status. The Ethernet interface is not
-//  checked for received messages if it is not up. When the Ethernet link comes up,
-//  the ARP packet requests are enabled to populate the ARP cache.
-//
-//  Parameter       Dir   Description
-//  ---------       ---   -----------
-//  pIFObjectPtr    IN    handle to IF State Object
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
-  u32 uReg;
-  u32 uMask = 0;
-  u32 uActivityMask = 0;
-  u8 uId;
-
-  /* TODO: pIFObjectPtr sanity checks - is it necessary? */
-
-  uId = pIFObjectPtr->uIFEthernetId;
-
-  uReg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
-  uMask = 1 << uId;
-
-  if ((uReg & uMask) != LINK_DOWN){
-    // Check if the link was previously down
-    if (pIFObjectPtr->uIFLinkStatus == LINK_DOWN){
-      xil_printf("I/F  [%02x] LINK %x HAS COME UP!\r\n", uId, uId);
-
-      if (uId == 0){  /* 1gbe i/f */
-        /* do not enable dhcp in loopback mode */
-#ifndef DO_1GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]);
-        uDHCPSetStateMachineEnable(&IFContext[uId], SM_TRUE);
-#endif
-      } else {    /* for all other i/f's i.e. the 40gbe i/f's */
-        /* do not enable dhcp in loopback mode */
-#ifndef DO_40GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]);
-        uDHCPSetStateMachineEnable(&IFContext[uId], SM_TRUE);
-#endif
-      }
-    }
-
-    /* check for link activity - only available on 40gbe links */
-    if (uId != 0){
-      /*
-       * report the first time link rx activity is detected - this gives us a
-       * fairly good indication of when the switch's link becomes ready.
-       */
-      if (pIFObjectPtr->uIFLinkRxActive == 0){
-        uActivityMask = 1 << (15 + (4*uId));
-        if (uReg & uActivityMask){
-          pIFObjectPtr->uIFLinkRxActive = 1;
-          xil_printf("I/F  [%02x] LINK %x RX ACTIVITY!\r\n", uId, uId);
-        }
-      }
-    }
-
-    pIFObjectPtr->uIFLinkStatus = LINK_UP;
-  } else {
-    // Check if the link was previously up
-    if (pIFObjectPtr->uIFLinkStatus == LINK_UP){
-      xil_printf("I/F  [%02x] LINK %x HAS GONE DOWN!\r\n", uId, uId);
-
-      if (uId == 0){  /* 1gbe i/f */
-        /* do not set in loopback mode */
-#ifndef DO_1GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]); /* this will reset and disable dhcp state machine */
-        uEthernetFabricIPAddress[uId] = 0;
-        uEthernetGatewayIPAddress[uId] = 0;
-        uEthernetSubnet[uId] = 0;
-        pIFObjectPtr->uIFEthernetSubnet = 0;
-
-        /* legacy dhcp states */
-        uDHCPState[uId] = DHCP_STATE_IDLE;
-#endif
-      } else {
-        /* do not set in loopback mode */
-#ifndef DO_40GBE_LOOPBACK_TEST
-        vDHCPStateMachineReset(&IFContext[uId]); /* this will reset and disable dhcp state machine */
-        uEthernetFabricIPAddress[uId] = 0;
-        uEthernetGatewayIPAddress[uId] = 0;
-        uEthernetSubnet[uId] = 0;
-        pIFObjectPtr->uIFEthernetSubnet = 0;
-
-        /* legacy dhcp states */
-        uDHCPState[uId] = DHCP_STATE_IDLE;
-        pIFObjectPtr->uIFLinkRxActive = 0;
-#endif
-      }
-    }
-
-    pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
-    pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
-
-    uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
-  }
-}
 
 
 //=================================================================================
@@ -719,9 +362,9 @@ void InitialiseEthernetInterfaceParameters()
   for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++){
     //uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
     //uEthernetLinkUp[uId] = LINK_DOWN;
-    uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
-    uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
-    uEthernetSubnet[uId] = ETHERNET_FABRIC_SUBNET;
+    //uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
+    //uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
+    //uEthernetSubnet[uId] = ETHERNET_FABRIC_SUBNET;
     uIPIdentification[uId] = 0x7342;
 
 #ifdef DO_40GBE_LOOPBACK_TEST
@@ -1009,6 +652,7 @@ int main()
   uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
   uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
 
+  struct sIFObject *pIFObjectPtr[NUM_ETHERNET_INTERFACES]; /* store i/f state handles */
   int iStatus;
   u32 uReadReg;
   u8 uEthernetId;
@@ -1061,6 +705,9 @@ int main()
 #ifdef TIME_PROFILE
   u32 time1 = 0, time2 = 0;
 #endif
+
+  u8 uFrontPanelLedsValue = 0;
+  u8 n_links;
 
   /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
@@ -1318,112 +965,116 @@ int main()
     /* 6th octet of mac should equal id anyway */
     uTempMac[5] = uEthernetFabricMacLow[uEthernetId] & 0xff;
 
-    iStatus = uInterfaceInit(&(IFContext[uEthernetId]), (u8 *) &(uReceiveBuffer[uEthernetId][0]), (RX_BUFFER_MAX * 4), (u8 *) uTransmitBuffer, (TX_BUFFER_MAX * 4), uTempMac, uEthernetId);
-    if (iStatus != IF_RETURN_OK){
+    pIFObjectPtr[uEthernetId] = InterfaceInit(uEthernetId,
+        (u8 *) &(uReceiveBuffer[uEthernetId][0]),
+        (RX_BUFFER_MAX * 4),
+        (u8 *) uTransmitBuffer,
+        (TX_BUFFER_MAX * 4),
+        uTempMac);
+
+    if (NULL == pIFObjectPtr[uEthernetId]){
       always_printf("IF   [%02x] Init error!\r\n", uEthernetId);
-    }
+    } else {
 
-    /* fill in interface number in host name and terminate string */
-    uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
-    uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
-    uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
+      /* fill in interface number in host name and terminate string */
+      uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
+      uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
+      uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
 
-    eventDHCPOnMsgBuilt(&IFContext[uEthernetId], &vSendDHCPMsg, NULL);
-    eventDHCPOnLeaseAcqd(&IFContext[uEthernetId], &vSetInterfaceConfig, NULL);
-    vDHCPSetHostName(&IFContext[uEthernetId], (char *) &uTempHostNameString);
+      eventDHCPOnMsgBuilt(pIFObjectPtr[uEthernetId], &vSendDHCPMsg, NULL);
+      eventDHCPOnLeaseAcqd(pIFObjectPtr[uEthernetId], &vSetInterfaceConfig, NULL);
+      vDHCPSetHostName(pIFObjectPtr[uEthernetId], (char *) &uTempHostNameString);
 
-    /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
-       We thus want to delay the start of dhcp till these transitions have settled.
-       The delay is determined by the DHCP_SM_WAIT macro. */
-    //if (uEthernetId == 0){  /* comment out since we now want it on all links */
-    uDHCPSetWaitOnInitFlag(&(IFContext[uEthernetId]));
-    if (dhcp_set){
-      uDHCPSetRetryInterval(&(IFContext[uEthernetId]), (u32) dhcp_retry);
-      uDHCPSetInitWait(&(IFContext[uEthernetId]), (u32) dhcp_wait);
-    }
-    //}
+      /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
+         We thus want to delay the start of dhcp till these transitions have settled.
+         The delay is determined by the DHCP_SM_WAIT macro. */
+      //if (uEthernetId == 0){  /* comment out since we now want it on all links */
+      uDHCPSetWaitOnInitFlag(pIFObjectPtr[uEthernetId]);
+      if (dhcp_set){
+        uDHCPSetRetryInterval(pIFObjectPtr[uEthernetId], (u32) dhcp_retry);
+        uDHCPSetInitWait(pIFObjectPtr[uEthernetId], (u32) dhcp_wait);
+      }
+      //}
 
-    /*
-     * NOTE: specifically for site - try to request the previous ip from the
-     * server in an attempt to reduce dhcp traffic at init. On site, only one
-     * 40gbe link is connected (i/f 1) and provision is currently only made
-     * for this one ip to persist between reconfig's.
-     * TODO: perhaps expand for all links - will require more persistent memory
-     */
-    if (uEthernetId == 1){
-      /* FIXME: move declarartions up */
-      u8 byte;
-      u32 tempIP = 0;
+      /*
+       * NOTE: specifically for site - try to request the previous ip from the
+       * server in an attempt to reduce dhcp traffic at init. On site, only one
+       * 40gbe link is connected (i/f 1) and provision is currently only made
+       * for this one ip to persist between reconfig's.
+       * TODO: perhaps expand for all links - will require more persistent memory
+       */
+      if (uEthernetId == 1){
+        /* FIXME: move declarartions up */
+        u8 byte;
+        u32 tempIP = 0;
 
-      /* check if we have cached the ip from the previous reconfigure cycle. */
-      PersistentMemory_ReadByte(DHCP_CACHED_IP_STATE_INDEX, &byte);
-      if (byte == 1){
-        /* set the IP to cached IP */
-        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT0_INDEX, &byte);
-        tempIP = tempIP | ((u32) byte << 24);
-        IFContext[uEthernetId].arrIFAddrIP[0] = byte;
-        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT1_INDEX, &byte);
-        tempIP = tempIP | ((u32) byte << 16);
-        IFContext[uEthernetId].arrIFAddrIP[1] = byte;
-        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT2_INDEX, &byte);
-        tempIP = tempIP | ((u32) byte << 8);
-        IFContext[uEthernetId].arrIFAddrIP[2] = byte;
-        PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT3_INDEX, &byte);
-        tempIP = tempIP | ((u32) byte);
-        IFContext[uEthernetId].arrIFAddrIP[3] = byte;
+        /* check if we have cached the ip from the previous reconfigure cycle. */
+        PersistentMemory_ReadByte(DHCP_CACHED_IP_STATE_INDEX, &byte);
+        if (byte == 1){
+          /* set the IP to cached IP */
+          PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT0_INDEX, &byte);
+          tempIP = tempIP | ((u32) byte << 24);
+          PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT1_INDEX, &byte);
+          tempIP = tempIP | ((u32) byte << 16);
+          PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT2_INDEX, &byte);
+          tempIP = tempIP | ((u32) byte << 8);
+          PersistentMemory_ReadByte(DHCP_CACHED_IP_OCT3_INDEX, &byte);
+          tempIP = tempIP | ((u32) byte);
 
-        /* pre-load state machine to attempt to request the same lease */
-        uDHCPSetRequestCachedIP(&(IFContext[uEthernetId]), tempIP);
-        /*
-         * Some more site-specific stuff:
-         * Also set the fabric interface parameters "preemptively" with the
-         * knowledge that we will always receive the same dhcp ip lease for the
-         * same switch interface on site. These settings only persist between
-         * "warm" reboots and thus will not have an impact after power-down.
-         * FIXME: add functionality to clear fabric interface parameters upon
-         * DHCP NAK receipt - this will add another safety check that the
-         * interface was not somehow configured with incorrect lease parameters.
-         * Background: this feature added to help overcome the DHCP "bottleneck"
-         * issue currently experienced on site. This allows us to communicate
-         * with the skarab before DHCP actually completes. Use of this feature
-         * together with the RECONFIG_UPON_NO_DHCP feature is strongly
-         * discouraged.
-         */
+          /* pre-load state machine to attempt to request the same lease */
+          uDHCPSetRequestCachedIP(pIFObjectPtr[uEthernetId], tempIP);
+          /*
+           * Some more site-specific stuff:
+           * Also set the fabric interface parameters "preemptively" with the
+           * knowledge that we will always receive the same dhcp ip lease for the
+           * same switch interface on site. These settings only persist between
+           * "warm" reboots and thus will not have an impact after power-down.
+           * FIXME: add functionality to clear fabric interface parameters upon
+           * DHCP NAK receipt - this will add another safety check that the
+           * interface was not somehow configured with incorrect lease parameters.
+           * Background: this feature added to help overcome the DHCP "bottleneck"
+           * issue currently experienced on site. This allows us to communicate
+           * with the skarab before DHCP actually completes. Use of this feature
+           * together with the RECONFIG_UPON_NO_DHCP feature is strongly
+           * discouraged.
+           */
 #ifdef PREEMPT_CONFIGURE_FABRIC_IF
-        u32 tempMask = 0;
+          u32 tempMask = 0;
 
-        SetFabricSourceIPAddress(uEthernetId, tempIP);
-        ProgramARPCacheEntry(uEthernetId, byte,
-            uEthernetFabricMacHigh[uEthernetId],
-            ((uEthernetFabricMacMid[uEthernetId] << 16) |
-             uEthernetFabricMacLow[uEthernetId]));
-        uEthernetFabricIPAddress[uEthernetId] = tempIP;
+          SetFabricSourceIPAddress(uEthernetId, tempIP);
+          ProgramARPCacheEntry(uEthernetId, byte,
+              uEthernetFabricMacHigh[uEthernetId],
+              ((uEthernetFabricMacMid[uEthernetId] << 16) |
+               uEthernetFabricMacLow[uEthernetId]));
+          //uEthernetFabricIPAddress[uEthernetId] = tempIP;
 
-        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT0_INDEX, &byte);
-        tempMask = tempMask | ((u32) byte << 24);
-        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT1_INDEX, &byte);
-        tempMask = tempMask | ((u32) byte << 16);
-        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT2_INDEX, &byte);
-        tempMask = tempMask | ((u32) byte << 8);
-        PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT3_INDEX, &byte);
-        tempMask = tempMask | ((u32) byte);
+          PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT0_INDEX, &byte);
+          tempMask = tempMask | ((u32) byte << 24);
+          PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT1_INDEX, &byte);
+          tempMask = tempMask | ((u32) byte << 16);
+          PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT2_INDEX, &byte);
+          tempMask = tempMask | ((u32) byte << 8);
+          PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT3_INDEX, &byte);
+          tempMask = tempMask | ((u32) byte);
 
-        debug_printf("IF   [%02x] setting cached netmask %x\r\n", uEthernetId, tempMask);
-        SetFabricNetmask(uEthernetId, tempMask);
+          debug_printf("IF   [%02x] setting cached netmask %x\r\n", uEthernetId, tempMask);
+          SetFabricNetmask(uEthernetId, tempMask);
 
-        PersistentMemory_ReadByte(DHCP_CACHED_GW_OCT3_INDEX, &byte);
+          PersistentMemory_ReadByte(DHCP_CACHED_GW_OCT3_INDEX, &byte);
 
-        debug_printf("IF   [%02x] setting cached gateway %x\r\n", uEthernetId, byte);
-        SetFabricGatewayARPCacheAddress(uEthernetId, byte);
+          debug_printf("IF   [%02x] setting cached gateway %x\r\n", uEthernetId, byte);
+          SetFabricGatewayARPCacheAddress(uEthernetId, byte);
 
-        uEthernetSubnet[uEthernetId] = (tempIP & tempMask);
-        IFContext[uEthernetId].uIFEthernetSubnet = (tempIP & tempMask);
-        IFContext[uEthernetId].uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
+          //uEthernetSubnet[uEthernetId] = (tempIP & tempMask);   /* TODO: global */
+          pIFObjectPtr[uEthernetId]->uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
-        /* legacy dhcp states */
-        uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
-        EnableFabricInterface(uEthernetId, 1);
+          IFConfig(pIFObjectPtr[uEthernetId], tempIP, tempMask);
+
+          /* legacy dhcp states */
+          uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
+          EnableFabricInterface(uEthernetId, 1);
 #endif
+        }
       }
     }
   }
@@ -1448,9 +1099,9 @@ int main()
 
     for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
     {
-      UpdateEthernetLinkUpStatus(&(IFContext[uEthernetId]));
+      UpdateEthernetLinkUpStatus(pIFObjectPtr[uEthernetId]);
 
-      if (IFContext[uEthernetId].uIFLinkStatus == LINK_UP)
+      if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP)
       {
         uNumWords = GetHostReceiveBufferLevel(uEthernetId);
         if (uNumWords != 0)
@@ -1479,7 +1130,7 @@ int main()
             pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
 
             /* convert the number of 32bit words to a number of 16bit half-words */
-            IFContext[uEthernetId].uNumWordsRead = uNumWords;
+            pIFObjectPtr[uEthernetId]->uNumWordsRead = uNumWords;
             uSize = uNumWords << 1;
 
             /* correct the endianess */
@@ -1487,7 +1138,7 @@ int main()
               pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
             }
 
-            uPacketType = uRecvPacketFilter(&(IFContext[uEthernetId]));
+            uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
             trace_printf("PCKT [%02x] Received packet type %d\r\n", uEthernetId, uPacketType);
 
             /* do relevant checksum validation */
@@ -1502,8 +1153,8 @@ int main()
                       error_printf("%04x ", (pBuffer[n]));
                     }
                     error_printf("\r\n");
-                    IFContext[uEthernetId].uRxUdpChecksumErrors++;
-                    break;  /*TODO FIXME does this break break the switch or the if statement?*/
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_UDP_CHK_ERR);
+                    break;
                   }
                 }
                 /* else no break statement - fall through */
@@ -1515,8 +1166,8 @@ int main()
                 if(uIPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                   if(uChecksum != 0xffff){
                     error_printf("%s [%02x] RX - Invalid IP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : uPacketType == PACKET_FILTER_ICMP ? "ICMP" : "CTRL", uEthernetId);
-                    IFContext[uEthernetId].uRxIpChecksumErrors++;
-                    break;  /*TODO FIXME does this break break the switch or the if statement?*/
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_IP_CHK_ERR);
+                    break;
                   }
                 }
                 /* else no break statement - fall through */
@@ -1543,12 +1194,12 @@ int main()
             if (uValidate){
               switch(uPacketType){
                 case PACKET_FILTER_DHCP:
-                  if (uDHCPMessageValidate(&(IFContext[uEthernetId])) == DHCP_RETURN_OK){
+                  if (uDHCPMessageValidate(pIFObjectPtr[uEthernetId]) == DHCP_RETURN_OK){
                     debug_printf("DHCP [%02x] valid packet received!\r\n", uEthernetId);
-                    uDHCPSetGotMsgFlag(&(IFContext[uEthernetId]));
-                    uDHCPStateMachine(&(IFContext[uEthernetId]));   /* run the DHCP state machine immediately */
+                    uDHCPSetGotMsgFlag(pIFObjectPtr[uEthernetId]);
+                    uDHCPStateMachine(pIFObjectPtr[uEthernetId]);   /* run the DHCP state machine immediately */
                   } else {
-                    IFContext[uEthernetId].uRxDhcpInvalid++;
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_DHCP_INVALID);
                     /* quiet the debug output here a bit since there will be lots of dhcp bcast traffic at startup */
                     /* Note: dhcp server bcast replies will show up as invalid dhcp packets as well */
                     trace_printf("DHCP [%02x] invalid packet received!\r\n", uEthernetId);
@@ -1564,35 +1215,35 @@ int main()
                   break;
 
                 case PACKET_FILTER_ICMP:
-                  if (uICMPMessageValidate(&IFContext[uEthernetId]) == ICMP_RETURN_OK){
+                  if (uICMPMessageValidate(pIFObjectPtr[uEthernetId]) == ICMP_RETURN_OK){
                     debug_printf("ICMP [%02x] valid packet received!\r\n", uEthernetId);
                     uFlagRunTask_ICMP_Reply[uEthernetId] = 1;
                   } else {
-                    IFContext[uEthernetId].uRxIcmpInvalid++;
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ICMP_INVALID);
                     debug_printf("ICMP [%02x] invalid packet received!\r\n", uEthernetId);
                   }
                   break;
 
                 case PACKET_FILTER_ARP:
-                  iStatus =  uARPMessageValidateReply(&IFContext[uEthernetId]);
+                  iStatus =  uARPMessageValidateReply(pIFObjectPtr[uEthernetId]);
                   if (iStatus == ARP_RETURN_REPLY){
                     trace_printf("ARP  [%02x] valid reply received!\r\n", uEthernetId);
-                    IFContext[uEthernetId].uRxArpReply++;
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_REPLY);
                     uFlagRunTask_ARP_Process[uEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_REQUEST){
                     trace_printf("ARP  [%02x] valid request received!\r\n", uEthernetId);
-                    IFContext[uEthernetId].uRxArpRequest++;
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_REQUEST);
                     uFlagRunTask_ARP_Respond[uEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_CONFLICT){
                     error_printf("ARP  [%02x] network address conflict!\r\n", uEthernetId);
-                    IFContext[uEthernetId].uRxArpConflict++;
-                    vDHCPStateMachineReset(&(IFContext[uEthernetId]));
-                    uDHCPSetStateMachineEnable(&(IFContext[uEthernetId]), SM_TRUE);
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_CONFLICT);
+                    vDHCPStateMachineReset(pIFObjectPtr[uEthernetId]);
+                    uDHCPSetStateMachineEnable(pIFObjectPtr[uEthernetId], SM_TRUE);
                     //uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
                     uFlagRunTask_DHCP = 1;
                   } else if (iStatus == ARP_RETURN_INVALID){
                     debug_printf("ARP  [%02x] malformed packet!\r\n", uEthernetId);
-                    IFContext[uEthernetId].uRxArpInvalid++;
+                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_INVALID);
                   } else {
                     /* arp packet probably not meant for us */
                     trace_printf("ARP  [%02x] dropping packet!\r\n", uEthernetId);
@@ -1628,9 +1279,9 @@ int main()
               uResponsePacketLength = (uResponsePacketLength >> 2);
               iStatus =  TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
               if (iStatus != XST_SUCCESS){
-                IFContext[uEthernetId].uTxIpIgmpErr++;
+                IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_IGMP_ERR);
               } else {
-                IFContext[uEthernetId].uTxIpIgmpOk++;
+                IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_IGMP_OK);
               }
               uCurrentIGMPMessage[uEthernetId]++;
             }
@@ -1672,7 +1323,7 @@ int main()
     if (uFlagRunTask_DHCP){
       uFlagRunTask_DHCP = 0;     /* reset task flag */
       for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        uDHCPStateMachine(&(IFContext[uEthernetId]));
+        uDHCPStateMachine(pIFObjectPtr[uEthernetId]);
       }
     }
 
@@ -1685,11 +1336,11 @@ int main()
         trace_printf("CTRL [%02x] Running control task...\r\n", uEthernetId);
         /* TODO: for now, run Peralex Control Protocol handler, slightly hackish */
         /* flip the endianess again */
-        pBuffer = (u16 *) IFContext[uEthernetId].pUserRxBufferPtr;
+        pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserRxBufferPtr;
         // pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
 
         /* convert the number of 32bit words to a number of 16bit half-words */
-        uSize = IFContext[uEthernetId].uNumWordsRead << 1;
+        uSize = pIFObjectPtr[uEthernetId]->uNumWordsRead << 1;
 
 #if 0
         debug_printf("uNumWordsRead = %d\r\n", IFContext[uEthernetId].uNumWordsRead);
@@ -1713,7 +1364,7 @@ int main()
           pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
         }
 
-        iStatus = EthernetRecvHandler(uEthernetId, IFContext[uEthernetId].uNumWordsRead, &uResponsePacketLength);
+        iStatus = EthernetRecvHandler(uEthernetId, pIFObjectPtr[uEthernetId]->uNumWordsRead, &uResponsePacketLength);
 
         if (iStatus == XST_SUCCESS){
           // Send the response packet now
@@ -1725,7 +1376,7 @@ int main()
           if (iStatus != XST_SUCCESS){
             error_printf("CTRL [%02x] Unable to send response\r\n", uEthernetId);
           } else {
-            IFContext[uEthernetId].uTxUdpCtrlOk++;
+            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_IGMP_OK);
           }
 #ifdef TIME_PROFILE
           xil_printf("time2 %08x - time1 %08x = %08x\r\n", time2, time1, time2 - time1);
@@ -1742,13 +1393,13 @@ int main()
     //----------------------------------------------------------------------------//
     for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
       if (uFlagRunTask_ICMP_Reply[uEthernetId]){
-        iStatus = uICMPBuildReplyMessage(&IFContext[uEthernetId]);
+        iStatus = uICMPBuildReplyMessage(pIFObjectPtr[uEthernetId]);
         if (iStatus != ICMP_RETURN_OK){
           debug_printf("ICMP [%02x] Packet build error!\r\n", uEthernetId);
         } else {
           /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-          uSize = (u32) IFContext[uEthernetId].uMsgSize;    /* bytes */
-          pBuffer = (u16 *) IFContext[uEthernetId].pUserTxBufferPtr;
+          uSize = (u32) pIFObjectPtr[uEthernetId]->uMsgSize;    /* bytes */
+          pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserTxBufferPtr;
           if (pBuffer != NULL){
             uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
             for (uIndex = 0; uIndex < uSize; uIndex++){
@@ -1757,9 +1408,9 @@ int main()
             uSize = uSize >> 1;   /*  now convert quantity to amount of 32-bit words */
             if (TransmitHostPacket(uEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
               xil_printf("ICMP [%02x] unable to send reply\r\n", 1);
-              IFContext[uEthernetId].uTxIpIcmpReplyErr++;
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_ICMP_REPLY_ERR);
             } else {
-              IFContext[uEthernetId].uTxIpIcmpReplyOk++;
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_ICMP_REPLY_OK);
             }
           }
         }
@@ -1777,14 +1428,14 @@ int main()
 
         /* TODO FIXME refactor following lines: remove inline declarations, etc. */
         u32 ip;
-        ip = (IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET + 3] & 0xff);
+        ip = (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET + 3] & 0xff);
 
-        u32 u = ((IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET] << 8) & 0xff00) |
-          (IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 1] & 0xff); 
-        u32 l = ((IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 2] << 24) & 0xff000000) |
-          ((IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 3] << 16) & 0xff0000) |
-          ((IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 4] << 8) & 0xff00) |
-          (IFContext[uEthernetId].pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 5] & 0xff); 
+        u32 u = ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET] << 8) & 0xff00) |
+          (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 1] & 0xff); 
+        u32 l = ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 2] << 24) & 0xff000000) |
+          ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 3] << 16) & 0xff0000) |
+          ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 4] << 8) & 0xff00) |
+          (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 5] & 0xff); 
 
         debug_printf("ARP  [%02x] ENTRY - IP#: %03d MAC: %04x.%04x.%04x\r\n", uEthernetId, ip, (u & 0xffff), ((l >> 16) & 0xffff), (l & 0xffff));
         /* TODO: API functions */
@@ -1800,13 +1451,13 @@ int main()
     //----------------------------------------------------------------------------//
     for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
       if (uFlagRunTask_ARP_Respond[uEthernetId]){
-        iStatus = uARPBuildMessage(&IFContext[uEthernetId], ARP_OPCODE_REPLY, 0);
+        iStatus = uARPBuildMessage(pIFObjectPtr[uEthernetId], ARP_OPCODE_REPLY, 0);
         if (iStatus != ARP_RETURN_OK){
           error_printf("ARP  [%02x] Packet build error!\r\n", uEthernetId);
         } else {
           /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-          uSize = (u32) IFContext[uEthernetId].uMsgSize;    /* bytes */
-          pBuffer = (u16 *) IFContext[uEthernetId].pUserTxBufferPtr;
+          uSize = (u32) pIFObjectPtr[uEthernetId]->uMsgSize;    /* bytes */
+          pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserTxBufferPtr;
           if (pBuffer != NULL){
             uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
             for (uIndex = 0; uIndex < uSize; uIndex++){
@@ -1815,9 +1466,9 @@ int main()
             uSize = uSize >> 1;   /*  now convert quantity to amount of 32-bit words */
             if (TransmitHostPacket(uEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
               error_printf("ARP  [%02x] unable to send reply\r\n", 1);
-              IFContext[uEthernetId].uTxEthArpErr++;
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_ARP_ERR);
             } else {
-              IFContext[uEthernetId].uTxEthArpReplyOk++;
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_ARP_REPLY_OK);
             }
           }
         }
@@ -1831,7 +1482,7 @@ int main()
       if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
         uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
         for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          ArpRequestHandler(&(IFContext[uEthernetId]));
+          ArpRequestHandler(pIFObjectPtr[uEthernetId]);
         }
       }
 
@@ -1852,9 +1503,9 @@ int main()
           uSize = uSize >> 1; /* 32 bit words*/
           iStatus = TransmitHostPacket(uEthernetId, (u32*) &pBuffer[0], uSize);
           if (iStatus != XST_SUCCESS){
-            IFContext[uEthernetId].uTxEthLldpErr++;
+            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_ERR);
           } else {
-            IFContext[uEthernetId].uTxEthLldpOk++;
+            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_OK);
           }
         }
       }
@@ -1876,7 +1527,7 @@ int main()
       uDHCPBoundTimeout = 0;
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         /* TODO: create API function to get state */
-        if (IFContext[uEthernetId].DHCPContextState.tDHCPCurrentState < BOUND){
+        if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
           if (uDHCPBoundCount[uEthernetId] < DHCP_BOUND_COUNTER_VALUE){ /*  prevent overflows */
             uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
           }
@@ -1898,8 +1549,8 @@ int main()
           SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
           ResetSdramReadAddress();
           warn_printf("REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+          AboutToBootFromSdram();
         }
-        AboutToBootFromSdram();
         uDoReboot = REBOOT_REQUESTED;
 
         /* Keep track of the number of DHCP caused reboots */
@@ -1920,9 +1571,33 @@ int main()
     if (uFlagRunTask_Diagnostics){
       uFlagRunTask_Diagnostics = 0;
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        PrintInterfaceCounters(&(IFContext[uEthernetId]));
+        PrintInterfaceCounters(pIFObjectPtr[uEthernetId]);
       }
     }
+
+#if NUM_ETHERNET_INTERFACES > 1   /* if we have at least one 40gbe compiled in */
+    if(uFlagRunTask_WriteLEDStatus){
+      uFlagRunTask_WriteLEDStatus = 0;
+      uFrontPanelLedsValue = 0;
+      /* historically, one qsfp module was implemented with four links and thus
+       * this implementation only services 40gbe link 1 up to max 4 */
+      n_links = (NUM_ETHERNET_INTERFACES < 5 ? NUM_ETHERNET_INTERFACES : 5);
+      for (uEthernetId = 1; uEthernetId < n_links; uEthernetId++){
+        if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
+          uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 1);
+          if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState >= BOUND){
+            uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 2);
+          }
+        }
+      }
+      /*
+       * NOTE: the C_WR_FRONT_PANEL_STAT_LED_ADDR register now monitors dhcp on
+       * interfaces
+       */
+      WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
+    }
+#endif
+
 
     if (uDoReboot == REBOOT_REQUESTED)
     {
@@ -2017,10 +1692,10 @@ static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData){
   uReturnValue = TransmitHostPacket(uLocalEthernetId, (u32 *) pLocalBuffer, uLocalSize);
   if (uReturnValue == XST_SUCCESS){
     /* info_printf("DHCP [%02x] sent DHCP packet with xid 0x%x\r\n", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached); */
-    pIFObjectPtr->uTxUdpDhcpOk++;
+    IFCounterIncr(pIFObjectPtr, TX_UDP_DHCP_OK);
   } else {
     error_printf("DHCP [%02x] FAILED to send DHCP packet with xid 0x%x\r\n", uLocalEthernetId, pDHCPObjectPtr->uDHCPXidCached);
-    pIFObjectPtr->uTxUdpDhcpErr++;
+    IFCounterIncr(pIFObjectPtr, TX_UDP_DHCP_ERR);
   }
 
   return uReturnValue;
@@ -2062,6 +1737,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     (pDHCPObjectPtr->arrDHCPAddrSubnetMask[2] << 8 ) |
     pDHCPObjectPtr->arrDHCPAddrSubnetMask[3];
 
+#if 0
   /* convert ip to string and cache for later use / printing */
   if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrIP), ip) != 0){
     error_printf("DHCP [%02x] Unable to convert IP %x to string.\r\n", id, ip);
@@ -2077,15 +1753,20 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     pIFObjectPtr->stringIFAddrNetmask[15] = '\0';
     info_printf("DHCP [%02x] Setting Netmask address to: %s\r\n", id, pIFObjectPtr->stringIFAddrNetmask);
   }
+#endif
 
-  uEthernetFabricIPAddress[id] = ip;
+  //uEthernetFabricIPAddress[id] = ip;
 
   /* Cache the ip and netmask in the IF Object layer */
+#if 0
   memcpy(pIFObjectPtr->arrIFAddrIP, pDHCPObjectPtr->arrDHCPAddrYIPCached, 4);
   memcpy(pIFObjectPtr->arrIFAddrNetmask, pDHCPObjectPtr->arrDHCPAddrSubnetMask, 4);
+#endif
+
+  IFConfig(pIFObjectPtr, ip, netmask);
 
   /* uEthernetSubnet[id] = (ip & 0xFFFFFF00); */
-  uEthernetSubnet[id] = (ip & netmask);
+  /* uEthernetSubnet[id] = (ip & netmask); */
   pIFObjectPtr->uIFEthernetSubnet = (ip & netmask);
 
   uEthernetGatewayIPAddress[id] = (pDHCPObjectPtr->arrDHCPAddrRoute[0] << 24) |

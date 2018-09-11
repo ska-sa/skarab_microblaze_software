@@ -97,7 +97,7 @@ extern "C" {
 #define DHCP_SM_INTERVAL  50    /* interval time (ms) = POLL_INTERVAL * DHCP_SM_INTERVAL */
                                 /* Retry rate -> The state machine will reset if this interval expires before a lease is obtained. */
 #define POLL_INTERVAL 100       /* polling interval, in msecs. ie interval at which state machine is invoked - user defined */
-#define DHCP_SM_WAIT  50        /* wait a prerequisite amount of time before starting dhcp. */
+#define DHCP_SM_WAIT  40        /* wait a prerequisite amount of time before starting dhcp. */
                                 /* -> times by POLL_INTERVAL to get milli-seconds value */
                                 /* NOTE: must be smaller than DHCP_SM_INTERVAL */
 

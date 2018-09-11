@@ -37,9 +37,11 @@ struct sIFObject{
 
   u8 arrIFAddrIP[4];
   u8 stringIFAddrIP[16];
+  u32 uIFAddrIP;
 
   u8 arrIFAddrNetmask[4];
   u8 stringIFAddrNetmask[16];
+  u32 uIFAddrMask;
 
   u8 uIFEthernetId;
   u32 uIFEthernetSubnet;
@@ -100,7 +102,79 @@ struct sIFObject{
   u32 uTxUdpCtrlNack;
 };
 
-u8 uInterfaceInit(struct sIFObject *pIFObjectPtr, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr, u8 uEthernetId);
+struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
+
+struct sIFObject *lookup_if_handle_by_id(u8 id);
+
+void IFConfig(struct sIFObject *pIFObjectPtr, u32 ip, u32 mask);
+void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr);
+
+
+typedef enum {
+  /* these are enumerations for protocols we are expecting */
+  PACKET_FILTER_ARP,
+  PACKET_FILTER_ICMP,
+  PACKET_FILTER_DHCP,
+  PACKET_FILTER_CONTROL,
+  /* these are enumerations to handle unexpected packets or errors */
+  PACKET_FILTER_UNKNOWN,
+  PACKET_FILTER_ERROR,
+  PACKET_FILTER_DROP,
+  PACKET_FILTER_UNKNOWN_UDP,
+  PACKET_FILTER_UNKNOWN_IP,
+  PACKET_FILTER_UNKNOWN_ETH
+} typePacketFilter;
+
+#define ETHER_TYPE_ARP    0x0806
+#define ETHER_TYPE_IPV4   0x0800
+
+#define IPV4_TYPE_ICMP   0x0001
+#define IPV4_TYPE_UDP    0x0011
+
+#define UDP_CONTROL_PORT  0x7778
+#define BOOTP_CLIENT_PORT 0x44
+#define BOOTP_SERVER_PORT 0x43
+
+typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr);
+
+typedef enum {
+  RX_TOTAL,
+  RX_ETH_ARP,
+  RX_ARP_REPLY,
+  RX_ARP_REQUEST,
+  RX_ARP_CONFLICT,
+  RX_ARP_INVALID,
+  RX_ETH_IP,
+  RX_IP_CHK_ERR,
+  RX_IP_ICMP,
+  RX_ICMP_INVALID,
+  RX_IP_UDP,
+  RX_UDP_CHK_ERR,
+  RX_UDP_CTRL,
+  RX_UDP_DHCP,
+  RX_DHCP_INVALID,
+  RX_DHCP_UNKNOWN,
+  RX_UDP_UNKNOWN,
+  RX_IP_UNKNOWN,
+  RX_ETH_UNKNOWN,
+  TX_TOTAL,
+  TX_ETH_ARP_REQ_OK,
+  TX_ETH_ARP_REPLY_OK,
+  TX_ETH_ARP_ERR,
+  TX_ETH_LLDP_OK,
+  TX_ETH_LLDP_ERR,
+  TX_IP_ICMP_REPLY_OK,
+  TX_IP_ICMP_REPLY_ERR,
+  TX_IP_IGMP_OK,
+  TX_IP_IGMP_ERR,
+  TX_UDP_DHCP_OK,
+  TX_UDP_DHCP_ERR,
+  TX_UDP_CTRL_OK,
+  TX_UDP_CTRL_ACK,
+  TX_UDP_CTRL_NACK
+} tCounter;
+
+void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c);
 
 #ifdef __cplusplus
 }

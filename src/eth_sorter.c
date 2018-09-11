@@ -306,7 +306,7 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
 //  ------
 //  XST_SUCCESS if successful
 //=================================================================================
-int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength, struct sIFObject *pIFObj)
+int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
   int iStatus;
   sCommandHeaderT *Command = (sCommandHeaderT *) pCommand;
@@ -376,9 +376,9 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == SDRAM_PROGRAM_OVER_WISHBONE)
       return(SDRAMProgramOverWishboneCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == SET_DHCP_TUNING_DEBUG)
-      return(SetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(SetDHCPTuningDebugCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_DHCP_TUNING_DEBUG)
-      return(GetDHCPTuningDebugCommandHandler(pIFObj, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(GetDHCPTuningDebugCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       xil_printf("Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -464,6 +464,7 @@ int CheckCommandPacket(u8 * pCommand, u32 uCommandLength)
 //=================================================================================
 void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength)
 {
+  struct sIFObject *pIF;
   struct sEthernetHeader *EthernetHeader = (struct sEthernetHeader *) uResponsePacketPtr;
   u8 * uIPResponseHeader = uResponsePacketPtr + sizeof(sEthernetHeaderT);
   struct sIPV4Header *IPHeader = (struct sIPV4Header *) uIPResponseHeader;
@@ -472,6 +473,8 @@ void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength)
   u32 uChecksum;
   u32 uIPHeaderLength = sizeof(sIPV4HeaderT);
   u32 uUdpLength = uResponseLength + sizeof(sUDPHeaderT);
+
+  pIF = lookup_if_handle_by_id(uId);
 
   EthernetHeader->uDestMacHigh = uResponseMacHigh;
   EthernetHeader->uDestMacMid = uResponseMacMid;
@@ -497,8 +500,8 @@ void CreateResponsePacket(u8 uId, u8 * uResponsePacketPtr, u32 uResponseLength)
   IPHeader->uProtocol = IP_PROTOCOL_UDP;
   IPHeader->uTimeToLive = 0x80;
 
-  IPHeader->uSourceIPHigh = (uEthernetFabricIPAddress[uId] >> 16) & 0xFFFF;
-  IPHeader->uSourceIPLow = uEthernetFabricIPAddress[uId] & 0xFFFF;
+  IPHeader->uSourceIPHigh = (pIF->uIFAddrIP >> 16) & 0xFFFF;
+  IPHeader->uSourceIPLow = pIF->uIFAddrIP & 0xFFFF;
   IPHeader->uDestinationIPHigh = (uResponseIPAddr >> 16) & 0xFFFF;
   IPHeader->uDestinationIPLow = uResponseIPAddr & 0xFFFF;
 
@@ -1645,7 +1648,7 @@ int DebugConfigureEthernetCommandHandler(u8 * pCommand, u32 uCommandLength, u8 *
 
   uDHCPState[Command->uId] = DHCP_STATE_COMPLETE;
 
-  uEthernetSubnet[Command->uId] = (uFabricIPAddress & 0xFFFFFF00);
+  //uEthernetSubnet[Command->uId] = (uFabricIPAddress & 0xFFFFFF00);
 
   // Enable ARP requests now that have IP address
   // DONT DO THIS IN LOOPBACK ELSE CAUSES DETECTION OF IP ADDRESS CONFLICTS
@@ -1675,7 +1678,7 @@ int DebugConfigureEthernetCommandHandler(u8 * pCommand, u32 uCommandLength, u8 *
   //uEthernetFabricMacHigh[Command->uId] = Command->uFabricMacHigh;
   //uEthernetFabricMacMid[Command->uId] = Command->uFabricMacMid;
   //uEthernetFabricMacLow[Command->uId] = Command->uFabricMacLow;
-  uEthernetFabricIPAddress[Command->uId] = uFabricIPAddress;
+  //uEthernetFabricIPAddress[Command->uId] = uFabricIPAddress;
   //uEthernetGatewayIPAddress[Command->uId] = (Command->uGatewayIPAddressHigh << 16) | Command->uGatewayIPAddressLow;
   //uEthernetFabricPortAddress[Command->uId] = Command->uFabricPortAddress;
   //uEthernetFabricMultiCastIPAddress[Command->uId] = uFabricMultiCastIPAddress;
@@ -2076,6 +2079,7 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
   struct sIPV4HeaderOptions *IPHeaderOptions = (struct sIPV4HeaderOptions *) uIPV4HeaderOptions;
   u8 * uIGMPHeader = uIPV4HeaderOptions + sizeof(sIPV4HeaderOptionsT);
   struct sIGMPHeader * IGMPHeader = (struct sIGMPHeader *) uIGMPHeader;
+  struct sIFObject *pIF;
 
   u8 uIndex;
   u32 uChecksum;
@@ -2083,6 +2087,8 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
   u32 uIGMPHeaderLength = sizeof(sIGMPHeaderT);
 
   u32 uTempGroupAddress;
+
+  pIF = lookup_if_handle_by_id(uId);
 
   if (uMessageType == IGMP_MEMBERSHIP_REPORT)
     uTempGroupAddress = uGroupAddress;
@@ -2116,8 +2122,8 @@ void CreateIGMPPacket(u8 uId, u8 *pTransmitBuffer, u32 * uResponseLength, u8 uMe
   IPHeader->uProtocol = IP_PROTOCOL_IGMP;
   IPHeader->uTimeToLive = 0x01; // IGMP TTL = 1
 
-  IPHeader->uSourceIPHigh = ((uEthernetFabricIPAddress[uId] >> 16) & 0xFFFF);
-  IPHeader->uSourceIPLow = (uEthernetFabricIPAddress[uId] & 0xFFFF);
+  IPHeader->uSourceIPHigh = ((pIF->uIFAddrIP >> 16) & 0xFFFF);
+  IPHeader->uSourceIPLow = (pIF->uIFAddrIP & 0xFFFF);
 
   if (uMessageType == IGMP_MEMBERSHIP_REPORT)
     uTempGroupAddress = uGroupAddress;
@@ -2193,9 +2199,12 @@ int DebugLoopbackTestCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
   u8 uIndex;
   u32 uTransmitNumWords = ((sizeof(sDebugLoopbackTestReqT) + sizeof(sUDPHeaderT) + sizeof(sIPV4HeaderT) + sizeof(sEthernetHeaderT)) >> 2);
   u32 uReceivedNumWords;
+  struct sIFObject *pIF;
 
   if (uCommandLength < sizeof(sDebugLoopbackTestReqT))
     return XST_FAILURE;
+
+  pIF = lookup_if_handle_by_id(Command->uId);
 
   // Create a packet to send to Ethernet I/F being tested
 
@@ -2223,10 +2232,10 @@ int DebugLoopbackTestCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
   IPHeader->uTimeToLive = 0x80;
 
   // Loopback so IP address matches source address
-  IPHeader->uSourceIPHigh = (uEthernetFabricIPAddress[Command->uId] >> 16) & 0xFFFF;
-  IPHeader->uSourceIPLow = uEthernetFabricIPAddress[Command->uId] & 0xFFFF;
-  IPHeader->uDestinationIPHigh = (uEthernetFabricIPAddress[Command->uId] >> 16) & 0xFFFF;
-  IPHeader->uDestinationIPLow = uEthernetFabricIPAddress[Command->uId] & 0xFFFF;
+  IPHeader->uSourceIPHigh = (pIF->uIFAddrIP >> 16) & 0xFFFF;
+  IPHeader->uSourceIPLow = pIF->uIFAddrIP & 0xFFFF;
+  IPHeader->uDestinationIPHigh = (pIF->uIFAddrIP >> 16) & 0xFFFF;
+  IPHeader->uDestinationIPLow = pIF->uIFAddrIP & 0xFFFF;
 
   uChecksum = CalculateIPChecksum(0, uIPHeaderLength / 2, (u16 *) IPHeader);
   IPHeader->uChecksum = ~uChecksum;
@@ -2665,10 +2674,11 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   return uRetVal;
 }
 
-int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+int SetDHCPTuningDebugCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
   u16 data[4] = {0};
   u16 rom[8];
   u8 uPaddingIndex;
+  struct sIFObject *pIFObj;
 
   sSetDHCPTuningDebugReqT *Command = (sSetDHCPTuningDebugReqT *) pCommand;
   sSetDHCPTuningDebugRespT *Response = (sSetDHCPTuningDebugRespT *) uResponsePacketPtr;
@@ -2679,6 +2689,8 @@ int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u3
 
   /* status: send 0 for failure, 1 for success */
   Response->uStatus = 1;
+
+  pIFObj = lookup_if_handle_by_id(uId);
 
   if (uDHCPSetRetryInterval(pIFObj, Command->uRetryTime) == DHCP_RETURN_FAIL){
     Response->uStatus = 0;
@@ -2729,7 +2741,7 @@ int SetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u3
 }
 
 
-int GetDHCPTuningDebugCommandHandler(struct sIFObject *pIFObj, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+int GetDHCPTuningDebugCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
   u16 data[4] = {0};
   u16 rom[8];
   u8 uPaddingIndex;
