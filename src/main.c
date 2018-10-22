@@ -709,6 +709,8 @@ int main()
   u8 uFrontPanelLedsValue = 0;
   u8 n_links;
 
+  unsigned char *buf,temp;
+
   /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
      and add another one to prevent off-by-one error*/
@@ -1135,7 +1137,16 @@ int main()
 
             /* correct the endianess */
             for (uIndex = 0; uIndex < uSize; uIndex++){
-              pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+              //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+#if 0
+              pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
+#else
+              buf = (unsigned char *) pBuffer;
+              temp = buf[0];
+              buf[0] = buf[1];
+              buf[1] = temp;
+              pBuffer++;
+#endif
             }
 
             uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
@@ -1359,9 +1370,19 @@ int main()
            host has timeout in it's state machine (casperfpga),
            therefore reduce over head (printf's, etc.) */
 
+
         /* correct the endianess */
         for (uIndex = 0; uIndex < uSize; uIndex++){
-          pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+          //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+#if 0
+          pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
+#else
+          buf = (unsigned char *) pBuffer;
+          temp = buf[0];
+          buf[0] = buf[1];
+          buf[1] = temp;
+          pBuffer++;
+#endif
         }
 
         iStatus = EthernetRecvHandler(uEthernetId, pIFObjectPtr[uEthernetId]->uNumWordsRead, &uResponsePacketLength);
