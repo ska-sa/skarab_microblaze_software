@@ -75,16 +75,33 @@ int SoftReset(u8 uId)
 
   u32 uAddressOffset = GetAddressOffset(uId);
 
+#ifdef WISHBONE_LEGACY_MAP
+
   // Assert soft reset bit
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 3, 0x1);
 
   // Wait for reset bit to be cleared indicating that the reset is complete
   do
   {
-    uStatus = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + ONE_GBE_MAC_ADDR + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE));
+    uStatus = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE));
     uTimeout++;
   }
   while(((uStatus & ETH_MAC_SOFT_RESET) != 0x0)&&(uTimeout < ETH_MAC_RESET_TIMEOUT));
+
+#else
+
+  // Assert soft reset bit
+  Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_RESET_PROMISC_ENABLE) + 3, 0x1);
+
+  // Wait for reset bit to be cleared indicating that the reset is complete
+  do
+  {
+    uStatus = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_RESET_PROMISC_ENABLE));
+    uTimeout++;
+  }
+  while(((uStatus & ETH_MAC_SOFT_RESET) != 0x0)&&(uTimeout < ETH_MAC_RESET_TIMEOUT));
+
+#endif
 
   if (uTimeout == ETH_MAC_RESET_TIMEOUT)
     return XST_FAILURE;
@@ -224,7 +241,11 @@ void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 {
   u32 uAddressOffset = GetAddressOffset(uId);
 
+#ifdef WISHBONE_LEGACY_MAP
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE), uPortAddress);
+#else
+  Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT), uPortAddress);
+#endif
 
 }
 
@@ -246,7 +267,11 @@ void EnableFabricInterface(u8 uId, u8 uEnable)
 {
   u32 uAddressOffset = GetAddressOffset(uId);
 
+#ifdef WISHBONE_LEGACY_MAP
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 2, uEnable);
+#else
+  Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_RESET_PROMISC_ENABLE), uEnable);
+#endif
 
 }
 
