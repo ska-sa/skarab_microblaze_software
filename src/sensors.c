@@ -903,13 +903,12 @@ void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
 		u16 temperature;
 		int i;
 
-		unsigned MezzanineSensorPages[4] = {MEZZANINE_0_TEMP_ADC_PAGE,
+		unsigned MezzanineSensorPages[3] = {MEZZANINE_0_TEMP_ADC_PAGE,
 											MEZZANINE_1_TEMP_ADC_PAGE,
-											MEZZANINE_2_TEMP_ADC_PAGE,
-											MEZZANINE_3_TEMP_ADC_PAGE};
+											MEZZANINE_2_TEMP_ADC_PAGE};
 
 
-		for (i = 0; i<4; i++)
+		for (i = 0; i<3; i++)
 		{
 			ReadMezzanineTemperature(ReadBytes, MezzanineSensorPages[i], true);			
 			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
