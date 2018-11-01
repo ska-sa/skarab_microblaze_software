@@ -1036,3 +1036,50 @@ void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch)
   // set the fan speed
   WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes_2, 3);
 }
+//=================================================================================
+//  GetAllHMCDieTemperatures
+//--------------------------------------------------------------------------------
+//	This method reads all the HMC Die temperature sensors on the SKARAB motherboard
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	Response	IN		Pointer to the response packet structure
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response);
+{
+
+	u16 ReadBytes[4];
+	u16 temperature;
+	int i;
+	int tmp;
+
+	unsigned HMC_Mezzanine_Sites[3] = {HMC_Mezzanine_Site_1,
+									   HMC_Mezzanine_Site_2,
+									   HMC_Mezzanine_Site_3};
+
+	int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadBytes);
+	/* TODO: change the HMCReadI2CBytes function prototype to match HMCWriteI2CBytes */
+	int HMCWriteI2CBytes(u16 uId, u16 uSlaveAddress, u32 uWriteAddress, u32 uWriteData);
+
+	for (i = 0; i<3; i++)
+	{
+		// do hmc write to probe temperature read
+		tmp = HMCWriteI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, HMC_Temperature_Write_Reg,
+				HMC_Temperature_Write_Command);
+
+		// then read hmc die temperature
+		tmp = HMCReadI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, HMC_Die_Temperature_Reg,
+				ReadBytes);
+
+		Response->uSensorData[i+94] = ReadBytes[0]; // offset of 94 to account for previous sensor data
+		Response->uSensorData[i+95] = ReadBytes[1]
+		Response->uSensorData[i+96] = ReadBytes[2]
+		Response->uSensorData[i+97] = ReadBytes[3]
+	}
+}
+
+// next offset = 106
