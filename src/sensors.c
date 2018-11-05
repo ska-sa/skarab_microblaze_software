@@ -1049,10 +1049,10 @@ void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch)
 //	------
 //	None
 //=================================================================================
-void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response);
+void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response)
 {
 
-	u16 ReadBytes[4];
+	u16 ReadBytes[5];
 	u16 temperature;
 	int i;
 	int tmp;
@@ -1076,9 +1076,9 @@ void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response);
 				ReadBytes);
 
 		Response->uSensorData[i+94] = ReadBytes[0]; // offset of 94 to account for previous sensor data
-		Response->uSensorData[i+95] = ReadBytes[1]
-		Response->uSensorData[i+96] = ReadBytes[2]
-		Response->uSensorData[i+97] = ReadBytes[3]
+		Response->uSensorData[i+95] = ReadBytes[1];
+		Response->uSensorData[i+96] = ReadBytes[2];
+		Response->uSensorData[i+97] = ReadBytes[3];
 	}
 }
 
