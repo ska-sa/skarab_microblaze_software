@@ -46,6 +46,7 @@ struct sMezzObject {
 #define FIRMW_SUPPORT_FALSE   0
 #define FIRMW_SUPPORT_TRUE    1
   u8 m_firmw_support;  /* has support been compiled into firmware */
+  u8 m_allow_init;     /* set if both hardware AND firmware suppported */
 
   union {
     struct sQSFPObject QSFPContext;

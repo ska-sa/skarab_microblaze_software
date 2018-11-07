@@ -515,7 +515,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
   unsigned uIndex = 0x0;
   u32 uAddressOffset = GetAddressOffset(uId);
-  u16 pktlen = 0, padlen = 0;
+  /* u16 pktlen = 0, padlen = 0; */
   //u32 uReg;
 
   // GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY

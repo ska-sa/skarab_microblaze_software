@@ -1,18 +1,20 @@
 /*
  * Memory with persistent state between FPGA reconfigures is required to hold
- * programtic state upon a reconfigure (not between resets).
+ * programtic state between reconfigures (not between resets).
  * The fan controller MAX31785 chip on the SKARAB motherboard has RAM which
  * can be accessed and used for this purpose. This is done by writing to the
- * chip's registers (chose one's which do not influence operation). For this
- * purpose we will choose registers associated with the MFR_LOCATION PMBus
- * command, which gives us 8 bytes of memory to use.
+ * chip's registers (one's which do not influence operation).
  * We will not issue the "write-to-flash" command. When the FPGA reconfigures,
  * this register can be read and states will persist. Upon reset, the states
  * will be cleared. We do not want to write to FLASH as not to add to the
  * FLASH wear-out.
  *
- * Extended this implementation by using the MFR_DATE registers as well.
- * => now 16 byte (2 x 8-byte) storage block implemented.
+ * The registers used to store the persistent states between FPGA reconfigures
+ * are as follows:
+ * MFR_LOCATION register
+ * MFR_DATE register
+ * MFR_SERIAL register
+ * => we can hold 24 bytes (3 x 8-byte) of data between fpga reconfigurations.
  */
 
 #include <xparameters.h>
@@ -25,9 +27,11 @@
 #include "scratchpad.h"
 
 #define MFR_LOCATION_CMD  0x9c
-#define MFR_DATE_CMD    0x9d
+#define MFR_DATE_CMD      0x9d
+#define MFR_SERIAL_CMD    0x9e
 #define MFR_REGISTER_LEN  8
 
+#define BLOCKS 3
 /*
  * Check whether this memory has been set up for our use. The reason we need to
  * do this is because the 8 bytes of memory associated with the MFR_LOCATION
@@ -45,7 +49,7 @@ typedef enum {
            allows us to have one exit point from function */
 } tPMemOperation;
 
-/* local unction prototype */
+/* local function prototype */
 static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index, u8 *byte_data);
 
 /* wrappers */
@@ -74,14 +78,15 @@ tPMemReturn PersistentMemory_Clear(void){
  * us to create wrapper functions for each operation.
  */
 static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index, u8 *byte_data){
-  const u16 wr_bytes_page[2] = {PAGE_CMD, 255};
-  const u16 MFR_registers_default_values[2][8] = {
+  const u16 wr_bytes_page[BLOCKS] = {PAGE_CMD, 255};
+  const u16 MFR_registers_default_values[BLOCKS][8] = {
+    {0x30, 0x31, 0x30, 0x31, 0x30, 0x31, 0x30, 0x31},
     {0x30, 0x31, 0x30, 0x31, 0x30, 0x31, 0x30, 0x31},
     {0x30, 0x31, 0x30, 0x31, 0x30, 0x31, 0x30, 0x31}
   };
-  static const u16 lookup_cmd[2] = {MFR_LOCATION_CMD, MFR_DATE_CMD};
-  u16 rd_bytes[2][8] = {0x0};
-  u16 wr_bytes_data[2][MFR_REGISTER_LEN + 1] = {0}; /* plus one for command id */
+  static const u16 lookup_cmd[BLOCKS] = {MFR_LOCATION_CMD, MFR_DATE_CMD, MFR_SERIAL_CMD};
+  u16 rd_bytes[BLOCKS][8] = {0x0};
+  u16 wr_bytes_data[BLOCKS][MFR_REGISTER_LEN + 1] = {0}; /* plus one for command id */
   u8 index;
   u8 block;
   u8 relative_index;
@@ -152,7 +157,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
     case PMEM_CHECK_REG:
     case PMEM_WRITE_BYTE:
     case PMEM_READ_BYTE:
-      for (block = 0; block < 2; block++){
+      for (block = 0; block < BLOCKS; block++){
         mfr_cmd = lookup_cmd[block];
         ret = PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
             mfr_cmd, rd_bytes[block], MFR_REGISTER_LEN);
@@ -176,7 +181,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
   switch(op){ 
     case PMEM_WRITE_BYTE:
       /* copy registers and set relevant byte */
-      for (block = 0; block < 2; block++){
+      for (block = 0; block < BLOCKS; block++){
         for (index = 0; index < MFR_REGISTER_LEN; index++){
           wr_bytes_data[block][index + 1] = rd_bytes[block][index];
         }
@@ -185,7 +190,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
       /* Note: fall-through i.e. no break */
 
     case PMEM_CLEAR_ALL:
-      for(block = 0; block < 2; block++){
+      for(block = 0; block < BLOCKS; block++){
         wr_bytes_data[block][0] = lookup_cmd[block];
         ret = WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS,
             wr_bytes_data[block], 9);
@@ -198,7 +203,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
       break;
 
     case PMEM_CHECK_REG:
-      for (block = 0; block < 2; block++){
+      for (block = 0; block < BLOCKS; block++){
         for (index = 0; index < MFR_REGISTER_LEN; index++){
           if (rd_bytes[block][index] != MFR_registers_default_values[block][index]){
             ret = PMEM_RETURN_NON_DEFAULT;

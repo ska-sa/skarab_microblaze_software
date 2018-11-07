@@ -85,7 +85,7 @@ static volatile u8 uFlagRunTask_Diagnostics = 0;
 static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 
-static volatile u8 uTimeoutCounter = 255;
+static volatile u16 uTimeoutCounter = 255;
 
 //u32 __attribute__ ((section(".rodata.memtest"))) __attribute__ ((aligned (32))) uMemPlace = 0xAABBCCDD ;
 
@@ -103,7 +103,7 @@ extern u32 _location_checksum_;
 static struct sQSFPObject QSFPContext;
 static struct sAdcObject AdcContext;
 
-//static struct sMezzObject MezzContext[4];   /* holds the state of each mezzanine card*/
+static struct sMezzObject *MezzHandle[4];   /* holds the handle to the state of each mezzanine card*/
 
 //=================================================================================
 //  TimerHandler
@@ -524,7 +524,7 @@ static void InitialiseMezzanineLocations()
   WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
   for (mezz = 0; mezz < 4; mezz++){
-    init_mezz_location(mezz);
+    MezzHandle[mezz] = init_mezz_location(mezz);
   }
 
   if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
@@ -692,8 +692,11 @@ int main()
   u16 uChecksum = 0;
   u32 uHMCBitMask;
 
-#define HMC_MAX_RECONFIG_COUNT 5
-  u8 uHMCReconfigCount = HMC_MAX_RECONFIG_COUNT;
+#define HMC_MAX_RECONFIG_COUNT 3
+  u8 uHMC_Total_ReconfigCount = HMC_MAX_RECONFIG_COUNT;
+  u8 uHMC_Max_ReconfigCount = HMC_MAX_RECONFIG_COUNT;
+  u8 uHMC_ReconfigCount[4] = {0};
+
   u8 PMemState = PMEM_RETURN_ERROR;
 
   typePacketFilter uPacketType = PACKET_FILTER_UNKNOWN;
@@ -710,6 +713,14 @@ int main()
   u8 n_links;
 
   unsigned char *buf,temp;
+
+  u16 rom[8];
+  u16 data[4];    /* this variable reused to read eeprom data - note: only 4 bytes */
+  u16 dhcp_wait = 0;
+  u16 dhcp_retry = 0;
+  u8 dhcp_set = 0;
+
+  u16 uHMCTimeout;
 
   /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
@@ -845,13 +856,43 @@ int main()
   /* dynamically build the bit mask for the hmc cards which are present */
   uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
   for (uIndex = 0; uIndex < 4; uIndex++){
-    if ((uReadReg & (0xF << (uIndex*8))) == (BYTE_MASK_HMC_PRESENT << (uIndex*8))){
-      debug_printf("HMC  [..] MEZZ %d has an HMC present\r\n", uIndex);
+    //if ((uReadReg & (0xF << (uIndex*8))) == (BYTE_MASK_HMC_PRESENT << (uIndex*8))){
+    if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
+      debug_printf("HMC  [..] MEZZ %d has an HMC present. Trying to initialise...\r\n", uIndex);
       uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
     }
   }
+  debug_printf("HMC  [..] bit mask 0x%08x\r\n", uHMCBitMask);
 
-  uTimeoutCounter = HMC_INIT_TIMEOUT;
+  /* set timeout to a default value in case eeprom read fails */
+  uHMCTimeout = HMC_INIT_TIMEOUT;
+
+  /* only do if we have hmc cards present i.e. bitmask != 0 */
+  if (uHMCBitMask){
+    /* read hmc retry timeout and max attempts stored in pg15 of DS2433 EEPROM on Motherboard */
+    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+      if (DS2433ReadMem(rom, 0, data, 3, 0xE4, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+        /* overwrite default */
+        uHMCTimeout = (data[0] & 0xff) | (data[1] << 8);
+        /*
+         * Now ensure that the hmc timeout is a reasonable value since this is
+         * user data in eeprom. Let's say a reasonable range is 1-60s else leave
+         * as default value.
+         */
+        uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 8) ? uHMCTimeout : HMC_INIT_TIMEOUT;
+        /* set max number of attempts before giving up */
+        uHMC_Max_ReconfigCount = data[2];
+        /* a reasonable value for the max hmc retry count is any value larger
+         * than 3. This is to prevent it being set to zero when this feature is
+         * first run without the correct config in flash */
+        uHMC_Max_ReconfigCount = (uHMC_Max_ReconfigCount >= HMC_MAX_RECONFIG_COUNT) ? uHMC_Max_ReconfigCount : HMC_MAX_RECONFIG_COUNT; 
+      }
+    }
+  }
+
+  uTimeoutCounter = uHMCTimeout;
+
+  debug_printf("HMC  [..] setting hmc timeout to %d ms with %d max attempts\r\n", (u32) uTimeoutCounter * 100, uHMC_Max_ReconfigCount);
 
   /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
   do
@@ -865,38 +906,137 @@ int main()
 
   always_printf("INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
-  PersistentMemory_ReadByte(HMC_RECONFIG_COUNT_INDEX, &uHMCReconfigCount);
+  /* if one or some or all of the HMC's don't init and post... */
+  if ((uReadReg & uHMCBitMask) != uHMCBitMask){
+    /*
+     * Read the current stats of the HMS'c stored in Persistent Memory - these are
+     * the stats stored since the last hard reset / power cycle.
+     */
+#if 0
+    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMCReconfigCount);
+#else
+    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMC_Total_ReconfigCount);
+    PersistentMemory_ReadByte(HMC_RECONFIG_HMC0_COUNT_INDEX, &(uHMC_ReconfigCount[0]));
+    PersistentMemory_ReadByte(HMC_RECONFIG_HMC1_COUNT_INDEX, &(uHMC_ReconfigCount[1]));
+    PersistentMemory_ReadByte(HMC_RECONFIG_HMC2_COUNT_INDEX, &(uHMC_ReconfigCount[2]));
+    PersistentMemory_ReadByte(HMC_RECONFIG_HMC3_COUNT_INDEX, &(uHMC_ReconfigCount[3]));
+#endif
 
-  if (uTimeoutCounter == 0){
-    error_printf("HMC  [..] all HMCs did not init within %d ms\r\n", (u32) (HMC_INIT_TIMEOUT * 100));
+    //if (uTimeoutCounter == 0){
+    /* determine which ones did not init and post */
+    for (uIndex = 0; uIndex < 4; uIndex++){
+      if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init)){
+        if (((uReadReg >> uIndex * 8) & BYTE_MASK_HMC_INIT) != BYTE_MASK_HMC_INIT){
+          debug_printf("HMC  [..] HMC-%d did not init/post!\r\n", uIndex);
+          /* increment the relevant failing HMC's counter */
+          uHMC_ReconfigCount[uIndex] = uHMC_ReconfigCount[uIndex] + 1;
+        }
+      }
+    }
+
     if (PMemState != PMEM_RETURN_ERROR){
-      if (uHMCReconfigCount < HMC_MAX_RECONFIG_COUNT){
-        /* for each reconfigure, increment count and write back to register */
-        uHMCReconfigCount = uHMCReconfigCount + 1;
-        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, uHMCReconfigCount);
+      if (uHMC_Total_ReconfigCount < (uHMC_Max_ReconfigCount - 1)){   /* do n-1 times */
+
+        /* for each reconfigure, increment total counter */
+        uHMC_Total_ReconfigCount = uHMC_Total_ReconfigCount + 1;
+
+        /* write back all counters to persistent memory registers */
+        PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, uHMC_Total_ReconfigCount);
+        PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, uHMC_ReconfigCount[0]);
+        PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, uHMC_ReconfigCount[1]);
+        PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, uHMC_ReconfigCount[2]);
+        PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, uHMC_ReconfigCount[3]);
+
         error_printf("HMC  [..] invoking reconfigure of FPGA\r\n");
-        SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-        ResetSdramReadAddress();
-        AboutToBootFromSdram();
+        /* if currently a toolflow image - reboot from SDRAM else reboot from FLASH */
+        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+          SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+          ResetSdramReadAddress();
+          AboutToBootFromSdram();
+          warn_printf("REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+        }
         Delay(100000);
         IcapeControllerInSystemReconfiguration();
-      } else {
-        error_printf("HMC  [..] maximum reconfiguration count reached [%d]\r\n",
-            HMC_MAX_RECONFIG_COUNT);
+      } else {    /* and do this the n-th time */
+        error_printf("HMC  [..] maximum reconfiguration count reached [%d]\r\n", uHMC_Max_ReconfigCount);
+        error_printf("HMC  [..] current hmc reconfig stats - mezz0:%d | mezz1:%d | mezz2:%d | mezz3:%d\r\n",
+            uHMC_ReconfigCount[0], uHMC_ReconfigCount[1], uHMC_ReconfigCount[2], uHMC_ReconfigCount[3] );
+
         /*
-         * clear the persistent memory register here so that the reconfig cycle starts
-         * fresh on the next reset. Otherwise the only way to clear it would be via
-         * hard reset or explicitly writing to it via casperfpga (fan_ctrl/i2c commands)
+         * The stats of each HMC will be recorded in the one-wire eeprom on the
+         * HMC mezzanine card. It will be located at the start of page 15 of the
+         * eeprom. Two values (32-bit unsigned) will be recorded, these are:
+         * 1) the number of times the HMC card did not init/post
+         * 2) the total number of maxed-out retries
+         * These values will only be recorded upon the HMC retry mechanism
+         * max'ing-out.
+         *
+         *  0x1E0 0x1E1 0x1E2 0x1E3
+         *  byte0 byte1 byte2 byte3 of retries
+         *
+         *  0x1E4 0x1E5 0x1E6 0x1E7
+         *  byte0 byte1 byte2 byte3 of total
          */
-        PersistentMemory_WriteByte(HMC_RECONFIG_COUNT_INDEX, 0);
+
+        u16 value[8];
+        u32 retries, total;
+
+        static const u16 one_wire_port_lookup[4] = {
+          [0] = MEZ_0_ONE_WIRE_PORT,
+          [1] = MEZ_1_ONE_WIRE_PORT,
+          [2] = MEZ_2_ONE_WIRE_PORT,
+          [3] = MEZ_3_ONE_WIRE_PORT };
+
+        for (uIndex = 0; uIndex < 4; uIndex++){
+          if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+            /* read from eeprom on respective hmc card */
+            if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+              if (uHMC_ReconfigCount[uIndex]){
+                /* write back to eeprom on the respective hmc card */
+                retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
+                total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
+                value[0] = retries & 0xff;
+                value[1] = (retries >> 8) & 0xff;
+                value[2] = (retries >> 16) & 0xff;
+                value[3] = (retries >> 24) & 0xff;
+                value[4] = total & 0xff;
+                value[5] = (total >> 8) & 0xff;
+                value[6] = (total >> 16) & 0xff;
+                value[7] = (total >> 24) & 0xff;
+                if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                  debug_printf("HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
+                } else {
+                  debug_printf("HMC  [%02x] error writing to DS2433\r\n", uIndex);
+                }
+              }
+            } else {
+              debug_printf("HMC  [%02x] error reading from DS2433\r\n", uIndex);
+            }
+          } else {
+            debug_printf("HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
+          }
+        }
+
       }
     } else {
       error_printf("HMC  [..] error accessing persistent memory register\r\n");
     }
   } else {
     /* if we haven't TIMED OUT then we're OK */
-    always_printf("HMC  [..] all HMCs initialized within %d ms[OK]\r\n", (u32) ((HMC_INIT_TIMEOUT - uTimeoutCounter) * 100));
+    always_printf("HMC  [..] HMCs initialized within %d ms[OK]\r\n", (u32) ((uHMCTimeout - uTimeoutCounter) * 100));
   }
+
+  /*
+   * clear the persistent memory register here so that the reconfig cycle starts
+   * fresh on the next reset. Otherwise the only way to clear it would be via
+   * hard reset or explicitly writing to it via casperfpga (fan_ctrl/i2c commands)
+   */
+  PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, 0);
+  PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, 0);
+  PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, 0);
+  PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, 0);
+  PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
+
 
   error_printf("INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
@@ -947,12 +1087,6 @@ int main()
    * -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
    * -> Retry time at addr 0x1E2(LSB) and 0x1E3(MSB)
    */
-  /* FIXME: move declarartions up */
-  u16 rom[8];
-  u16 data[4];
-  u16 dhcp_wait = 0;
-  u16 dhcp_retry = 0;
-  u8 dhcp_set = 0;
 
   if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){ 
     if (DS2433ReadMem(rom, 0, data, 4, 0xE0, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
@@ -1141,13 +1275,17 @@ int main()
 #if 0
               pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
 #else
-              buf = (unsigned char *) pBuffer;
+              buf = (unsigned char *) (pBuffer + uIndex);
               temp = buf[0];
               buf[0] = buf[1];
               buf[1] = temp;
-              pBuffer++;
+              //pBuffer++;
+              /* TODO: check this logic again!! */
 #endif
             }
+
+            /* reset pBuffer to point to start of buffer since we altered it */
+            //pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
 
             uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
             trace_printf("PCKT [%02x] Received packet type %d\r\n", uEthernetId, uPacketType);
@@ -1160,10 +1298,12 @@ int main()
                 if (uUDPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                   if(uChecksum != 0xffff){
                     error_printf("%s [%02x] RX - Invalid UDP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : "CTRL", uEthernetId);
+#if 0
                     for (u8 n = 0; n < 50; n++){
                       error_printf("%04x ", (pBuffer[n]));
                     }
                     error_printf("\r\n");
+#endif
                     IFCounterIncr(pIFObjectPtr[uEthernetId], RX_UDP_CHK_ERR);
                     break;
                   }

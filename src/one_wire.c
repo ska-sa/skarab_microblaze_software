@@ -849,6 +849,10 @@ int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u
 
   trace_printf("[1WIRE] Read Memory Page...");
 
+  /* TODO: currently there is no failure mechanism when user enters incorrect
+   * device ROM. Try to search for this ROM on the bus with existing function
+   * and fail if not found. */
+
   if (OneWireReset(uOneWirePort) == XST_SUCCESS)
   {
 

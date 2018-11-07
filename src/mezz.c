@@ -41,8 +41,10 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   MezzContext[mezz_site].m_magic = MEZZ_MAGIC;
   MezzContext[mezz_site].m_site = mezz_site;
 
+  MezzContext[mezz_site].m_allow_init = 0;
+
   mt = read_mezz_type_id(mezz_site);    /* get the type id stored on the mezzanine card */
-  MezzContext->m_type = mt;
+  MezzContext[mezz_site].m_type = mt;
 
   ft = get_mezz_firmware_type(mezz_site);   /* get the firmware type compiled
                                                for this mezz */
@@ -58,6 +60,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
           uQSFPMezzanineLocation = mezz_site;     /* TODO: need to get rid of global scope and place within local scope of obj */
         }
         uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
+        MezzContext[mezz_site].m_allow_init = 1;
         //ret = init_qsfp_mezz(&(MezzContext[mezz_site].QSFPContext));
       } else {
         warn_printf("MEZZ [%02x] WARNING: no firmware support for QSFP!\r\n", mezz_site);
@@ -67,6 +70,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
     case MEZ_BOARD_TYPE_HMC_R1000_0005:
       if (MEZ_FIRMW_TYPE_HMC_R1000_0005 == ft){   /* firmware support? */
         MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+        MezzContext[mezz_site].m_allow_init = 1;
       } else {
         warn_printf("MEZZ [%02x] WARNING: no firmware support for HMC!\r\n", mezz_site);
       }
@@ -81,6 +85,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
           uADC32RF45X2MezzanineLocation = mezz_site;
         }
         uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
+        MezzContext[mezz_site].m_allow_init = 1;
         //ret = init_adc_mezz(&(MezzContext[mezz_site].AdcContext));
       } else {
         warn_printf("MEZZ [%02x] WARNING: no firmware support for ADC!\r\n", mezz_site);
