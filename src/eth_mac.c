@@ -538,8 +538,14 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     puReceivePacket[uIndex] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
     //uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
     //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
+#if 0
+    u8 *t = (u8 *) &(puReceivePacket[uIndex]);
+    debug_printf("%02x%02x%02x%02x ",t[0],t[1],t[2],t[3]);
+    ((uIndex != 0) && (uIndex % 15) == 0) ? debug_printf("\r\n") : debug_printf("");
+#endif
   }
 
+#if 0
   /* added to debug packet length and firmware read buffer length discrepancy */
   if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
     pktlen = ((((puReceivePacket[4] >> 16) & 0xff) + ((puReceivePacket[4] >> 24) & 0xff)) * 2) + 8 + 14;
@@ -558,7 +564,11 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   if (uNumWords != pktlen){
     xil_printf("I/F  [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+    for (uIndex = 0x0; uIndex < uNumWords; uIndex++){
+      debug_printf("%08x\r\n", puReceivePacket[uIndex]);
+    }
   }
+#endif
 
   //debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
 
