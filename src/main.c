@@ -60,6 +60,8 @@
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
 
+#define LINK_MON_COUNTER_VALUE  600
+
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
 static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData);
@@ -84,6 +86,9 @@ static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
+#ifdef LINK_MON_RX_40GBE
+static volatile u8 uFlagRunTask_LinkWatchdog = 0;
+#endif
 
 static volatile u16 uTimeoutCounter = 255;
 
@@ -155,6 +160,10 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #ifdef RECONFIG_UPON_NO_DHCP
   uFlagRunTask_CheckDHCPBound = 1;
+#endif
+
+#ifdef LINK_MON_RX_40GBE
+  uFlagRunTask_LinkWatchdog = 1;
 #endif
 
   // DHCP every 10 seconds (timer every 100 ms)
@@ -712,6 +721,11 @@ int main()
   u8 uFrontPanelLedsValue = 0;
   u8 n_links;
 
+#ifdef LINK_MON_RX_40GBE
+  u32 LinkTimeout = 1;
+  u16 uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
+#endif
+
   unsigned char *buf,temp;
 
   u16 rom[8];
@@ -879,7 +893,7 @@ int main()
          * user data in eeprom. Let's say a reasonable range is 1-60s else leave
          * as default value.
          */
-        uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 8) ? uHMCTimeout : HMC_INIT_TIMEOUT;
+        uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 10) ? uHMCTimeout : HMC_INIT_TIMEOUT;
         /* set max number of attempts before giving up */
         uHMC_Max_ReconfigCount = data[2];
         /* a reasonable value for the max hmc retry count is any value larger
@@ -1037,6 +1051,26 @@ int main()
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, 0);
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
 
+#ifdef LINK_MON_RX_40GBE
+  /* set default value */
+  uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
+
+  /* read link monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
+  if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+    if (DS2433ReadMem(rom, 0, data, 2, 0xE7, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+      /* overwrite default */
+      uLinkTimeoutMax  = (data[0] & 0xff) | (data[1] << 8);
+      /*
+       * Now ensure that the link timeout is a reasonable value since this is
+       * user data in eeprom. Let's say a reasonable value is larger than 30s  since
+       * the switch may take some time to initialize the link before we see activity,
+       * else leave as default value.
+       */
+      uLinkTimeoutMax = (uLinkTimeoutMax >= 300) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
+    }
+  }
+  debug_printf("INIT [..] setting 40gbe link timeout to %d ms\r\n", (u32) uLinkTimeoutMax * 100);
+#endif  /* LINK_MON_RX_40GBE */
 
   error_printf("INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
@@ -1673,6 +1707,58 @@ int main()
       uFlagRunTask_LLDP = 0;  
     }
 
+
+    //----------------------------------------------------------------------------//
+    //  40GBE RX LINK MONITOR TASK                                                //
+    //  Triggered on timer interrupt                                              //
+    //----------------------------------------------------------------------------//
+
+    /*
+     * This is another MeerKAT site-specific feature. This feature will
+     * reconfigure the FGPA if the 40gbe link on interface id:1 is up but no
+     * *rx* activity has been detected after n seconds. This is to
+     * combat/eliminate possible rx link issues on site.
+     */
+
+#if defined(LINK_MON_RX_40GBE) && (NUM_ETHERNET_INTERFACES > 1)
+    if (uFlagRunTask_LinkWatchdog && (pIFObjectPtr[1]->uIFLinkStatus == LINK_UP)) {
+      uFlagRunTask_LinkWatchdog = 0;
+
+      /* if the rx side of the link is active, stop the timer by setting timeout
+       * to zero */
+      if (pIFObjectPtr[1]->uIFLinkRxActive == 1){
+        LinkTimeout = 0;
+      }
+
+      /*
+       * If 40gbe link one is not up yet, increment timeout counter.  However,
+       * once the link comes up, this should never-ever run again since
+       * LinkTimeout is set to 0 and can never enter this conditional to alter
+       * it. This also relies on LinkTimeout not equalling 0 at startup - see
+       * initialisation of LinkTimeout at start of main().
+       */
+      if (LinkTimeout != 0){
+        LinkTimeout++;
+      }
+
+      /* timeout after n seconds */
+      if (LinkTimeout > uLinkTimeoutMax){
+        error_printf("REBOOT - 40gbe rx link-1 inactive for %ds!\r\n", uLinkTimeoutMax * 100);
+        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+          /* if it's a toolflow image */
+          SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
+          ResetSdramReadAddress();
+          warn_printf("REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+          AboutToBootFromSdram();
+        }
+        uDoReboot = REBOOT_REQUESTED;
+      }
+    }
+
+#endif
+
+
+#if 0 /* Deprecated - replaced with link monitoring feature above */
     //----------------------------------------------------------------------------//
     //  CHECK DHCP BOUND TASK                                                     //
     //  Triggered on timer interrupt                                              //
@@ -1682,6 +1768,7 @@ int main()
      * an indication that the link did not come up cleanly and the only way to
      * fix this is through a reset
      */
+
 #ifdef RECONFIG_UPON_NO_DHCP
     if(uFlagRunTask_CheckDHCPBound){
       uFlagRunTask_CheckDHCPBound = 0;
@@ -1723,6 +1810,7 @@ int main()
         }
       }
     }
+#endif
 #endif
 
     //----------------------------------------------------------------------------//
