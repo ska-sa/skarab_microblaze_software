@@ -2,43 +2,182 @@
 
 set -e
 
-which dialog > /dev/null
+OPTION=0
+
+#the order of the following are important - last one preffered over previous
+which dialog > /dev/null && OPTION=1
+which zenity > /dev/null && OPTION=2
 
 touch "./Makefile.inc"
 
-LIBDIR=$(dialog --no-cancel --clear --no-collapse --title "Select library path (<SPACE> to auto-complete)" \
-    --backtitle "Please select the path to the microblaze BSP libraries (libc.a, libxil.a, etc.):" \
-    --stdout --dselect "/" 14 60)
+#create a temp file
+tmpfile=$(mktemp -q .Makefile.inc.tmp.XXXX)
+#create a file descritor to write data to after closing temp file
+exec 3>"$tmpfile"
+#create another file descriptor for later reading
+exec 4<"$tmpfile"
+#delete temp file
+rm "$tmpfile"
 
-test -d $LIBDIR
+case "$OPTION" in
 
-echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"$LIBDIR\"\n" > Makefile.inc
+"1")
+#TODO: dialog interface needs work - error checking, etc.
+  dialog --msgbox "TIP: use <SPACE> to auto-complete directory- or file-names" 10 60
 
+  LIBDIR=$(dialog --no-cancel --clear --no-collapse --title "Select library path (<SPACE> to auto-complete)" \
+      --backtitle "Please select the path to the microblaze BSP libraries (libc.a, libxil.a, etc.):" \
+      --stdout --dselect "/" 14 60)
 
-INCDIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to include/ headers (<SPACE> to auto-complete)" \
-    --backtitle "Please select the path to include the microblaze BSP library header files (xparameters.h, xil_hal.h, xio.h, etc.):" \
-    --stdout --dselect "/" 14 60)
+  test -d ${LIBDIR}
 
-test -d $INCDIR
+  INCDIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to include/ headers (<SPACE> to auto-complete)" \
+      --backtitle "Please select the path to include the microblaze BSP library header files (xparameters.h, xil_hal.h, xio.h, etc.):" \
+      --stdout --dselect "/" 14 60)
 
-echo -e "#path to microblaze bsp library hearders:\nINCDIR=\"$INCDIR\"\n" >> Makefile.inc
+  test -d ${INCDIR}
 
+  CCPATH=$(dialog --no-cancel --clear --no-collapse --title "Select path to toolchain (<SPACE> to auto-complete)" \
+      --backtitle "Please select the path in which the microblaze gcc tools are installed:" \
+      --stdout --dselect "/opt/Xilinx/SDK/2016.2/gnu/microblaze/lin/bin/" 14 60)
 
-BUILD_ELF_DIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to output Elf (<SPACE> to auto-complete)" \
-    --backtitle "Please select the path in which to output the Elf file (This is the dir which Vivado searches for Elf):" \
-    --stdout --dselect "/" 14 60)
+  test -d ${CCPATH}
+  clear
+  ;;
 
-test -d $BUILD_ELF_DIR
+"2")
+  while : ; do
+    zenity --info --ok-label="select" --text="Please point me to your Xilinx install directory..."
+    XILDIR=$(zenity --file-selection --directory --filename="/")
+    #CCPATH_INT=$((find ${XILDIR} -name 'mb-gcc' -printf "%h\n" 2>/dev/null) | zenity --progress --auto-close)
+    (find ${XILDIR} -name 'mb-gcc' -printf "%h " 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    CCPATH_INT=$(cat <&4)
+    #test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" && exit 1
+    test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" || break
+  done
 
-echo -e "#path which Vivado searches for Elf file:\nBUILD_ELF_DIR=\"$BUILD_ELF_DIR\"\n" >> Makefile.inc
+  while : ; do
+    #if found - list possibilities (since there may be multiple installs)
+    CCPATH=$(zenity --list --title "Search Results" --text "Finding possible toolchain location(s)" --column "Directory" ${CCPATH_INT})
+    #earlier versions of zenity actually returned option twice seperated by pipe upon double-click selecting
+    #therefore clean in case this happens
+    CCPATH=${CCPATH%|*}
+    echo ${CCPATH}
+    #sanity check - expecting to find compiler mb-gcc in this directory
+    #test ! -e "${CCPATH}/mb-gcc" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" && exit 1
+    test ! -e "${CCPATH}/mb-gcc" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" || break
+  done
+  zenity --info --text="Setting toolchain location to: ${CCPATH}" --no-wrap
 
+  while : ; do
+    #next is the path where the libs to be linked into the microblaze source/elf build lives
+    zenity --info --ok-label="select" --text="Please point me to your microblaze software bsp library directory..."
+    LIBDIR_INT=$(zenity --file-selection --directory --filename="/")
+    #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
+    #selected a higher level parent directory.
+    #LIBDIR=$(find ${LIBDIR_INT} -name 'libxil.a' -printf "%h\n" 2>/dev/null)
+    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    LIBDIR=$(cat <&4)
+    #test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" && exit 1
+    test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" || break
+  done
+  echo ${LIBDIR}
+  zenity --info --text="Setting microblaze library path to: ${LIBDIR}" --no-wrap
 
-CCPATH=$(dialog --no-cancel --clear --no-collapse --title "Select path to toolchain (<SPACE> to auto-complete)" \
-    --backtitle "Please select the path in which the microblaze gcc tools are installed:" \
-    --stdout --dselect "/opt/Xilinx/SDK/2016.2/gnu/microblaze/lin/bin/" 14 60)
+  while : ; do
+    #next is the path where the microblaze bsp library headers live - usually in same parent directory as libs
+    zenity --info --ok-label="select" --text="Please point me to your microblaze software bsp library include headers..."
+    INCDIR_INT=$(zenity --file-selection --directory --filename="${LIBDIR}/../include")
+    #let's try to do a sanity check on this directory - we expect xparameters.h to be here since the user may have
+    #selected a higher level parent directory.
+    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    INCDIR=$(cat <&4)
+    #test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" && exit 1
+    test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" || break
+  done
+  echo ${INCDIR}
+  zenity --info --text="Setting microblaze library headers include path to: ${INCDIR}" --no-wrap
+  ;;
 
-test -d $CCPATH
+*)
+  echo "dialog or zenity not installed - running interactive text mode."
+  echo ">>>Please point me to your Xilinx install directory:"
+  read -e XILDIR
+  #force expansions - example '~'
+  eval XILDIR=${XILDIR}
+  echo "Searching..."
+  CCPATH_INT=$(find ${XILDIR} -name 'mb-gcc' -printf "%h ")
+  test -z "${CCPATH_INT}" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
 
-echo -e "#path to cross-compiler installation directory\nCCPATH=\"$CCPATH\"" >> Makefile.inc
+  #it's possible to have multiple Xilinx installs...
+  echo -e "\nFound $(echo $CCPATH_INT | wc -w) option(s):"
+  COUNT=0
+  for i in ${CCPATH_INT}; do
+    COUNT=$((COUNT+1))
+    echo "${COUNT}> ${i}"
+    #using bash array - probably will not port well to other shells
+    ARRAY[${COUNT}]="${i}"
+  done
 
-clear
+  echo ""
+
+  NUMBER=0
+  while (( ${NUMBER} == 0 || ${NUMBER} > ${#ARRAY[*]})); do
+    echo ">>>Please choose one of the above paths by selecting the corresponding number:"
+    read NUMBER
+    #don't break script on "Enter" with no value
+    test -z ${NUMBER} && NUMBER=0
+  done
+
+  CCPATH=${ARRAY[${NUMBER}]}
+  #expecting to find compiler mb-gcc in this directory
+  test ! -e "${CCPATH}/mb-gcc" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
+  echo -e "\nSetting toolchain location to: ${CCPATH}\n"
+
+  #next is the path where the libs to be linked into the microblaze source/elf build lives
+  echo ">>>Please point me to your microblaze software bsp library directory:"
+  read -e LIBDIR_INT
+  eval LIBDIR_INT=${LIBDIR_INT}
+  #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
+  #selected a higher level parent directory.
+  LIBDIR=$(find "${LIBDIR_INT}" -name 'libxil.a' -printf "%h" -quit)
+  #force shell expansion - for example for "~"
+  eval LIBDIR=${LIBDIR}
+  test ! -e "${LIBDIR}/libxil.a" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
+  echo -e "\nSetting microblaze library path to: ${LIBDIR}\n"
+
+  #next is the path where the microblaze bsp library headers live - usually in same parent directory as libs
+  echo ">>>Please point me to your microblaze software bsp library include headers:"
+  read -e INCDIR_INT
+  eval INCDIR_INT=${INCDIR_INT}
+  #let's try to do a sanity check on this directory - we expect xparameters.h to be here since the user may have
+  #selected a higher level parent directory.
+  INCDIR=$(find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit)
+  test ! -e "${INCDIR}/xparameters.h" && echo "**Error** Expected to find 'xparameters.h' but not found!" && exit 1
+  echo -e "\nSetting microblaze library headers include path to: ${INCDIR}\n"
+  ;;
+esac
+
+#test the validity of the input data ie do paths exist?
+#test -d "$LIBDIR" || (echo "\"${LIBDIR}\" is not a valid directory or does not exist" && exit 1)
+#test -d "$INCDIR" || (echo "\"${INCDIR}\" is not a valid directory or does not exist" && exit 1)
+#test -d "$CCPATH" || (echo "\"${CCPATH}\" is not a valid directory or does not exist" && exit 1)
+
+#build the content to be written to file and first write to temp file descriptor
+echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"$LIBDIR/\"\n" >&3
+echo -e "#path to microblaze bsp library hearders:\nINCDIR=\"$INCDIR/\"\n" >&3
+echo -e "#path to cross-compiler installation directory\nCCPATH=\"$CCPATH/\"" >&3
+
+#clean file
+> Makefile.inc
+
+#copy and append temp file into Makefile.inc
+while read -u 4 line;do echo "$line" >> Makefile.inc;done
+
+#close the file descriptor pointing to the temp file
+exec 3>&-
+exec 4>&-
+
+echo "+--------------------------+"
+echo "| config successfully done |"
+echo "+--------------------------+"
