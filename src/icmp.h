@@ -20,6 +20,10 @@
 #include "ipv4.h"
 #include "if.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* link custom return values */
 #define ICMP_RETURN_OK            XST_SUCCESS
 #define ICMP_RETURN_FAIL          XST_FAILURE
@@ -79,4 +83,7 @@ struct sIFObject;
 u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr);
 u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

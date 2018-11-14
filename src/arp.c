@@ -1,17 +1,20 @@
 /**----------------------------------------------------------------------------
-*   FILE:       arp.c
-*   BRIEF:      Implementation of ARP functionality.
-*
-*   DATE:       OCT 2017
-*
-*   COMPANY:    SKA SA
-*   AUTHOR:     R van Wyk
-*
-*   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
-*------------------------------------------------------------------------------*/
+ *   FILE:       arp.c
+ *   BRIEF:      Implementation of ARP functionality.
+ *
+ *   DATE:       OCT 2017
+ *
+ *   COMPANY:    SKA SA
+ *   AUTHOR:     R van Wyk
+ *
+ *   NOTES:      vim settings: "set sw=2 ts=2 expandtab autoindent"
+ *------------------------------------------------------------------------------*/
 
 #include <xil_types.h>
+#include <xil_assert.h>
+#include <xil_io.h>
 
+#include "eth_mac.h"
 #include "if.h"
 #include "arp.h"
 #include "print.h"
@@ -19,6 +22,7 @@
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
 #define SANE_ARP(IFobject) if (SanityCheckARP(IFobject)) { return ARP_RETURN_FAIL; }
+/* TODO: abort() rather? */
 #else
 #define SANE_ARP(IFobject)
 #endif
@@ -63,7 +67,7 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   SANE_ARP(pIFObjectPtr);
 
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
-  
+
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
     debug_printf("ARP: Ethernet HW Type problem!\r\n");
     return ARP_RETURN_INVALID;
@@ -116,11 +120,12 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
 
 
 /* ARP Response */
-u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, u8 *arrTargetIP){
+u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, u32 uTargetIP){
   u8 *pTxBuffer = NULL;
   u8 *pRxBuffer = NULL;
   u16 uSize; 
   u8 uIndex;
+  u8 arrTargetIP[4] = {0};
 
   SANE_ARP(pIFObjectPtr);
 
@@ -128,6 +133,10 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
 
   uSize = pIFObjectPtr->uUserTxBufferSize;
+
+  if ((tARPMsgType != ARP_OPCODE_REPLY) && (tARPMsgType != ARP_OPCODE_REQUEST)){
+    return ARP_RETURN_FAIL;
+  }
 
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
   memset(pTxBuffer, 0, uSize);
@@ -171,8 +180,7 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   }
 
   memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
-  memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 6);
-
+  memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4);
 
   if (tARPMsgType == ARP_OPCODE_REPLY){
     /* THA ignored for requests */
@@ -181,6 +189,10 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   }
 
   if (tARPMsgType == ARP_OPCODE_REQUEST){
+    arrTargetIP[0] =  ((uTargetIP >> 24) & 0xff);
+    arrTargetIP[1] =  ((uTargetIP >> 16) & 0xff);
+    arrTargetIP[2] =  ((uTargetIP >>  8) & 0xff);
+    arrTargetIP[3] =  ( uTargetIP        & 0xff);
     memcpy(pTxBuffer + ARP_FRAME_BASE + ARP_TGT_PROTO_ADDR_OFFSET, arrTargetIP, 4);
   }
 
@@ -196,4 +208,70 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   trace_printf("\r\n");
 
   return ARP_RETURN_OK;
+}
+
+
+
+//=================================================================================
+//  ArpRequestHandler
+//--------------------------------------------------------------------------------
+//  This method constucts ARP requests to populate the ARP caches in the fabric
+//  Ethernet interfaces.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  None
+//=================================================================================
+/* NOTE: FIXME? this implementation is limited to class C /24 networks since it only cycles
+   through arp requests for IP's .1 to .254 (i.e. the last octet) */
+void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
+{
+  u32 RequestIP;
+  int iStatus;
+  u16 *pBuffer;
+  u32 size, i;
+  u8 id;
+
+  pBuffer = (u16 *) pIFObjectPtr->pUserTxBufferPtr;
+  if (NULL == pBuffer){
+    Xil_AssertVoidAlways();
+  }
+
+  if (pIFObjectPtr->uIFEnableArpRequests == ARP_REQUESTS_ENABLE){
+    RequestIP = pIFObjectPtr->uIFEthernetSubnet | pIFObjectPtr->uIFCurrentArpRequest;
+    /* build the arp request */
+    trace_printf("build : 0x%08x ", RequestIP);
+    uARPBuildMessage(pIFObjectPtr, ARP_OPCODE_REQUEST, RequestIP);
+
+    size = (u32) (pIFObjectPtr->uMsgSize >> 1);    /* bytes to 16-bit words */
+
+    trace_printf("swap: %d ", size);
+    for (i = 0; i < size; i++){
+      pBuffer[i] = Xil_EndianSwap16(pBuffer[i]);
+    }
+
+    id = pIFObjectPtr->uIFEthernetId;
+
+    size = size >> 1;   /*  32-bit words */
+    trace_printf("send: %d %d ", size, id);
+    iStatus = TransmitHostPacket(id, (u32 *) pBuffer, size);
+    if (iStatus == XST_SUCCESS){
+      pIFObjectPtr->uTxEthArpRequestOk++;
+    } else {
+      error_printf("ARP  [%02x] FAILED to send ARP REQUEST to target with IP 0x%08x\r\n", id, RequestIP);
+      pIFObjectPtr->uTxEthArpErr++;
+    }
+
+    trace_printf("done\r\n");
+    /* cycle through IP's from .1 to .254 */
+    if (pIFObjectPtr->uIFCurrentArpRequest == 254){
+      pIFObjectPtr->uIFCurrentArpRequest = 1;
+    } else {
+      pIFObjectPtr->uIFCurrentArpRequest++;
+    }
+  }
 }
