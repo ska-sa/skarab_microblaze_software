@@ -123,10 +123,6 @@ $(ADLER32):
 	$(MAKE) -w -C utils/adler32/
 	@echo ' '
 
-copy: $(ELF)
-	@echo 'Copying file: $< to $(BUILD_ELF_DIR)'
-	$(shell cp $(ELFDIR)/$(ELF) $(BUILD_ELF_DIR))
-
 clean-all: clean
 	$(RM) $(ELFDIR)*.elf
 
@@ -134,6 +130,6 @@ clean:
 	$(MAKE) -C utils/adler32/ clean
 	$(RM) $(OBJDIR)*.o $(OBJDIR)*.d $(ELFDIR)$(ELF)
 
-.PHONY: all clean copy check clean-all
+.PHONY: all clean check clean-all
 
 .FORCE:
