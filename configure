@@ -8,8 +8,6 @@ OPTION=0
 which dialog > /dev/null && OPTION=1
 which zenity > /dev/null && OPTION=2
 
-touch "./Makefile.inc"
-
 #create a temp file
 tmpfile=$(mktemp -q .Makefile.inc.tmp.XXXX)
 #create a file descritor to write data to after closing temp file
@@ -22,26 +20,40 @@ rm "$tmpfile"
 case "$OPTION" in
 
 "1")
-#TODO: dialog interface needs work - error checking, etc.
   dialog --msgbox "TIP: use <SPACE> to auto-complete directory- or file-names" 10 60
 
-  LIBDIR=$(dialog --no-cancel --clear --no-collapse --title "Select library path (<SPACE> to auto-complete)" \
-      --backtitle "Please select the path to the microblaze BSP libraries (libc.a, libxil.a, etc.):" \
-      --stdout --dselect "/" 14 60)
+  while : ; do
+    XILDIR=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your Xilinx install directory..." \
+        --stdout --dselect "/" 14 60)
+    (find ${XILDIR} -name 'mb-gcc' -printf "%h " | tee 1>&3) | dialog --infobox "Searching..." 0 0
+    CCPATH_INT=$(cat <&4)
+    test -z "${CCPATH_INT}" && dialog --msgbox "Expected to find 'mb-gcc' but not found!" 0 0 || break
+  done
+  exec 5>&1
+  CCPATH=$(dialog --no-tags --no-items --menu "Choose toolchain location:" 0 100 0 ${CCPATH_INT} 2>&1 1>&5)
+  exec 5>&-
+  test ! -e "${CCPATH}/mb-gcc" && dialog --msgbox "Expected to find 'mb-gcc' but not found!" 0 0 || break
+  dialog --msgbox "Setting toolchain location to: ${CCPATH}" 0 0
 
-  test -d ${LIBDIR}
+  while : ; do
+    LIBDIR_INT=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your microblaze software bsp library directory..." \
+        --stdout --dselect "/" 14 0)
+    #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
+    #selected a higher level parent directory.
+    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | dialog --infobox "Searching..." 0 0
+    LIBDIR=$(cat <&4)
+    test ! -e "${LIBDIR}/libxil.a" && dialog --msgbox "Expected to find 'libxil.a' but not found!" 0 0 || break
+  done
+  dialog --msgbox "Setting microblaze library path to: ${LIBDIR}" 0 0
 
-  INCDIR=$(dialog --no-cancel --clear --no-collapse --title "Select path to include/ headers (<SPACE> to auto-complete)" \
-      --backtitle "Please select the path to include the microblaze BSP library header files (xparameters.h, xil_hal.h, xio.h, etc.):" \
-      --stdout --dselect "/" 14 60)
-
-  test -d ${INCDIR}
-
-  CCPATH=$(dialog --no-cancel --clear --no-collapse --title "Select path to toolchain (<SPACE> to auto-complete)" \
-      --backtitle "Please select the path in which the microblaze gcc tools are installed:" \
-      --stdout --dselect "/opt/Xilinx/SDK/2016.2/gnu/microblaze/lin/bin/" 14 60)
-
-  test -d ${CCPATH}
+  while : ; do
+    INCDIR_INT=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your microblaze software bsp library include headers..." \
+        --stdout --dselect "${LIBDIR/lib/include}" 14 0)
+    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | dialog --infobox "Searching..." 0 0
+    INCDIR=$(cat <&4)
+    test ! -e "${INCDIR}/xparameters.h" && dialog --msgbox "Expected to find 'xparameters.h' but not found!" 0 0 || break
+  done
+  dialog --msgbox "Setting microblaze library headers include path to: ${INCDIR}" 0 0
   clear
   ;;
 
@@ -50,7 +62,7 @@ case "$OPTION" in
     zenity --info --ok-label="select" --text="Please point me to your Xilinx install directory..."
     XILDIR=$(zenity --file-selection --directory --filename="/")
     #CCPATH_INT=$((find ${XILDIR} -name 'mb-gcc' -printf "%h\n" 2>/dev/null) | zenity --progress --auto-close)
-    (find ${XILDIR} -name 'mb-gcc' -printf "%h " 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    (find ${XILDIR} -name 'mb-gcc' -printf "%h " 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
     CCPATH_INT=$(cat <&4)
     #test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" && exit 1
     test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" || break
@@ -76,7 +88,7 @@ case "$OPTION" in
     #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
     #selected a higher level parent directory.
     #LIBDIR=$(find ${LIBDIR_INT} -name 'libxil.a' -printf "%h\n" 2>/dev/null)
-    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
     LIBDIR=$(cat <&4)
     #test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" && exit 1
     test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" || break
@@ -90,7 +102,7 @@ case "$OPTION" in
     INCDIR_INT=$(zenity --file-selection --directory --filename="${LIBDIR}/../include")
     #let's try to do a sanity check on this directory - we expect xparameters.h to be here since the user may have
     #selected a higher level parent directory.
-    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate
+    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
     INCDIR=$(cat <&4)
     #test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" && exit 1
     test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" || break
@@ -168,6 +180,9 @@ echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"$LIBDIR/\"\n" >&3
 echo -e "#path to microblaze bsp library hearders:\nINCDIR=\"$INCDIR/\"\n" >&3
 echo -e "#path to cross-compiler installation directory\nCCPATH=\"$CCPATH/\"" >&3
 
+#create Makefile.inc if it doesn't exist
+touch "./Makefile.inc"
+
 #clean file
 > Makefile.inc
 
@@ -178,6 +193,9 @@ while read -u 4 line;do echo "$line" >> Makefile.inc;done
 exec 3>&-
 exec 4>&-
 
+cat Makefile.inc
+
+echo ""
 echo "+--------------------------+"
 echo "| config successfully done |"
 echo "+--------------------------+"
