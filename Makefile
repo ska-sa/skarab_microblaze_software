@@ -7,9 +7,15 @@
 
 -include Makefile.inc Makefile.config
 
-#version info
+# get version info for elf naming later
+
 GIT_BRANCH=$(shell git rev-parse --verify -q --abbrev-ref HEAD 2>/dev/null || echo unknown)
-GIT_DESCRIBE=$(shell git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown)
+
+# Note: we want to temporarily ignore any changes to Makefile.config when getting the version info
+#	otherwise the elf will be tagged with "uncommitted-changes" when configuring a build
+GIT_DESCRIBE=$(shell git update-index --assume-unchanged Makefile.config; \
+	git describe --dirty=-uncommitted-changes --always --tags --long 2> /dev/null || echo unknown; \
+	git update-index --no-assume-unchanged Makefile.config)
 
 VERSION=$(GIT_DESCRIBE)-$(GIT_BRANCH)
 
