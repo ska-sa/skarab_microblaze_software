@@ -1814,11 +1814,16 @@ int main()
 #endif
 
     //----------------------------------------------------------------------------//
-    //  DUMP INTERFACE COUNTERS                                                   //
+    //  DUMP INTERFACE COUNTERS AND OTHER USEFUL DEBUG INFO TO TERMINAL           //
     //  Triggered on ICMP ping and timer                                          //
     //----------------------------------------------------------------------------//
     if (uFlagRunTask_Diagnostics){
       uFlagRunTask_Diagnostics = 0;
+
+      /* also print some other useful info for debugging */
+      debug_printf("Memory Test - expected 0x%08x, calculated 0x%08x\r\n", _location_checksum_, uMemTest );
+      debug_printf("Register C_RD_ETH_IF_LINK_UP_ADDR: 0x%08x\r\n", ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR));
+
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         PrintInterfaceCounters(pIFObjectPtr[uEthernetId]);
       }
