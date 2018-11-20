@@ -257,7 +257,15 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
     pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
     pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
 
+    uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
+    /*
+     *  Leave IGMP in it's current state but simply stop sending the messages.
+     *  This is to combat a link "flap" or switch reboot. We will resend the
+     *  igmp messages again when the link / IP is reconfigured.
+     */
+#if 0
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;      /* TODO: remove global */
+#endif
   }
 }
 

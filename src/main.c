@@ -396,7 +396,7 @@ void InitialiseEthernetInterfaceParameters()
     //SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
-    uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
+    uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
     uCurrentIGMPMessage[uId] = 0x0;
 
     status = SoftReset(uId);
@@ -2062,6 +2062,17 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
     PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
+
+    /*
+     *  If we were previously part of a multicast group, try to resend igmp
+     *  subscriptions as soon as we obtain a lease. This will allow us to rejoin
+     *  the multicast group if the link "flaps" or the switch is rebooted.
+     */
+    if (uIGMPState[id] == IGMP_STATE_JOINED_GROUP){
+      xil_printf("I/F  [%02x] resubscribing to previous multicast groups!\r\n", id);
+      uIGMPSendMessage[id] = IGMP_SEND_MESSAGE;
+      uCurrentIGMPMessage[id] = 0x0;
+    }
   }
 
   return 0;
