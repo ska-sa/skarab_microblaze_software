@@ -396,7 +396,7 @@ void InitialiseEthernetInterfaceParameters()
     //SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
 
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
-    uIGMPSendMessage[uId] = IGMP_SEND_MESSAGE;
+    uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
     uCurrentIGMPMessage[uId] = 0x0;
 
     status = SoftReset(uId);
@@ -1814,11 +1814,16 @@ int main()
 #endif
 
     //----------------------------------------------------------------------------//
-    //  DUMP INTERFACE COUNTERS                                                   //
+    //  DUMP INTERFACE COUNTERS AND OTHER USEFUL DEBUG INFO TO TERMINAL           //
     //  Triggered on ICMP ping and timer                                          //
     //----------------------------------------------------------------------------//
     if (uFlagRunTask_Diagnostics){
       uFlagRunTask_Diagnostics = 0;
+
+      /* also print some other useful info for debugging */
+      debug_printf("Memory Test - expected 0x%08x, calculated 0x%08x\r\n", _location_checksum_, uMemTest );
+      debug_printf("Register C_RD_ETH_IF_LINK_UP_ADDR: 0x%08x\r\n", ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR));
+
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         PrintInterfaceCounters(pIFObjectPtr[uEthernetId]);
       }
@@ -2062,6 +2067,17 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
     PersistentMemory_WriteByte(DHCP_CACHED_GW_OCT3_INDEX, pDHCPObjectPtr->arrDHCPAddrRoute[3]);
 
     PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
+
+    /*
+     *  If we were previously part of a multicast group, try to resend igmp
+     *  subscriptions as soon as we obtain a lease. This will allow us to rejoin
+     *  the multicast group if the link "flaps" or the switch is rebooted.
+     */
+    if (uIGMPState[id] == IGMP_STATE_JOINED_GROUP){
+      xil_printf("I/F  [%02x] resubscribing to previous multicast groups!\r\n", id);
+      uIGMPSendMessage[id] = IGMP_SEND_MESSAGE;
+      uCurrentIGMPMessage[id] = 0x0;
+    }
   }
 
   return 0;

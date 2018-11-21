@@ -30,12 +30,19 @@
 //  none
 //=================================================================================
 void PrintInterfaceCounters(struct sIFObject *pIFObj){
+  int i;
+
   if (NULL == pIFObj){
     return;
   }
 
   pIFObj->uTxTotal = pIFObj->uTxEthArpReplyOk + pIFObj->uTxEthArpRequestOk + pIFObj->uTxEthLldpOk +
     pIFObj->uTxIpIcmpReplyOk + pIFObj->uTxIpIgmpOk + pIFObj->uTxUdpDhcpOk + pIFObj->uTxUdpCtrlOk;
+
+  for (i = 0; i < 60; i++){
+    debug_printf("-");
+  }
+  debug_printf("\r\n");
 
   debug_printf("IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\r\n", pIFObj->uIFEthernetId,
       pIFObj->uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
@@ -79,4 +86,9 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
   debug_printf(" Tx%2sCTRL\r\n", "");
   debug_printf("%30s", "|");
   debug_printf(" Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpCtrlOk,       "\r\n");
+
+  for (i = 0; i < 60; i++){
+    debug_printf("-");
+  }
+  debug_printf("\r\n");
 }
