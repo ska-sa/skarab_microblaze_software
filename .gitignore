@@ -4,3 +4,4 @@ output/
 elf/
 Makefile.inc
 tags
+utils/adler32/adler32
