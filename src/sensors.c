@@ -57,6 +57,7 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	GetAllVoltages(Response); // psu voltages
 	GetAllCurrents(Response); // psu currents
 	GetAllMezzanineTempSensors(Response); // mezzanine temperatures
+  GetAllHMCDieTemperatures(Response); // HMC Die Temperatures
 
   // add padding to 64-bit boundary
   for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++)
@@ -1036,3 +1037,100 @@ void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch)
   // set the fan speed
   WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes_2, 3);
 }
+//=================================================================================
+//  GetAllHMCDieTemperatures
+//--------------------------------------------------------------------------------
+//	This method reads all the HMC Die temperature sensors on the SKARAB motherboard
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	Response	IN		Pointer to the response packet structure
+//
+//	Return
+//	------
+//	None
+//=================================================================================
+void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response)
+{
+
+	u16 ReadBytes[4] = {1,2,3,4};
+	u16 uWriteBytes[8];
+  u16 uReadAddress[4];
+	int i;
+	int tmp;
+  int iStatus;
+  int uIndex;
+
+	unsigned HMC_Mezzanine_Sites[3] = {HMC_Mezzanine_Site_1,
+									   HMC_Mezzanine_Site_2,
+									   HMC_Mezzanine_Site_3};
+
+  /* write the following 8 bytes of data to the I2C bus */
+  uWriteBytes[0] = (HMC_Temperature_Write_Reg >> 24) & 0xff;     /* MSB of HMC reg addr */
+  uWriteBytes[1] = (HMC_Temperature_Write_Reg >> 16) & 0xff;
+  uWriteBytes[2] = (HMC_Temperature_Write_Reg >>  8) & 0xff;
+  uWriteBytes[3] = (HMC_Temperature_Write_Reg      ) & 0xff;     /* LSB of HMC reg addr */
+
+  uWriteBytes[4] = (HMC_Temperature_Write_Command >> 24) & 0xff;        /* MSB of data word to be written */
+  uWriteBytes[5] = (HMC_Temperature_Write_Command >> 16) & 0xff;
+  uWriteBytes[6] = (HMC_Temperature_Write_Command >>  8) & 0xff;
+  uWriteBytes[7] = (HMC_Temperature_Write_Command      ) & 0xff;        /* LSB of data word to be written */
+
+	 for (i = 0; i<3; i++)
+	 {
+
+    /*xil_printf("HMC WR[%x]:", HMC_Mezzanine_Sites[i]);
+    for (uIndex = 0; uIndex < 8; uIndex++)
+    {
+    xil_printf(" %x", uWriteBytes[uIndex]);
+    }
+    xil_printf("\r\n");
+    */
+    
+    iStatus = WriteI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uWriteBytes, 8);
+
+    //xil_printf("Before Read: %x %x %x %x\r\n", ReadBytes[0], ReadBytes[1], ReadBytes[2], ReadBytes[3]);
+
+    //xil_printf("HMC_I2C_Address: %x\r\n", HMC_I2C_Address);
+    //xil_printf("HMC_Die_Temperature_Reg: %x\r\n", HMC_Die_Temperature_Reg);
+
+    uReadAddress[0] = (HMC_Die_Temperature_Reg >> 24) & 0xff;
+    uReadAddress[1] = (HMC_Die_Temperature_Reg >> 16) & 0xff;
+    uReadAddress[2] = (HMC_Die_Temperature_Reg >>  8) & 0xff;
+    uReadAddress[3] = (HMC_Die_Temperature_Reg      ) & 0xff;
+
+    //xil_printf("HMC_Die_Temperature_Reg_Bytes: %x %x %x %x\r\n", uReadAddress[0], uReadAddress[1], uReadAddress[2], uReadAddress[3]);
+
+    tmp = HMCReadI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uReadAddress, ReadBytes);
+
+    /*
+    // do hmc write to probe temperature read
+    xil_printf("Doing HMCWriteI2CBytes now . . .\r\n");
+    debug_printf("HMC WR[%x]: addr = %08x and data = %08x\r\n", HMC_Mezzanine_Sites[i], HMC_Temperature_Write_Reg, HMC_Temperature_Write_Command);
+		tmp = HMCWriteI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, HMC_Temperature_Write_Reg, HMC_Temperature_Write_Command);
+
+    debug_printf("HMC WR[%x]: addr = %08x and data = %08x\n", HMC_Mezzanine_Sites[i], HMC_Temperature_Write_Reg, HMC_Temperature_Write_Command);
+
+    xil_printf("HMCWriteI2CBytes complete . . .\r\n");
+
+		// then read hmc die temperature
+		xil_printf("Doing HMCReadI2CBytes now . . .\r\n");
+    tmp = HMCReadI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, HMC_Die_Temperature_Reg, ReadBytes);
+    xil_printf("HMCReadI2CBytes complete . . .\r\n");
+
+    xil_printf("Data: %x %x %x %x\r\n", ReadBytes[0], ReadBytes[1], ReadBytes[2], ReadBytes[3]);
+		*/
+    
+    //xil_printf("After Read: %x %x %x %x\r\n", ReadBytes[0], ReadBytes[1], ReadBytes[2], ReadBytes[3]);
+
+    //xil_printf("DEBUG: Read Data Now: %x %x %x %x\r\n", ReadBytes[0], ReadBytes[1], ReadBytes[2], ReadBytes[3]);
+    
+    Response->uSensorData[(i*4)+94] = ReadBytes[0]; // offset of 94 to account for previous sensor data
+		Response->uSensorData[(i*4)+95] = ReadBytes[1];
+		Response->uSensorData[(i*4)+96] = ReadBytes[2];
+		Response->uSensorData[(i*4)+97] = ReadBytes[3];
+
+    //xil_printf("DEBUG: In Respone Pkt: %x %x %x %x\r\n", Response->uSensorData[i+94],Response->uSensorData[i+94],Response->uSensorData[i+94],Response->uSensorData[i+97]);
+	}
+}
+// next offset = 106

@@ -37,6 +37,7 @@ void GetAllCurrents(sGetSensorDataRespT *Response);
 void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch);
 void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch);
 void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response);
+void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response);
 
 
 // auxiliary functions
