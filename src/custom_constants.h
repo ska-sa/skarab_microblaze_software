@@ -108,6 +108,15 @@ extern "C" {
 #define P1V2_MGTAVTT_CURRENT_MON_PAGE   10
 #define P1V8_CURRENT_MON_PAGE       11
 
+// HMC Mezzanine Sites - used for i2c reads
+#define HMC_Mezzanine_Site_1 1
+#define HMC_Mezzanine_Site_2 2
+#define HMC_Mezzanine_Site_3 3
+#define HMC_I2C_Address 0x10
+#define HMC_Temperature_Write_Reg 0x2b0004
+#define HMC_Temperature_Write_Command 0x8000000a
+#define HMC_Die_Temperature_Reg 0x2b0000
+
 
 // custom structures
 // structs for the request and response packets of commands
@@ -141,7 +150,7 @@ typedef struct sGetSensorDataReq {
 
 typedef struct sGetSensorDataResp {
 	sCommandHeaderT Header;
-	u16				uSensorData[94];
+	u16				uSensorData[106];
 	u16				uPadding[3];
 } sGetSensorDataRespT;
 
