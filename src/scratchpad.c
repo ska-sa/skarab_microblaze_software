@@ -23,7 +23,6 @@
 
 #include "sensors.h"
 #include "i2c_master.h"
-#include "print.h"
 #include "scratchpad.h"
 
 #define MFR_LOCATION_CMD  0x9c

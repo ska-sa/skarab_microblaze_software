@@ -4,7 +4,7 @@
 #include "qsfp.h"
 #include "constant_defs.h"
 #include "i2c_master.h"
-#include "print.h"
+#include "logging.h"
 #include "register.h"
 #include "delay.h"
 
@@ -137,7 +137,7 @@ static typeQSFPInitState qsfp_init_bootloader_version_wr_state(struct sQSFPObjec
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 6);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] Bootloader I2C write [FAILED]\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] Bootloader I2C write [FAILED]\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_INIT_BOOTLOADER_VERSION_READ_MODE;
@@ -150,13 +150,13 @@ static typeQSFPInitState qsfp_init_bootloader_version_rd_state(struct sQSFPObjec
 
   iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] Bootloader I2C read [FAILED]\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] Bootloader I2C read [FAILED]\r\n", uQSFPMezzanineLocation);
   }
 
   uQSFPBootloaderVersionMajor = (uReadBytes[0] >> 4) & 0xF;
   uQSFPBootloaderVersionMinor = uReadBytes[0] & 0xF;
 
-  info_printf("QSFP+[%02x] Mezzanine bootloader version: %x.%x\r\n", uQSFPMezzanineLocation, uQSFPBootloaderVersionMajor, uQSFPBootloaderVersionMinor);
+  log_printf(LOG_LEVEL_INFO, "QSFP+[%02x] Mezzanine bootloader version: %x.%x\r\n", uQSFPMezzanineLocation, uQSFPBootloaderVersionMajor, uQSFPBootloaderVersionMinor);
 
   return QSFP_STATE_INIT_BOOTLOADER_MODE;
 }
@@ -167,11 +167,11 @@ static typeQSFPInitState qsfp_init_bootloader_state(struct sQSFPObject *pQSFPObj
   int iStatus;
 
   uWriteBytes[0] = QSFP_LEAVE_BOOTLOADER_MODE;
-  info_printf("QSFP+[%02x] Mezzanine leaving bootloader mode.\r\n", uQSFPMezzanineLocation);
+  log_printf(LOG_LEVEL_INFO, "QSFP+[%02x] Mezzanine leaving bootloader mode.\r\n", uQSFPMezzanineLocation);
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] Bootloader I2C write [FAILED]\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] Bootloader I2C write [FAILED]\r\n", uQSFPMezzanineLocation);
   }
 
   pQSFPObject->uWaitCount = 0;
@@ -245,7 +245,7 @@ static typeQSFPAppState qsfp_app_update_tx_leds(struct sQSFPObject *pQSFPObject)
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 2);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] TX LED MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] TX LED MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_RX_LEDS;
@@ -286,7 +286,7 @@ static typeQSFPAppState qsfp_app_update_rx_leds(struct sQSFPObject *pQSFPObject)
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 2);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] RX LED MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] RX LED MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_MOD_PRSNT_0_WR;
@@ -301,7 +301,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_0_wr(struct sQSFPObject *pQSFP
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 0 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 0 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_MOD_PRSNT_0_RD;
@@ -314,7 +314,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_0_rd(struct sQSFPObject *pQSFP
 
   iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 0 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 0 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
   } else {
     if (uReadBytes[0] != 0x0) {
       /* If a module is present, take out of reset */
@@ -338,7 +338,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_1_wr(struct sQSFPObject *pQSFP
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 1 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 1 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_MOD_PRSNT_1_RD;
@@ -351,7 +351,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_1_rd(struct sQSFPObject *pQSFP
 
   iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 1 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 1 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
   } else {
     if (uReadBytes[0] != 0x0) {
       /* If a module is present, take out of reset */
@@ -375,7 +375,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_2_wr(struct sQSFPObject *pQSFP
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 2 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 2 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_MOD_PRSNT_2_RD;
@@ -388,7 +388,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_2_rd(struct sQSFPObject *pQSFP
 
   iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 2 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 2 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
   } else {
     if (uReadBytes[0] != 0x0) {
       /* If a module is present, take out of reset */
@@ -412,7 +412,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_3_wr(struct sQSFPObject *pQSFP
 
   iStatus = WriteI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 3 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 3 MEZ I2C WRITE FAILED\r\n", uQSFPMezzanineLocation);
   }
 
   return QSFP_STATE_APP_UPDATING_MOD_PRSNT_3_RD;
@@ -425,7 +425,7 @@ static typeQSFPAppState qsfp_app_update_mod_prsnt_3_rd(struct sQSFPObject *pQSFP
 
   iStatus = ReadI2CBytes(uQSFPMezzanineLocation + 1, QSFP_STM_I2C_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS) {
-    error_printf("QSFP+[%02x] MOD 3 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_ERROR, "QSFP+[%02x] MOD 3 MEZ I2C READ FAILED\r\n", uQSFPMezzanineLocation);
   } else {
     if (uReadBytes[0] != 0x0) {
       /* If a module is present, take out of reset */

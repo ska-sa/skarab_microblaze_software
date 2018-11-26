@@ -10,7 +10,7 @@
 
 #include "invalid_nack.h"
 #include "custom_constants.h"
-#include "print.h"
+#include "logging.h"
 
 // function definitions
 
@@ -36,7 +36,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
   sInvalidOpcodeRespT *Response = (sInvalidOpcodeRespT *) uResponsePacketPtr;
   u8 uPaddingIndex;
 
-  trace_printf("Creating Response Packet for NACK. . .\r\n");
+  log_printf(LOG_LEVEL_TRACE, "Creating Response Packet for NACK. . .\r\n");
   // Create response packet
   Response->Header.uCommandType = NACK_OPCODE_RESP;
   Response->Header.uSequenceNumber = 0xFFFF;
@@ -52,7 +52,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
     Response->uPadding[uPaddingIndex] = 0;
   }
 
-  debug_printf("Created Response for NACK!!!!!\r\n");
+  log_printf(LOG_LEVEL_DEBUG, "Created Response for NACK!!!!!\r\n");
 
   *uResponseLength = sizeof(sInvalidOpcodeRespT);
 

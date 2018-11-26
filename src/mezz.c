@@ -6,7 +6,7 @@
 #include "one_wire.h"
 #include "register.h"
 #include "constant_defs.h"
-#include "print.h"
+#include "logging.h"
 
 static MezzHWType read_mezz_type_id(u8 mezz_site);
 static MezzFirmwType get_mezz_firmware_type(u8 mezz_site);
@@ -34,7 +34,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   SANE_MEZZ_SITE(mezz_site);
 
   if (MEZZ_MAGIC == MezzContext[mezz_site].m_magic){
-    error_printf("MEZZ [%02x] Failed - attempted to overwrite previous state.", mezz_site);
+    log_printf(LOG_LEVEL_ERROR, "MEZZ [%02x] Failed - attempted to overwrite previous state.", mezz_site);
     return &(MezzContext[mezz_site]);
   }
 
@@ -63,7 +63,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
         MezzContext[mezz_site].m_allow_init = 1;
         //ret = init_qsfp_mezz(&(MezzContext[mezz_site].QSFPContext));
       } else {
-        warn_printf("MEZZ [%02x] WARNING: no firmware support for QSFP!\r\n", mezz_site);
+        log_printf(LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for QSFP!\r\n", mezz_site);
       }
       break;
 
@@ -72,7 +72,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
         MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
         MezzContext[mezz_site].m_allow_init = 1;
       } else {
-        warn_printf("MEZZ [%02x] WARNING: no firmware support for HMC!\r\n", mezz_site);
+        log_printf(LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for HMC!\r\n", mezz_site);
       }
       //ret = init_hmc_mezz(mezz);
       break;
@@ -88,7 +88,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
         MezzContext[mezz_site].m_allow_init = 1;
         //ret = init_adc_mezz(&(MezzContext[mezz_site].AdcContext));
       } else {
-        warn_printf("MEZZ [%02x] WARNING: no firmware support for ADC!\r\n", mezz_site);
+        log_printf(LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for ADC!\r\n", mezz_site);
       }
       break;
 
@@ -132,39 +132,39 @@ static MezzHWType read_mezz_type_id(u8 mezz_site){
   mezz_ctl_shadow_reg = mezz_ctl_shadow_reg | mezz_mask;
   WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, mezz_ctl_shadow_reg);
 
-  error_printf("MEZZ [%02x] ", mezz_site);
+  log_printf(LOG_LEVEL_ERROR, "MEZZ [%02x] ", mezz_site);
 
   /* get the ID from one-wire EEPROM */
   ret = OneWireReadRom(device_rom, one_wire_port);
   if (XST_FAILURE == ret){
-    error_printf("UNKNOWN - Failed to read device-rom from one-wire EEPROM.\r\n");
+    log_printf(LOG_LEVEL_ERROR, "UNKNOWN - Failed to read device-rom from one-wire EEPROM.\r\n");
     return MEZ_BOARD_TYPE_UNKNOWN;
   }
 
   ret = DS2433ReadMem(device_rom, 0x0, read_bytes, 0x7, 0x0, 0x0, one_wire_port);
   if (XST_FAILURE == ret){
-    error_printf("UNKNOWN - Failed to read ID bytes from one-wire EEPROM.\r\n");
+    log_printf(LOG_LEVEL_ERROR, "UNKNOWN - Failed to read ID bytes from one-wire EEPROM.\r\n");
     return MEZ_BOARD_TYPE_UNKNOWN;
   }
 
   if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0x99)){
-    error_printf("QSFP+ MEZZANINE\r\n");
+    log_printf(LOG_LEVEL_ERROR, "QSFP+ MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_QSFP;
 
   } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
-    info_printf("QSFP+ PHY MEZZANINE\r\n");
+    log_printf(LOG_LEVEL_INFO, "QSFP+ PHY MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_QSFP_PHY;
 
   } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&(read_bytes[0x6] == 0xE5)){
-    info_printf("ADC32RF45X2 MEZZANINE\r\n");
+    log_printf(LOG_LEVEL_INFO, "ADC32RF45X2 MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;
 
   } else if ((read_bytes[0x0] == 0x53)&&(read_bytes[0x4] == 0xFF)&&(read_bytes[0x5] == 0x00)&&(read_bytes[0x6] == 0x01)){
-    info_printf("HMC R1000-0005 MEZZANINE\r\n");
+    log_printf(LOG_LEVEL_INFO, "HMC R1000-0005 MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_HMC_R1000_0005;
 
   } else {
-    info_printf("UNKNOWN - Unsupported PX number and manufacturer ID.\r\n");
+    log_printf(LOG_LEVEL_INFO, "UNKNOWN - Unsupported PX number and manufacturer ID.\r\n");
     return MEZ_BOARD_TYPE_UNKNOWN;
   }
 }
@@ -192,32 +192,32 @@ static MezzFirmwType get_mezz_firmware_type(u8 mezz_site){
   masked_byte = reg & mask;
   masked_byte = masked_byte >> (mezz_site * 8);
 
-  debug_printf("MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
+  log_printf(LOG_LEVEL_DEBUG, "MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
 
   switch (masked_byte){
     case BYTE_MASK_NONE_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_OPEN;
-      debug_printf("OPEN\r\n");
+      log_printf(LOG_LEVEL_DEBUG, "OPEN\r\n");
       break;
 
     case BYTE_MASK_QSFP_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_QSFP;
-      debug_printf("QSFP\r\n");
+      log_printf(LOG_LEVEL_DEBUG, "QSFP\r\n");
       break;
 
     case BYTE_MASK_HMC_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_HMC_R1000_0005;
-      debug_printf("HMC\r\n");
+      log_printf(LOG_LEVEL_DEBUG, "HMC\r\n");
       break;
 
     case BYTE_MASK_ADC_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2;
-      debug_printf("ADC\r\n");
+      log_printf(LOG_LEVEL_DEBUG, "ADC\r\n");
       break;
 
     default:
       firmw_type = MEZ_FIRMW_TYPE_UNKNOWN;
-      debug_printf("UNKNOWN\r\n");
+      log_printf(LOG_LEVEL_DEBUG, "UNKNOWN\r\n");
       break;
   }
 

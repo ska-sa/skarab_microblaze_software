@@ -38,7 +38,7 @@
 #include "net_utils.h"
 #include "dhcp.h"
 #include "one_wire.h"
-#include "print.h"
+#include "logging.h"
 #include "qsfp.h"
 
 //=================================================================================
@@ -111,7 +111,7 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 
   if (uPacketLength < sizeof(struct sIPV4Header))
   {
-    xil_printf("IP Length problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "IP Length problem\r\n");
     return XST_FAILURE;
   }
 
@@ -119,17 +119,17 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 
   uDestinationIPAddress = (IPHeader->uDestinationIPHigh << 16) | IPHeader->uDestinationIPLow;
 
-  //xil_printf("VERS: %x TOS: %x LEN: %x ID: %x FLGS: %x TTL: %x PROT: %x CHK: %x SRC: %x %x DEST: %x %x\r\n", IPHeader->uVersion, IPHeader->uTypeOfService, IPHeader->uTotalLength, IPHeader->uIdentification, IPHeader->uFlagsFragment, IPHeader->uTimeToLive, IPHeader->uProtocol, IPHeader->uChecksum,  IPHeader->uSourceIPHigh, IPHeader->uSourceIPLow, IPHeader->uDestinationIPHigh, IPHeader->uDestinationIPLow );
+  //log_printf(LOG_LEVEL_INFO, "VERS: %x TOS: %x LEN: %x ID: %x FLGS: %x TTL: %x PROT: %x CHK: %x SRC: %x %x DEST: %x %x\r\n", IPHeader->uVersion, IPHeader->uTypeOfService, IPHeader->uTotalLength, IPHeader->uIdentification, IPHeader->uFlagsFragment, IPHeader->uTimeToLive, IPHeader->uProtocol, IPHeader->uChecksum,  IPHeader->uSourceIPHigh, IPHeader->uSourceIPLow, IPHeader->uDestinationIPHigh, IPHeader->uDestinationIPLow );
 
   if (uPacketLength < IPHeader->uTotalLength)
   {
-    xil_printf("IP Total length problem PKT: %x\r\n", uPacketLength);
+    log_printf(LOG_LEVEL_INFO, "IP Total length problem PKT: %x\r\n", uPacketLength);
 
-    //xil_printf("VERS: %x TOS: %x LEN: %x ID: %x FLGS: %x TTL: %x PROT: %x CHK: %x SRC: %x %x DEST: %x %x\r\n", IPHeader->uVersion, IPHeader->uTypeOfService, IPHeader->uTotalLength, IPHeader->uIdentification, IPHeader->uFlagsFragment, IPHeader->uTimeToLive, IPHeader->uProtocol, IPHeader->uChecksum,  IPHeader->uSourceIPHigh, IPHeader->uSourceIPLow, IPHeader->uDestinationIPHigh, IPHeader->uDestinationIPLow );
+    //log_printf(LOG_LEVEL_INFO, "VERS: %x TOS: %x LEN: %x ID: %x FLGS: %x TTL: %x PROT: %x CHK: %x SRC: %x %x DEST: %x %x\r\n", IPHeader->uVersion, IPHeader->uTypeOfService, IPHeader->uTotalLength, IPHeader->uIdentification, IPHeader->uFlagsFragment, IPHeader->uTimeToLive, IPHeader->uProtocol, IPHeader->uChecksum,  IPHeader->uSourceIPHigh, IPHeader->uSourceIPLow, IPHeader->uDestinationIPHigh, IPHeader->uDestinationIPLow );
 
     /*  TODO FIXME uReceiveBuffer now a 2D array
         for (uIndex = 0; uIndex < 256; uIndex++)
-        xil_printf("%x DATA: %x\r\n", uIndex, uReceiveBuffer[uIndex]);
+        log_printf(LOG_LEVEL_INFO, "%x DATA: %x\r\n", uIndex, uReceiveBuffer[uIndex]);
      */
 
     return XST_FAILURE;
@@ -138,7 +138,7 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
   // IP version
   if ((IPHeader->uVersion & 0xF0) != 0x40)
   {
-    xil_printf("IP Version problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "IP Version problem\r\n");
     return XST_FAILURE;
   }
 
@@ -148,7 +148,7 @@ int CheckIPV4Header(u32 uIPAddress, u32 uSubnet, u32 uPacketLength, u8 * pIPHead
 
   if (uChecksum != 0xFFFFu)
   {
-    xil_printf("IP Checksum problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "IP Checksum problem\r\n");
     return XST_FAILURE;
   }
 
@@ -230,14 +230,14 @@ int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPoi
 
   if (uIPPayloadLength < sizeof(struct sUDPHeader))
   {
-    xil_printf("UDP Length problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "UDP Length problem\r\n");
     return XST_FAILURE;
   }
 
   struct sUDPHeader *UDPHeader = (struct sUDPHeader *) pUdpHeaderPointer;
   if (uIPPayloadLength < UDPHeader->uTotalLength)
   {
-    xil_printf("UDP Total length problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "UDP Total length problem\r\n");
     return XST_FAILURE;
   }
 
@@ -254,7 +254,7 @@ int CheckUdpHeader(u8 *pIPHeaderPointer, u32 uIPPayloadLength, u8 *pUdpHeaderPoi
 
   if (uChecksum != 0xFFFFu)
   {
-    xil_printf("UDP Checksum problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "UDP Checksum problem\r\n");
     return XST_FAILURE;
   }
 
@@ -380,14 +380,14 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == GET_DHCP_TUNING_DEBUG)
       return(GetDHCPTuningDebugCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
-      xil_printf("Invalid Opcode Detected!\r\n");
+      log_printf(LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
       //return XST_FAILURE;
     }
 
   }
   else
-    xil_printf("Invalid Opcode Detected: Out of Range!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Invalid Opcode Detected: Out of Range!\r\n");
   return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
   //return XST_FAILURE;
 
@@ -416,28 +416,28 @@ int CheckCommandPacket(u8 * pCommand, u32 uCommandLength)
 
   if (uCommandLength < sizeof(sCommandHeaderT))
   {
-    xil_printf("Length problem!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Length problem!\r\n");
     return XST_FAILURE;
   }
 
   // Command must be odd (response even)
   if ((Command->uCommandType & 1) != 1)
   {
-    xil_printf("Command type problem!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Command type problem!\r\n");
     return XST_FAILURE;
   }
 
   // Out of range
   if (Command->uCommandType > HIGHEST_DEFINED_COMMAND)
   {
-    xil_printf("Command range problem!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Command range problem!\r\n");
     return XST_FAILURE;
   }
 
   // Sequence number should not be same as previous sequence number
   //if (Command->uSequenceNumber == uPreviousSequenceNumber)
   //{
-  //  xil_printf("Sequence number problem!\r\n");
+  //  log_printf(LOG_LEVEL_INFO, "Sequence number problem!\r\n");
   //  return XST_FAILURE;
   //}
 
@@ -553,7 +553,7 @@ int WriteRegCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
 
   uReg = ((Command->uRegDataHigh & 0xFFFF) << 16) | (Command->uRegDataLow & 0xFFFF);
 
-  //xil_printf("BRD: %x ADDR: %x DATA: %x\r\n", Command->uBoardReg, Command->uRegAddress, uReg);
+  //log_printf(LOG_LEVEL_INFO, "BRD: %x ADDR: %x DATA: %x\r\n", Command->uBoardReg, Command->uRegAddress, uReg);
 
   // Execute the command
   if (Command->uBoardReg == 1)
@@ -647,7 +647,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   u32 uWriteData;
   u8 uPaddingIndex;
 
-  xil_printf("Wishbone write...\r\n");
+  log_printf(LOG_LEVEL_INFO, "Wishbone write...\r\n");
   if (uCommandLength < sizeof(sWriteWishboneReqT))
     return XST_FAILURE;
 
@@ -749,10 +749,10 @@ int WriteI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePack
    */
 
 #ifdef DEBUG_PRINT
-  //xil_printf("ID: %x SLAVE ADDRESS: %x NUM BYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uNumBytes);
+  //log_printf(LOG_LEVEL_INFO, "ID: %x SLAVE ADDRESS: %x NUM BYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uNumBytes);
 
   //for (uIndex = 0; uIndex < Command->uNumBytes; uIndex++)
-  //  xil_printf("INDEX: %x DATA: %x\r\n", uIndex, Command->uWriteBytes[uIndex]);
+  //  log_printf(LOG_LEVEL_INFO, "INDEX: %x DATA: %x\r\n", uIndex, Command->uWriteBytes[uIndex]);
 #endif
 
 
@@ -839,7 +839,7 @@ int ReadI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  //xil_printf("ID: %x SLAVE ADDRESS: %x NUM BYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uNumBytes);
+  //log_printf(LOG_LEVEL_INFO, "ID: %x SLAVE ADDRESS: %x NUM BYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uNumBytes);
 #endif
 
   if ((uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT)&&((uQSFPMezzanineLocation + 1) == Command->uId))
@@ -882,7 +882,7 @@ int ReadI2CCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
 
 #ifdef DEBUG_PRINT
   for (uIndex = 0; uIndex < Command->uNumBytes; uIndex++)
-    xil_printf("INDEX: %x READ DATA: %x\r\n", uIndex, Response->uReadBytes[uIndex]);
+    log_printf(LOG_LEVEL_INFO, "INDEX: %x READ DATA: %x\r\n", uIndex, Response->uReadBytes[uIndex]);
 #endif
 
   if (iStatus == XST_SUCCESS)
@@ -930,8 +930,8 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 #ifdef DEBUG_PRINT
   if (Command->uDoSdramAsyncRead == 0)
   {
-    xil_printf("OUT: %x CLR SDR: %x FIN: %x ABT: %x RBT: %x\r\n", Command->uOutputMode, Command->uClearSdram, Command->uFinishedWritingToSdram, Command->uAboutToBootFromSdram, Command->uDoReboot);
-    xil_printf("RST: %x CLR: %x ENBL: %x DO RD: %x\r\n", Command->uResetSdramReadAddress, Command->uClearEthernetStatistics, Command->uEnableDebugSdramReadMode, Command->uDoSdramAsyncRead);
+    log_printf(LOG_LEVEL_INFO, "OUT: %x CLR SDR: %x FIN: %x ABT: %x RBT: %x\r\n", Command->uOutputMode, Command->uClearSdram, Command->uFinishedWritingToSdram, Command->uAboutToBootFromSdram, Command->uDoReboot);
+    log_printf(LOG_LEVEL_INFO, "RST: %x CLR: %x ENBL: %x DO RD: %x\r\n", Command->uResetSdramReadAddress, Command->uClearEthernetStatistics, Command->uEnableDebugSdramReadMode, Command->uDoSdramAsyncRead);
   }
 #endif
 
@@ -964,9 +964,9 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
 #ifdef DEBUG_PRINT
-    xil_printf("Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
-    xil_printf("Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
-    xil_printf("About to send IGMP leave messages.\r\n");
+    log_printf(LOG_LEVEL_INFO, "Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
+    log_printf(LOG_LEVEL_INFO, "Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
+    log_printf(LOG_LEVEL_INFO, "About to send IGMP leave messages.\r\n");
 #endif
 
     /* The clear sdram command is usually called before programming. Thus, in anticipation of a new sdram image being sent */
@@ -1001,7 +1001,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   // Keep it simple for now
   if (Command->uDoReboot == 1)
   {
-    xil_printf("About to reboot. Sending IGMP leave messages now.\r\n");
+    log_printf(LOG_LEVEL_INFO, "About to reboot. Sending IGMP leave messages now.\r\n");
 
     // IcapeControllerInSystemReconfiguration();
     uDoReboot = REBOOT_REQUESTED;
@@ -1042,7 +1042,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     uPreviousSequenceNumber = Command->Header.uSequenceNumber;
 
 #ifdef DEBUG_PRINT
-    //xil_printf("READ DATA: %x\r\n", uReg);
+    //log_printf(LOG_LEVEL_INFO, "READ DATA: %x\r\n", uReg);
 #endif
     Response->uSdramAsyncReadDataHigh = (uReg >> 16) & 0xFFFF;
     Response->uSdramAsyncReadDataLow = uReg & 0xFFFF;
@@ -1118,11 +1118,11 @@ int ReadFlashWordsCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
     return XST_FAILURE;
 
   // Execute the command
-  //xil_printf("NUM WRDS: %x\r\n", Command->uNumWords);
+  //log_printf(LOG_LEVEL_INFO, "NUM WRDS: %x\r\n", Command->uNumWords);
   for (uIndex = 0; uIndex < Command->uNumWords; uIndex++)
   {
     Response->uReadWords[uIndex] = ReadWord(uAddress);
-    //xil_printf("INDX: %x READ: %x\r\n", uIndex, Response->uReadWords[uIndex]);
+    //log_printf(LOG_LEVEL_INFO, "INDX: %x READ: %x\r\n", uIndex, Response->uReadWords[uIndex]);
     uAddress++;
   }
 
@@ -1166,7 +1166,7 @@ int ProgramFlashWordsCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
   int iStatus = XST_SUCCESS;
 
 #ifdef DEBUG_PRINT
-  xil_printf("PRGRM FLASH: %x\r\n", uAddress);
+  log_printf(LOG_LEVEL_INFO, "PRGRM FLASH: %x\r\n", uAddress);
 #endif
 
   if (uCommandLength < sizeof(sProgramFlashWordsReqT))
@@ -1239,7 +1239,7 @@ int EraseFlashBlockCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("BLK ADDR: %x\r\n", uBlockAddress);
+  log_printf(LOG_LEVEL_INFO, "BLK ADDR: %x\r\n", uBlockAddress);
 #endif
 
   // Execute the command
@@ -1291,7 +1291,7 @@ int ReadSpiPageCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponseP
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("SPI READ ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
+  log_printf(LOG_LEVEL_INFO, "SPI READ ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
 #endif
 
   // Execute the command
@@ -1343,7 +1343,7 @@ int ProgramSpiPageCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
+  log_printf(LOG_LEVEL_INFO, "ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
 #endif
 
   // Execute the command
@@ -1401,7 +1401,7 @@ int EraseSpiSectorCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
   u32 uSectorAddress = (Command->uSectorAddressHigh << 16) | Command->uSectorAddressLow;
   u8 uPaddingIndex;
 
-  xil_printf("SPI SECT ERASE ADDR: %x\r\n", uSectorAddress);
+  log_printf(LOG_LEVEL_INFO, "SPI SECT ERASE ADDR: %x\r\n", uSectorAddress);
 
   if (uCommandLength < sizeof(sEraseSpiSectorReqT))
     return XST_FAILURE;
@@ -1460,7 +1460,7 @@ int OneWireReadRomCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 
 #ifdef DEBUG_PRINT
   for (uIndex = 0; uIndex < 8; uIndex++)
-    xil_printf("INDX: %x ROM: %x\r\n", uIndex, Response->uRom[uIndex]);
+    log_printf(LOG_LEVEL_INFO, "INDX: %x ROM: %x\r\n", uIndex, Response->uRom[uIndex]);
 #endif
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
@@ -1509,7 +1509,7 @@ int OneWireDS2433WriteMemCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * 
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("SKP ROM: %x, NUM BYTES: %x TA1: %x TA2: %x ID: %x", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
+  log_printf(LOG_LEVEL_INFO, "SKP ROM: %x, NUM BYTES: %x TA1: %x TA2: %x ID: %x", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
 #endif
 
   // Execute the command
@@ -1572,7 +1572,7 @@ int OneWireDS2433ReadMemCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * u
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("SKIP: %x NUMBYTES: %x TA1: %x TA2: %x ID: %x\r\n", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
+  log_printf(LOG_LEVEL_INFO, "SKIP: %x NUMBYTES: %x TA1: %x TA2: %x ID: %x\r\n", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
 #endif
 
   // Execute the command
@@ -1632,8 +1632,8 @@ int DebugConfigureEthernetCommandHandler(u8 * pCommand, u32 uCommandLength, u8 *
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("ID: %x MAC: %x %x %x ENABLE: %x\r\n", Command->uId, Command->uFabricMacHigh, Command->uFabricMacMid, Command->uFabricMacLow, Command->uEnableFabricInterface);
-  xil_printf("PORT: %x GTWAY: %x %x IP: %x MCSTIP: %x MCSTIPMSK: %x\r\n", Command->uFabricPortAddress, Command->uGatewayIPAddressHigh, Command->uGatewayIPAddressLow, uFabricIPAddress, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+  log_printf(LOG_LEVEL_INFO, "ID: %x MAC: %x %x %x ENABLE: %x\r\n", Command->uId, Command->uFabricMacHigh, Command->uFabricMacMid, Command->uFabricMacLow, Command->uEnableFabricInterface);
+  log_printf(LOG_LEVEL_INFO, "PORT: %x GTWAY: %x %x IP: %x MCSTIP: %x MCSTIPMSK: %x\r\n", Command->uFabricPortAddress, Command->uGatewayIPAddressHigh, Command->uGatewayIPAddressLow, uFabricIPAddress, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 #endif
 
   // Execute the command
@@ -1714,7 +1714,7 @@ int DebugAddARPCacheEntryCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * 
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  xil_printf("ID: %x INDX: %x MAC: %x %x %x\r\n", Command->uId, Command->uIPAddressLower8Bits, Command->uMacHigh, Command->uMacMid, Command->uMacLow);
+  log_printf(LOG_LEVEL_INFO, "ID: %x INDX: %x MAC: %x %x %x\r\n", Command->uId, Command->uIPAddressLower8Bits, Command->uMacHigh, Command->uMacMid, Command->uMacLow);
 #endif
 
   // Execute the command
@@ -1805,7 +1805,7 @@ int PMBusReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  //xil_printf("ID: %x SLV: %x CMD: %x NMBYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uCommandCode, Command->uNumBytes);
+  //log_printf(LOG_LEVEL_INFO, "ID: %x SLV: %x CMD: %x NMBYTES: %x\r\n", Command->uId, Command->uSlaveAddress, Command->uCommandCode, Command->uNumBytes);
 #endif
 
   // Execute the command
@@ -1859,7 +1859,7 @@ int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRe
   uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
 
 #ifdef DEBUG_PRINT
-  xil_printf("ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+  log_printf(LOG_LEVEL_INFO, "ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 #endif
 
   // Execute the command
@@ -1910,7 +1910,7 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
 
   if (uPktLen < sizeof(sArpPacketT))
   {
-    xil_printf("ARP Length problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "ARP Length problem\r\n");
     return XST_FAILURE;
   }
 
@@ -1918,13 +1918,13 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
 
   if (Arp->uHardwareType != 1 || Arp->uProtocolType != ETHERNET_TYPE_IPV4)
   {
-    xil_printf("ARP Type problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "ARP Type problem\r\n");
     return XST_FAILURE;
   }
 
   if (Arp->uHardwareLength != 6 || Arp->uProtocolLength != 4)
   {
-    xil_printf("ARP Hardware length problem\r\n");
+    log_printf(LOG_LEVEL_INFO, "ARP Hardware length problem\r\n");
     return XST_FAILURE;
   }
 
@@ -1940,7 +1940,7 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
 
     if (uSenderIPAddress == uEthernetFabricIPAddress[uId])
     {
-      xil_printf("IP ADDRESS CONFLICT DETECTED! RESTARTING DHCP ON ID: %x\r\n", uId);
+      log_printf(LOG_LEVEL_INFO, "IP ADDRESS CONFLICT DETECTED! RESTARTING DHCP ON ID: %x\r\n", uId);
       uDHCPState[uId] = DHCP_STATE_DISCOVER;
       uDHCPRetryTimer[uId] = DHCP_RETRY_ENABLED;
     }
@@ -1948,7 +1948,7 @@ int CheckArpRequest(u8 uId, u32 uFabricIPAddress, u32 uPktLen, u8 *pArpPacket)
     {
       // It was a response so add it to the ARP cache
 #ifdef DEBUG_PRINT
-      xil_printf("ARP ENTRY ID: %x IP: %x %x MAC: %x %x %x\r\n", uId, Arp->uSenderIpHigh, Arp->uSenderIPLow, Arp->uSenderMacHigh, Arp->uSenderMacMid, Arp->uSenderMacLow);
+      log_printf(LOG_LEVEL_INFO, "ARP ENTRY ID: %x IP: %x %x MAC: %x %x %x\r\n", uId, Arp->uSenderIpHigh, Arp->uSenderIPLow, Arp->uSenderMacHigh, Arp->uSenderMacMid, Arp->uSenderMacLow);
 #endif
 
       ProgramARPCacheEntry(uId, (Arp->uSenderIPLow & 0xFF), Arp->uSenderMacHigh, ((Arp->uSenderMacMid << 16) | Arp->uSenderMacLow));
@@ -2345,7 +2345,7 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
   }
 
   if (Command->uReset == 0x1){
-    debug_printf("QSFP+[%02x] Resetting Mezzanine.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting Mezzanine.\r\n", uQSFPMezzanineLocation);
 
     uReg = uReg | (QSFP_MEZZANINE_RESET << uQSFPMezzanineLocation);
     WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
@@ -2358,13 +2358,13 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
      * interrupt */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
 
-    debug_printf("QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
     if (Command->uProgram == 0x1){
-      debug_printf("QSFP+[%02x] Mezzanine entering bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+      log_printf(LOG_LEVEL_DEBUG, "QSFP+[%02x] Mezzanine entering bootloader programming mode.\r\n", uQSFPMezzanineLocation);
       btldr_programming = 1;
       uQSFPStateMachinePause();
     }
@@ -2375,14 +2375,14 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
      now finished */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
 
-    debug_printf("QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
     uQSFPStateMachineResume();
 
-    debug_printf("QSFP+[%02x] Mezzanine leaving bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_LEVEL_DEBUG, "QSFP+[%02x] Mezzanine leaving bootloader programming mode.\r\n", uQSFPMezzanineLocation);
     btldr_programming = 0;
   }
 
@@ -2427,7 +2427,7 @@ int HMCReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
     return XST_FAILURE;
 
 #ifdef DEBUG_PRINT
-  //xil_printf("ID: %x SLV: %x ADDRS: %x %x %x %x\r\n", Command->uId, Command->uSlaveAddress, Command->uReadAddress[0], Command->uReadAddress[1], Command->uReadAddress[2], Command->uReadAddress[3]);
+  //log_printf(LOG_LEVEL_INFO, "ID: %x SLV: %x ADDRS: %x %x %x %x\r\n", Command->uId, Command->uSlaveAddress, Command->uReadAddress[0], Command->uReadAddress[1], Command->uReadAddress[2], Command->uReadAddress[3]);
 #endif
 
   // Execute the command
@@ -2496,7 +2496,7 @@ int HMCWriteI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   uData = uData | ((Command->uWriteData[2] & 0xff) <<  8);
   uData = uData | ((Command->uWriteData[3] & 0xff));
 
-  //debug_printf("HMC WR[%x]: addr = %08x and data = %08x\n", Command->uId, uAddr, uData);
+  //log_printf(LOG_LEVEL_DEBUG, "HMC WR[%x]: addr = %08x and data = %08x\n", Command->uId, uAddr, uData);
 #endif
 
   //iStatus = HMCWriteI2CBytes(Command->uId, Command->uSlaveAddress, uAddr, uData);
@@ -2507,11 +2507,11 @@ int HMCWriteI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     uWriteBytes[uIndex + 4] = Command->uWriteData[uIndex];
   }
 
-  debug_printf("HMC WR[%x]:", Command->uId);
+  log_printf(LOG_LEVEL_DEBUG, "HMC WR[%x]:", Command->uId);
   for (uIndex = 0; uIndex < 8; uIndex++){
-    debug_printf(" %x", uWriteBytes[uIndex]);
+    log_printf(LOG_LEVEL_DEBUG, " %x", uWriteBytes[uIndex]);
   }
-  debug_printf("\r\n");
+  log_printf(LOG_LEVEL_DEBUG, "\r\n");
 
   /* write the array of 8 bytes out directly to the i2c bus. */
   iStatus = WriteI2CBytes(Command->uId, Command->uSlaveAddress, uWriteBytes, 8);
@@ -2575,13 +2575,13 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   /* only support (+-) 2k, 4k and 8k programming modes */
   /* JUST A NOTE: chunk length must be even for +2 step increment of upcoming for loop */
   if (((uCommandLength - 8) != 1988) && ((uCommandLength - 8) != 3976) && ((uCommandLength - 8) != 7952)){
-    xil_printf("SDRAM PROGRAM[%02x] Unsupported chunk size of %d bytes.\r\n" , uId, uCommandLength - 8);
+    log_printf(LOG_LEVEL_ERROR, "SDRAM PROGRAM[%02x] Unsupported chunk size of %d bytes.\r\n" , uId, uCommandLength - 8);
     return XST_FAILURE;
   }
 
   /* check that the chunk size matches the previously cached size set by chunk 0 */
   if ((Command->uChunkNum != 0) && ((uCommandLength - 8) != uChunkSizeBytesCached)){
-    xil_printf("SDRAM PROGRAM[%02x] Chunk size mismatch - %d expected but %d received.\r\n" , uId, uChunkSizeBytesCached, uCommandLength - 8);
+    log_printf(LOG_LEVEL_ERROR, "SDRAM PROGRAM[%02x] Chunk size mismatch - %d expected but %d received.\r\n" , uId, uChunkSizeBytesCached, uCommandLength - 8);
     return XST_FAILURE;
   }
 
@@ -2611,12 +2611,12 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
         uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
         uCurrentIGMPMessage[uIndex] = 0x0;
 #ifdef DEBUG_PRINT
-        xil_printf("IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
+        log_printf(LOG_LEVEL_INFO, "IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
 #endif
       }
     }
 
-    xil_printf("SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
+    log_printf(LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
     uChunkIdCached = 0;
     ClearSdram();
     SetOutputMode(0x1, 0x1);
@@ -2628,9 +2628,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     uRetVal = XST_SUCCESS;
 
   } else if (Command->uChunkNum == (uChunkIdCached + 1)){
-#ifdef DEBUG_PRINT
-    /* xil_printf("chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */
-#endif
+    /* log_printf(LOG_LEVEL_TRACE, "chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */
     for (uChunkByteIndex = 0; uChunkByteIndex < (uChunkSizeBytesCached / 2) /*16bit words*/; uChunkByteIndex = uChunkByteIndex + 2){
       uTemp = (Command->uBitstreamChunk[uChunkByteIndex] << 16 & 0xFFFF0000) | (Command->uBitstreamChunk[uChunkByteIndex + 1] & 0x0000FFFF);
 
@@ -2646,7 +2644,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     }
 
     if (Command->uChunkNum == Command->uChunkTotal){
-      xil_printf("SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\r\n", uId, Command->uChunkNum);
+      log_printf(LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\r\n", uId, Command->uChunkNum);
 
       SetOutputMode(0x2, 0x1);
       FinishedWritingToSdram();
@@ -2664,9 +2662,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
   } else if (Command->uChunkNum == uChunkIdCached){
     uRetVal = XST_SUCCESS;
-#ifdef DEBUG_PRINT
-    xil_printf("SDRAM PROGRAM[%02x] Chunk %d: already received\r\n", uId, Command->uChunkNum);
-#endif
+    log_printf(LOG_LEVEL_WARN, "SDRAM PROGRAM[%02x] Chunk %d: already received\r\n", uId, Command->uChunkNum);
   } else {
     uRetVal = XST_FAILURE;
   }
@@ -2734,7 +2730,7 @@ int SetDHCPTuningDebugCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
 
   *uResponseLength = sizeof(sSetDHCPTuningDebugRespT);
 
-  xil_printf("DHCP TUNING[%02x] %s - Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Response->uStatus == 0 ? "FAIL" : "OK",
+  log_printf(LOG_LEVEL_INFO, "DHCP TUNING[%02x] %s - Retry: %d, Init: %d\r\n", pIFObj->uIFEthernetId, Response->uStatus == 0 ? "FAIL" : "OK",
       Command->uRetryTime, Command->uInitTime);
 
   return XST_SUCCESS;

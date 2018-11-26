@@ -11,7 +11,7 @@
  *------------------------------------------------------------------------------*/
 
 #include "memtest.h"
-#include "print.h"
+#include "logging.h"
 
 #define HIGHEST_16BIT_PRIME 16321
 
@@ -41,7 +41,7 @@ static inline u8 uAdler32Calc(const u8 *pDataPtr, const u32 uDataSize, u32 *pChe
 
   /* do the Adler32 calculation */
   for (pCurrentBytePtr = (u8 *) pDataPtr; pCurrentBytePtr < ((u8 *) pDataPtr + uDataSize); pCurrentBytePtr++){
-    /* xil_printf("@%08p  0x%02x\r\n", pCurrentBytePtr, *pCurrentBytePtr); */
+    /* log_printf(LOG_LEVEL_INFO, "@%08p  0x%02x\r\n", pCurrentBytePtr, *pCurrentBytePtr); */
     a = a + (u16) *pCurrentBytePtr;
     b = b + a;
   }
@@ -71,17 +71,17 @@ static inline u8 uAdler32Calc(const u8 *pDataPtr, const u32 uDataSize, u32 *pChe
 u8 uDoMemoryTest(const u8 *pDataPtr, const u32 uDataSize, u32 *pChecksum){
 #ifdef DO_SANITY_CHECKS
   if (NULL == pDataPtr){
-    debug_printf("[Memory Test] Error - No data reference\r\n");
+    log_printf(LOG_LEVEL_DEBUG, "[Memory Test] Error - No data reference\r\n");
     return -1;
   }
 
   if (0 == uDataSize){
-    debug_printf("[Memory Test] Error - Zero data size\r\n");
+    log_printf(LOG_LEVEL_DEBUG, "[Memory Test] Error - Zero data size\r\n");
     return -1;
   }
 
   if (NULL == pChecksum){
-    debug_printf("[Memory Test] Error - No storage handle provided\r\n");
+    log_printf(LOG_LEVEL_DEBUG, "[Memory Test] Error - No storage handle provided\r\n");
     return -1;
   }
 #endif

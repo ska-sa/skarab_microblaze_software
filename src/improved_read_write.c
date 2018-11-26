@@ -55,7 +55,7 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
 
   uAddress = (Command->uStartAddressHigh << 16) | (Command->uStartAddressLow);
 
-  //xil_printf("Response packet created OK!\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Response packet created OK!\r\n");
 
   // Execute the command
   for (uReadIndex = 0; uReadIndex < Command->uNumberOfReads; uReadIndex++)
@@ -69,12 +69,12 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
     uAddress = uAddress + 4; // increment address by 4 to read the next 32-bit register
   }
 
-  //xil_printf("Big Read Completed OK!\r\n");
-  //xil_printf("Data High: %d\r\n", Response->uReadData[0]);
-  //xil_printf("Data Low: %d\r\n", Response->uReadData[1]);
+  //log_printf(LOG_LEVEL_INFO, "Big Read Completed OK!\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Data High: %d\r\n", Response->uReadData[0]);
+  //log_printf(LOG_LEVEL_INFO, "Data Low: %d\r\n", Response->uReadData[1]);
 
   // determine how many null words are required to fill up the packet
-  //xil_printf("Trying 994 words\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Trying 994 words\r\n");
   uNullWords = 994 - (Command->uNumberOfReads)*2;
 
   for (uNullWordsIndex = Command->uNumberOfReads*2; uNullWordsIndex < uNullWords; uNullWordsIndex++)
@@ -116,7 +116,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   u16 uNumberOfWritesDone = 0;
   u8 uPaddingIndex;
 
-  //xil_printf("Inside BigWriteWishboneCommandHandler now . . .\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Inside BigWriteWishboneCommandHandler now . . .\r\n");
 
   if (uCommandLength < sizeof(sBigWriteWishboneReqT)){
     return XST_FAILURE;
@@ -125,7 +125,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   // determine the address at which to start 
   uAddress = (Command->uStartAddressHigh << 16) | (Command->uStartAddressLow);
 
-  //xil_printf("Response packet created OK!\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Response packet created OK!\r\n");
 
   // Execute the write command(s)
   for (uWriteCount = 0; uWriteCount < Command->uNumberOfWrites; uWriteCount++)
@@ -138,7 +138,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress, uWriteData);
 
     // debug msg
-    //xil_printf("Wrote data\r\n");
+    //log_printf(LOG_LEVEL_INFO, "Wrote data\r\n");
 
     uNumberOfWritesDone += 1;
     uDataIndex = uDataIndex + 2; // increment data index to get the next 32-bit word
@@ -146,8 +146,8 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   }
 
   // debug msg
-  //xil_printf("Number of writes done: %d\r\n", uNumberOfWritesDone);
-  //xil_printf("Creating response packet. . .\r\n");
+  //log_printf(LOG_LEVEL_INFO, "Number of writes done: %d\r\n", uNumberOfWritesDone);
+  //log_printf(LOG_LEVEL_INFO, "Creating response packet. . .\r\n");
 
   // Create response packet
   Response->Header.uCommandType = Command->Header.uCommandType + 1;

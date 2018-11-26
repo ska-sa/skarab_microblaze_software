@@ -26,6 +26,7 @@
 #include "flash_sdram_controller.h"
 #include "constant_defs.h"
 #include "delay.h"
+#include "logging.h"
 
 //=================================================================================
 //  SetOutputMode
@@ -392,7 +393,7 @@ void ClearStatusRegisterCmd(u32 uAddress)
 //=================================================================================
 void ProgramReadConfigurationRegisterCmd(u32 uRCRValue)
 {
-  xil_printf("Setting ASYNC read mode for flash.\r\n");
+  log_printf(LOG_LEVEL_INFO, "Setting ASYNC read mode for flash.\r\n");
   WriteFlashWord(uRCRValue, FLASH_SET_CONFIG_REGISTER);
   WriteFlashWord(uRCRValue, FLASH_SET_CONFIG_REGISTER_CONFIRM);
 }
@@ -607,7 +608,7 @@ int ProgramBuffer(u32 uAddress, u16 * puDataArray, u16 uTotalNumWords, u16 uNumW
 
   if (uStartProgram == 1)
   {
-    //xil_printf("Flash first programming\r\n");
+    //log_printf(LOG_LEVEL_INFO, "Flash first programming\r\n");
     WriteFlashWord(uAddress, FLASH_BUFFERED_PROGRAM);
 
     WriteFlashWord(uAddress, uTotalNumWords - 1);
@@ -620,7 +621,7 @@ int ProgramBuffer(u32 uAddress, u16 * puDataArray, u16 uTotalNumWords, u16 uNumW
 
   if (uFinishProgram == 1)
   {
-    //xil_printf("Flash finish programming\r\n");
+    //log_printf(LOG_LEVEL_INFO, "Flash finish programming\r\n");
 
     WriteFlashWord(uAddress, FLASH_BUFFERED_PROGRAM_CONFIRM);
 
@@ -634,25 +635,25 @@ int ProgramBuffer(u32 uAddress, u16 * puDataArray, u16 uTotalNumWords, u16 uNumW
 
     if (uTimeOut == FLASH_PROGRAM_TIMEOUT)
     {
-      xil_printf("Flash program timeout\r\n");
+      log_printf(LOG_LEVEL_INFO, "Flash program timeout\r\n");
       return XST_FAILURE;
     }
 
     if ((uStatusReg & FLASH_STATUS_PROGRAM_STATUS) != 0x0)
     {
-      xil_printf("Flash program status error\r\n");
+      log_printf(LOG_LEVEL_INFO, "Flash program status error\r\n");
       return XST_FAILURE;
     }
 
     if ((uStatusReg & FLASH_STATUS_VPP_STATUS) != 0x0)
     {
-      xil_printf("Flash program vpp error\r\n");
+      log_printf(LOG_LEVEL_INFO, "Flash program vpp error\r\n");
       return XST_FAILURE;
     }
 
     if ((uStatusReg & FLASH_STATUS_BLOCK_LOCK_ERROR) != 0x0)
     {
-      xil_printf("Flash program block lock error\r\n");
+      log_printf(LOG_LEVEL_INFO, "Flash program block lock error\r\n");
       return XST_FAILURE;
     }
 
@@ -698,25 +699,25 @@ int EraseBlock(u32 uBlockAddress)
 
   if (uTimeOut == FLASH_ERASE_TIMEOUT)
   {
-    xil_printf("Erase timeout!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Erase timeout!\r\n");
     return XST_FAILURE;
   }
 
   if ((uStatusReg & FLASH_STATUS_ERASE_STATUS) != 0x0)
   {
-    xil_printf("Erase error!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Erase error!\r\n");
     return XST_FAILURE;
   }
 
   if ((uStatusReg & FLASH_STATUS_VPP_STATUS) != 0x0)
   {
-    xil_printf("VPP error!\r\n");
+    log_printf(LOG_LEVEL_INFO, "VPP error!\r\n");
     return XST_FAILURE;
   }
 
   if ((uStatusReg & FLASH_STATUS_BLOCK_LOCK_ERROR) != 0x0)
   {
-    xil_printf("Lock error!\r\n");
+    log_printf(LOG_LEVEL_INFO, "Lock error!\r\n");
     return XST_FAILURE;
   }
 

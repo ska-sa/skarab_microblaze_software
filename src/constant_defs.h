@@ -21,6 +21,8 @@
 *  This file contains global constant and type definitions.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

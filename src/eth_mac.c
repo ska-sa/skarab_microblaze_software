@@ -25,7 +25,8 @@
 #include <xstatus.h>
 
 #include "eth_mac.h"
-#include "print.h"
+#include "logging.h"
+#include "constant_defs.h"
 
 //=================================================================================
 //  GetAddressOffset
@@ -295,7 +296,7 @@ void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper
 {
   u32 uAddressOffset = GetAddressOffset(uId);
 
-  //trace_printf("Program ARP cache...\r\n");
+  //log_printf(LOG_LEVEL_TRACE, "Program ARP cache...\r\n");
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*((2 * uIPAddressLower8Bits) + 1)), uMACAddressLower32Bits);
 
@@ -349,7 +350,7 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
-  //debug_printf("[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
+  //log_printf(LOG_LEVEL_DEBUG, "[RECV %02x] cpu receive buffer level: %d (64-bit words)\r\n", uId, uReg);
 
 #ifdef WISHBONE_LEGACY_MAP
   return (2 * (uReg & 0xFF));
@@ -432,13 +433,13 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
   // Must be a multiple of 64 bits
   if ((uNumWords % 2) != 0x0)
   {
-    xil_printf("I/F  [%02x] TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] TransmitHostPacket: Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
     return XST_FAILURE;
   }
 
   if (uNumWords < 16){
     uPaddingWords = (16 - uNumWords);
-    xil_printf("I/F  [%02x] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
   }
 
   // Check that the transmit buffer is ready for a packet
@@ -451,11 +452,11 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    xil_printf("I/F  [%02x] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
-  //debug_printf("[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
+  //log_printf(LOG_LEVEL_DEBUG, "[SEND %02x] About to send %d 32-bit words via the cpu transmit buffer\r\n", uId, uNumWords);
 
   // Program transmit packet words into FIFO
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
@@ -486,11 +487,11 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    xil_printf("I/F  [%02x] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
-  //debug_printf("[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
+  //log_printf(LOG_LEVEL_DEBUG, "[SEND %02x] Done sending data via the cpu transmit buffer\r\n", uId, uNumWords);
 
   return XST_SUCCESS;
 
@@ -521,17 +522,17 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
   // GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
   //if (uNumWords > GetHostReceiveBufferLevel(uId))
   //{
-  //  xil_printf("ReadHostPacket: Packet too big!\r\n");
+  //  log_printf(LOG_LEVEL_INFO, "ReadHostPacket: Packet too big!\r\n");
   //  return XST_FAILURE;
   //}
 
   if (uNumWords > RX_BUFFER_MAX)
   {
-    xil_printf("I/F  [%02x] ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", uId, RX_BUFFER_MAX, uNumWords);
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] ReadHostPacket: Packet size exceeds %d words. SIZE: %x\r\n", uId, RX_BUFFER_MAX, uNumWords);
     return XST_FAILURE;
   }
 
-  //debug_printf("%02x: rd %d words\n", uId, uNumWords);
+  //log_printf(LOG_LEVEL_DEBUG, "%02x: rd %d words\n", uId, uNumWords);
 
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
   {
@@ -540,8 +541,8 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 #if 0
     u8 *t = (u8 *) &(puReceivePacket[uIndex]);
-    debug_printf("%02x%02x%02x%02x ",t[0],t[1],t[2],t[3]);
-    ((uIndex != 0) && (uIndex % 15) == 0) ? debug_printf("\r\n") : debug_printf("");
+    log_printf(LOG_LEVEL_DEBUG, "%02x%02x%02x%02x ",t[0],t[1],t[2],t[3]);
+    ((uIndex != 0) && (uIndex % 15) == 0) ? log_printf(LOG_LEVEL_DEBUG, "\r\n") : debug_printf("");
 #endif
   }
 
@@ -563,14 +564,14 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
   pktlen = pktlen < 16 ? 16 : pktlen;     /* lowest value is 16 */
 
   if (uNumWords != pktlen){
-    xil_printf("I/F  [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
     for (uIndex = 0x0; uIndex < uNumWords; uIndex++){
-      debug_printf("%08x\r\n", puReceivePacket[uIndex]);
+      log_printf(LOG_LEVEL_DEBUG, "%08x\r\n", puReceivePacket[uIndex]);
     }
   }
 #endif
 
-  //debug_printf("[RECV %02x] Done reading cpu receive buffer\r\n", uId);
+  //log_printf(LOG_LEVEL_DEBUG, "[RECV %02x] Done reading cpu receive buffer\r\n", uId);
 
   // Acknowledge reading the packet from the FIFO
   AckHostPacketReceive(uId);
