@@ -28,6 +28,7 @@
 #include <xwdttb.h>
 #include <xtmrctr.h>
 #include <mb_interface.h>
+#include <xuartlite.h>
 
 #include "register.h"
 #include "delay.h"
@@ -670,6 +671,12 @@ int main()
   XTmrCtr Timer;
   XIntc InterruptController;
   XWdtTb WatchdogTimer;
+
+  XUartLite UartLite;		/* Instance of the UartLite Device */
+  u8 RecvBuffer;
+  u8 ReceivedCount = 0;
+
+
   u32 uIGMPGroupAddress;
   u8 uOKToReboot;
 #ifdef RECONFIG_UPON_NO_DHCP
@@ -735,6 +742,24 @@ int main()
   u8 dhcp_set = 0;
 
   u16 uHMCTimeout;
+
+  /*
+   * Initialize the uart driver
+   */
+  iStatus = XUartLite_Initialize(&UartLite, XPAR_UARTLITE_0_DEVICE_ID);
+  if (iStatus != XST_SUCCESS) {
+    log_printf(LOG_LEVEL_ERROR, "UART [..] Unable to configure the UART driver\r\n");
+  } else {
+    /*
+     * Perform a self-test to ensure that the hardware was built correctly.
+     */
+    iStatus = XUartLite_SelfTest(&UartLite);
+    if (iStatus != XST_SUCCESS) {
+      log_printf(LOG_LEVEL_ERROR, "UART [..] Seft-test FAILED!\r\n");
+    } else {
+      log_printf(LOG_LEVEL_DEBUG, "UART [..] Initialized successfully!\r\n");
+    }
+  }
 
   /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
@@ -1877,6 +1902,29 @@ int main()
       }
 
     }
+
+    //----------------------------------------------------------------------------//
+    // very simple serial character parser for configuring log-level              //
+    //----------------------------------------------------------------------------//
+    ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
+		if (ReceivedCount){
+      switch (RecvBuffer){
+        case '1': /* TRACE */
+        case '2': /* DEBUG */
+        case '3': /* INFO */
+        case '4': /* WARN */
+        case '5': /* ERROR */
+        case '6': /* FATAL */
+          set_log_level(RecvBuffer - 49u);
+          break;
+        case '0': /* OFF */
+          set_log_level(LOG_LEVEL_OFF);
+          break;
+        default:
+          break;
+      }
+      log_printf(LOG_LEVEL_TRACE, "Serial Out: %c\r\n", RecvBuffer);
+		}
 
     /* to test the watchdog timer - uncomment the following */
     /***************/

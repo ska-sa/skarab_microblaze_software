@@ -41,6 +41,9 @@ const char *get_level_string(tLogLevel l);
 void set_log_level(tLogLevel l);
 tLogLevel get_log_level(void);
 
+void cache_log_level(void);
+void restore_log_level(void);
+
 #ifdef __cplusplus
 }
 #endif

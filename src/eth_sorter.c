@@ -2617,6 +2617,13 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     }
 
     log_printf(LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
+
+    /* during programming, we need the serial console to be relatively quiet
+     * since this is a data-intensive task, cache the log-level...restore later */
+    cache_log_level();
+    /* only print warnings during programming */
+    set_log_level(LOG_LEVEL_WARN);
+
     uChunkIdCached = 0;
     ClearSdram();
     SetOutputMode(0x1, 0x1);
@@ -2645,6 +2652,9 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
     if (Command->uChunkNum == Command->uChunkTotal){
       log_printf(LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk %d: about to end sdram write.\r\n", uId, Command->uChunkNum);
+
+      /* restore log-level cached at start of programming */
+      restore_log_level();
 
       SetOutputMode(0x2, 0x1);
       FinishedWritingToSdram();

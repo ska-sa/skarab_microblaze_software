@@ -16,6 +16,7 @@ static const char *level_str[LOG_LEVEL_MAX] = {
 
 /* log level - default set to "debug" level */
 static volatile tLogLevel trace_level = LOG_LEVEL_DEBUG;
+static volatile tLogLevel cached_level = LOG_LEVEL_DEBUG;
 
 const char *get_level_string(tLogLevel l){
   /* Assert correct API usage */
@@ -31,8 +32,17 @@ void set_log_level(tLogLevel l){
     l = LOG_LEVEL_DEBUG;
   }
   trace_level = l;
+  log_printf(LOG_LEVEL_ALWAYS, "Setting log-level to: %s\r\n", get_level_string(l));
 }
 
 tLogLevel get_log_level(void){
   return trace_level;
+}
+
+void cache_log_level(void){
+  cached_level = trace_level;
+}
+
+void restore_log_level(void){
+  trace_level = cached_level;
 }
