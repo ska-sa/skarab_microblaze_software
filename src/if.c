@@ -297,8 +297,6 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
 
   u8 *pRxBuffer = NULL;
 
-  log_printf(LOG_LEVEL_TRACE, "Running packet filter...\r\n");
-
   SANE_IF(pIFObjectPtr);
 
   pRxBuffer = pIFObjectPtr->pUserRxBufferPtr;
@@ -316,7 +314,7 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
 
   switch(uL2Type){
     case ETHER_TYPE_ARP:
-      log_printf(LOG_LEVEL_TRACE, "ARP packet received!\r\n");
+      log_printf(LOG_LEVEL_TRACE, "ARP pkt\r\n");
       pIFObjectPtr->uRxEthArp++;
       uReturnType = PACKET_FILTER_ARP;
       /* no further filtering required */
@@ -325,19 +323,19 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
     case ETHER_TYPE_IPV4:
       /* further filtering required on ip packet */
       /* inspect the ip header protocol type */
-      log_printf(LOG_LEVEL_TRACE, "IP packet received!\r\n");
+      log_printf(LOG_LEVEL_TRACE, "IP pkt\r\n");
       pIFObjectPtr->uRxEthIp++;
       uL3Type = pRxBuffer[IP_FRAME_BASE + IP_PROT_OFFSET] & 0xff;
       switch(uL3Type){
         case IPV4_TYPE_ICMP:
-          log_printf(LOG_LEVEL_TRACE, "ICMP packet received!\r\n");
+          log_printf(LOG_LEVEL_TRACE, "ICMP pkt\r\n");
           pIFObjectPtr->uRxIpIcmp++;
           uReturnType = PACKET_FILTER_ICMP;
           /* no further filtering required */
           break;
 
         case IPV4_TYPE_UDP:
-          log_printf(LOG_LEVEL_TRACE, "UDP packet received!\r\n");
+          log_printf(LOG_LEVEL_TRACE, "UDP pkt\r\n");
           pIFObjectPtr->uRxIpUdp++;
           /* further filtering required on udp datagram */
           /* allow for variable ip header lengths */
@@ -356,11 +354,11 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
           uUDPDstPort = uUDPDstPort | (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET + 1] & 0xff);
 
           if (uUDPDstPort == UDP_CONTROL_PORT){
-            log_printf(LOG_LEVEL_TRACE, "CONTROL packet received!\r\n");
+            log_printf(LOG_LEVEL_TRACE, "CTRL pkt\r\n");
             pIFObjectPtr->uRxUdpCtrl++;
             uReturnType = PACKET_FILTER_CONTROL;
           } else if ((uUDPDstPort == BOOTP_CLIENT_PORT) && (uUDPSrcPort == BOOTP_SERVER_PORT)){
-            log_printf(LOG_LEVEL_TRACE, "DHCP packet received!\r\n");
+            log_printf(LOG_LEVEL_TRACE, "DHCP pkt\r\n");
             pIFObjectPtr->uRxUdpDhcp++;
             uReturnType = PACKET_FILTER_DHCP;
           } else if ((uUDPDstPort == BOOTP_SERVER_PORT) && (uUDPSrcPort == BOOTP_CLIENT_PORT)){
