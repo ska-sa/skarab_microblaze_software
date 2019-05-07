@@ -40,6 +40,7 @@
 #include "one_wire.h"
 #include "logging.h"
 #include "qsfp.h"
+#include "fault_log.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -289,6 +290,12 @@ u8 *ExtractUdpFieldsAndGetPayloadPointer(u8 *pUdpHeaderPointer,u32 *uPayloadLeng
   return (pUdpHeaderPointer + sizeof(struct sUDPHeader));
 }
 
+/* Forward declarations */
+static int GetCurrentLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 *uResponseLength);
+static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+
 //=================================================================================
 //  CommandSorter
 //--------------------------------------------------------------------------------
@@ -379,6 +386,14 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(SetDHCPTuningDebugCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_DHCP_TUNING_DEBUG)
       return(GetDHCPTuningDebugCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_CURRENT_LOGS)
+      return(GetCurrentLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_VOLTAGE_LOGS)
+      return(GetVoltageLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_FANCONTROLLER_LOGS)
+      return(GetFanControllerLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == CLEAR_FANCONTROLLER_LOGS)
+      return(ClearFanControllerLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -2799,6 +2814,287 @@ int GetDHCPTuningDebugCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
   }
 
   *uResponseLength = sizeof(sGetDHCPTuningDebugRespT);
+
+  return XST_SUCCESS;
+}
+
+
+#define BITSET(flag,bit)  flag = (((unsigned int) flag) | ((unsigned int) 1u << bit));
+#define BITCLR(flag,bit)  flag = (((unsigned int) flag) & (~((unsigned int) 1u << bit)));
+
+/*
+ *  Get the current monitor fault logs
+ */
+static int GetCurrentLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+  u8 num_entries;
+  sLogDataEntryT log_entry;
+  u8 *byte_buffer_ptr;
+  /* u8 uPaddingIndex; */
+  u8 j, index;
+  size_t i;
+  int status = 0;
+
+  sGetCurrentLogsReqT *Command = (sGetCurrentLogsReqT *) pCommand;
+  sGetCurrentLogsRespT *Response = (sGetCurrentLogsRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetCurrentLogsReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetCurrentLogsRespT);
+
+  /*
+   * Get all the populated log entries from the monitoring device.
+   * If the device has less than NUM_LOG_ENTRIES populated
+   * in the log table / fifo, return 0xffff for all fields of that
+   * entry.
+   */
+
+  byte_buffer_ptr = (u8 *) Response->uCurrentLogEntries;
+  /* fill the whole block of the cmd payload with 0xff */
+  for (i = 0; i < (NUM_LOG_ENTRIES * sizeof(sLogDataEntryT)); i++){
+    byte_buffer_ptr[i] = 0xff;
+  }
+
+  /*
+   * Start with the premise that all log entry reads will be successful. Since the log
+   * entries are populated with the latest entry at the last valid index, it may be a
+   * potential issue if the success bit is zero initially since we would not be able to
+   * discern between an i2c retrieval error or a valid empty entry for the last entry.
+   * Thus for valid empty entries, the success bit will be set to '1'.
+   */
+  Response->uLogEntrySuccess = 0xffff;  /* will clear the failed entries later */
+
+  /* get the number of entries in the log - max = NUM_LOG_ENTRIES */
+  status = get_num_current_log_entries(&num_entries);
+  if (XST_SUCCESS != status){
+    Response->uLogEntrySuccess = 0;
+    return XST_SUCCESS;   /* return success in order for skarab to reply with failed status word */
+  }
+
+  /* now fill in the entries according to nun_entries */
+  for (index = 0; index < num_entries; index++){
+    status = get_current_log_entry(index, &log_entry);
+    if (XST_SUCCESS != status){
+      BITCLR(Response->uLogEntrySuccess, index);
+    } else {
+      Response->uCurrentLogEntries[index].uPageSpecific = log_entry.uPageSpecific;
+      Response->uCurrentLogEntries[index].uFaultType = log_entry.uFaultType;
+      Response->uCurrentLogEntries[index].uPage = log_entry.uPage;
+      Response->uCurrentLogEntries[index].uFaultValue = log_entry.uFaultValue;
+      Response->uCurrentLogEntries[index].uValueScale = log_entry.uValueScale;
+      for (j=0; j<2;j++){
+        Response->uCurrentLogEntries[index].uSeconds[j] = log_entry.uSeconds[j];
+#if 0
+        Response->uCurrentLogEntries[index].uMilliSeconds[j] = log_entry.uMilliSeconds[j];
+        Response->uCurrentLogEntries[index].uDays[j] = log_entry.uDays[j];
+#endif
+      }
+      BITSET(Response->uLogEntrySuccess, index);
+    }
+  }
+
+#if 0
+  for (uPaddingIndex = 0; uPaddingIndex < 1; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+#endif
+
+  return XST_SUCCESS;
+}
+
+
+
+
+/* TODO:  this was a copy and paste exercise from the above current handler - find another way to do this
+ *        since the functionality of the functions are basically identical! */
+
+static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+  u8 num_entries;
+  sLogDataEntryT log_entry;
+  u8 *byte_buffer_ptr;
+  /* u8 uPaddingIndex; */
+  u8 j, index;
+  size_t i;
+  int status = 0;
+
+  sGetVoltageLogsReqT *Command = (sGetVoltageLogsReqT *) pCommand;
+  sGetVoltageLogsRespT *Response = (sGetVoltageLogsRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetVoltageLogsReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetVoltageLogsRespT);
+
+  /*
+   * Get all the populated log entries from the monitoring device.
+   * If the device has less than NUM_LOG_ENTRIES populated
+   * in the log table / fifo, return 0xffff for all fields of that
+   * entry.
+   */
+
+  byte_buffer_ptr = (u8 *) Response->uVoltageLogEntries;
+  /* fill the whole block of the cmd payload with 0xff */
+  for (i = 0; i < (NUM_LOG_ENTRIES * sizeof(sLogDataEntryT)); i++){
+    byte_buffer_ptr[i] = 0xff;
+  }
+
+  /*
+   * Start with the premise that all log entry reads will be successful. Since the log
+   * entries are populated with the latest entry at the last valid index, it may be a
+   * potential issue if the success bit is zero initially since we would not be able to
+   * discern between an i2c retrieval error or a valid empty entry for the last entry.
+   * Thus for valid empty entries, the success bit will be set to '1'.
+   */
+  Response->uLogEntrySuccess = 0xffff;  /* will clear the failed entries later */
+
+  /* get the number of entries in the log - max = NUM_LOG_ENTRIES */
+  status = get_num_voltage_log_entries(&num_entries);
+  if (XST_SUCCESS != status){
+    Response->uLogEntrySuccess = 0;
+    return XST_SUCCESS;   /* return success in order for skarab to reply with failed status word set above */
+  }
+
+  /* now fill in the entries according to nun_entries */
+  for (index = 0; index < num_entries; index++){
+    status = get_voltage_log_entry(index, &log_entry);
+#if 0
+    /*FIXME: simulating an error*/
+    status = index == 1 ? XST_FAILURE : status;
+#endif
+    if (XST_SUCCESS != status){
+      BITCLR(Response->uLogEntrySuccess, index);
+    } else {
+      Response->uVoltageLogEntries[index].uPageSpecific = log_entry.uPageSpecific;
+      Response->uVoltageLogEntries[index].uFaultType = log_entry.uFaultType;
+      Response->uVoltageLogEntries[index].uPage = log_entry.uPage;
+      Response->uVoltageLogEntries[index].uFaultValue = log_entry.uFaultValue;
+      Response->uVoltageLogEntries[index].uValueScale = log_entry.uValueScale;
+      for (j=0; j<2;j++){
+        Response->uVoltageLogEntries[index].uSeconds[j] = log_entry.uSeconds[j];
+#if 0
+        Response->uVoltageLogEntries[index].uMilliSeconds[j] = log_entry.uMilliSeconds[j];
+        Response->uVoltageLogEntries[index].uDays[j] = log_entry.uDays[j];
+#endif
+      }
+      BITSET(Response->uLogEntrySuccess, index);
+    }
+  }
+
+#if 0
+  for (uPaddingIndex = 0; uPaddingIndex < 1; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+#endif
+
+  return XST_SUCCESS;
+}
+
+
+static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+  int i, j, status = 0;
+  u8 *byte_buffer_ptr;
+  //sTempLogDataEntryT log_entry;
+  sFanCtrlrLogDataEntryT log_entry;
+  u16 offset;
+
+  sGetFanControllerLogsReqT *Command = (sGetFanControllerLogsReqT *) pCommand;
+  sGetFanControllerLogsRespT *Response = (sGetFanControllerLogsRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetFanControllerLogsReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetFanControllerLogsRespT);
+
+  byte_buffer_ptr = (u8 *) Response->uFanCtrlrLogEntries;
+  /* fill the whole block of the cmd payload with 0xff */
+  for (i = 0; i < (NUM_FANCTRLR_LOG_ENTRIES * sizeof(sFanCtrlrLogDataEntryT)); i++){
+    byte_buffer_ptr[i] = 0xff;
+  }
+
+
+  /* there is a max of 15 fault log entries on the MAX31785 device */
+  for (j = 0; j < NUM_FANCTRLR_LOG_ENTRIES; j++){
+    status += get_fanctrlr_log_entry_next(&log_entry);
+    /*
+     * either returns a valid index between 0 and 14, or returns an
+     * 0xff if that location is empty.
+     */
+    offset = log_entry.uFaultLogIndex;
+    if ((offset >= 0) && (offset <= 14)){
+      /* fill in the response packet at the appropriate offset */
+      /* TODO [p-10] could probably do a memcpy or for-loop byte copy here... */
+      Response->uFanCtrlrLogEntries[offset].uFaultLogIndex = log_entry.uFaultLogIndex;
+      Response->uFanCtrlrLogEntries[offset].uFaultLogCount = log_entry.uFaultLogCount;
+      Response->uFanCtrlrLogEntries[offset].uStatusWord = log_entry.uStatusWord;
+      Response->uFanCtrlrLogEntries[offset].uStatusVout_17_18 = log_entry.uStatusVout_17_18;
+      Response->uFanCtrlrLogEntries[offset].uStatusVout_19_20 = log_entry.uStatusVout_19_20;
+      Response->uFanCtrlrLogEntries[offset].uStatusVout_21_22 = log_entry.uStatusVout_21_22;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_6_7 = log_entry.uStatusMfr_6_7;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_8_9 = log_entry.uStatusMfr_8_9;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_10_11 = log_entry.uStatusMfr_10_11;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_12_13 = log_entry.uStatusMfr_12_13;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_14_15 = log_entry.uStatusMfr_14_15;
+      Response->uFanCtrlrLogEntries[offset].uStatusMfr_16_none = log_entry.uStatusMfr_16_none;
+      Response->uFanCtrlrLogEntries[offset].uStatusFans_0_1 = log_entry.uStatusFans_0_1;
+      Response->uFanCtrlrLogEntries[offset].uStatusFans_2_3 = log_entry.uStatusFans_2_3;
+      Response->uFanCtrlrLogEntries[offset].uStatusFans_4_5 = log_entry.uStatusFans_4_5;
+    }
+    else {
+      continue;
+      /* skip -> will be filled with earlier 0xff's */
+    }
+  }
+
+  Response->uCompleteSuccess = (status == 0 ? 1 : 0);
+
+  for (i = 0; i < 3; i++){
+    Response->uPadding[i] = 0;
+  }
+
+  return XST_SUCCESS;
+}
+
+
+static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+  int status, i;
+
+  sClearFanControllerLogsReqT *Command = (sClearFanControllerLogsReqT *) pCommand;
+  sClearFanControllerLogsRespT *Response = (sClearFanControllerLogsRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sClearFanControllerLogsReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sClearFanControllerLogsRespT);
+
+  status = clear_fanctrlr_logs();
+
+  Response->uSuccess = (status == XST_SUCCESS ? 1 : 0);
+
+  for (i = 0; i < 8; i++){
+    Response->uPadding[i] = 0;
+  }
+
+
 
   return XST_SUCCESS;
 }

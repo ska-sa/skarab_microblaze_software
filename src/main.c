@@ -58,6 +58,7 @@
 #include "mezz.h"
 #include "logging.h"
 #include "cli.h"
+#include "fault_log.h"
 
 #define DHCP_BOUND_COUNTER_VALUE  600
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -1280,6 +1281,10 @@ int main()
       }
     }
   }
+
+  iStatus = log_time_sync_devices();
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "TIME [..] {%s} sync monitoring run time counters\r\n", XST_SUCCESS == iStatus ? "OK" : "FAIL");
+
 
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
