@@ -58,7 +58,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   pIFObjectPtr = lookup_if_handle_by_id(uEthernetId);
 
   if (IF_MAGIC == pIFObjectPtr->uIFMagic){
-    log_printf(LOG_LEVEL_ERROR, "I/F  [%02x] Failed - attempted to overwrite previous state.", uEthernetId);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "I/F  [%02x] Failed - attempted to overwrite previous state.", uEthernetId);
     return pIFObjectPtr;
   }
 
@@ -187,7 +187,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   if ((uReg & uMask) != LINK_DOWN){
     // Check if the link was previously down
     if (pIFObjectPtr->uIFLinkStatus == LINK_DOWN){
-      log_printf(LOG_LEVEL_INFO, "I/F  [%02x] LINK %x HAS COME UP!\r\n", uId, uId);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] LINK %x HAS COME UP!\r\n", uId, uId);
 
       if (uId == 0){  /* 1gbe i/f */
         /* do not enable dhcp in loopback mode */
@@ -214,7 +214,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
         uActivityMask = 1 << (15 + (4*uId));
         if (uReg & uActivityMask){
           pIFObjectPtr->uIFLinkRxActive = 1;
-          log_printf(LOG_LEVEL_INFO, "I/F  [%02x] LINK %x RX ACTIVITY!\r\n", uId, uId);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] LINK %x RX ACTIVITY!\r\n", uId, uId);
         }
       }
     }
@@ -223,7 +223,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
   } else {
     // Check if the link was previously up
     if (pIFObjectPtr->uIFLinkStatus == LINK_UP){
-      log_printf(LOG_LEVEL_INFO, "I/F  [%02x] LINK %x HAS GONE DOWN!\r\n", uId, uId);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] LINK %x HAS GONE DOWN!\r\n", uId, uId);
 
       if (uId == 0){  /* 1gbe i/f */
         /* do not set in loopback mode */
@@ -309,12 +309,12 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
   /* inspect the ethernet frame type */
   uL2Type = (pRxBuffer[ETH_FRAME_TYPE_OFFSET] << 8) & 0xff00;
   uL2Type = uL2Type | (pRxBuffer[ETH_FRAME_TYPE_OFFSET + 1] & 0xff);
-  log_printf(LOG_LEVEL_TRACE, "layer2 type 0x%04x\r\n",uL2Type);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "layer2 type 0x%04x\r\n",uL2Type);
 
 
   switch(uL2Type){
     case ETHER_TYPE_ARP:
-      log_printf(LOG_LEVEL_TRACE, "ARP pkt\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "ARP pkt\r\n");
       pIFObjectPtr->uRxEthArp++;
       uReturnType = PACKET_FILTER_ARP;
       /* no further filtering required */
@@ -323,26 +323,26 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
     case ETHER_TYPE_IPV4:
       /* further filtering required on ip packet */
       /* inspect the ip header protocol type */
-      log_printf(LOG_LEVEL_TRACE, "IP pkt\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "IP pkt\r\n");
       pIFObjectPtr->uRxEthIp++;
       uL3Type = pRxBuffer[IP_FRAME_BASE + IP_PROT_OFFSET] & 0xff;
       switch(uL3Type){
         case IPV4_TYPE_ICMP:
-          log_printf(LOG_LEVEL_TRACE, "ICMP pkt\r\n");
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "ICMP pkt\r\n");
           pIFObjectPtr->uRxIpIcmp++;
           uReturnType = PACKET_FILTER_ICMP;
           /* no further filtering required */
           break;
 
         case IPV4_TYPE_UDP:
-          log_printf(LOG_LEVEL_TRACE, "UDP pkt\r\n");
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "UDP pkt\r\n");
           pIFObjectPtr->uRxIpUdp++;
           /* further filtering required on udp datagram */
           /* allow for variable ip header lengths */
           /* adjust ip base value if ip length greater than 20 bytes. Min header length = 20 bytes; Max header length = 60 bytes */
           uIPHdrLenAdjust = (((pRxBuffer[IP_FRAME_BASE] & 0x0F) * 4) - 20);
           if (uIPHdrLenAdjust > 40){
-            log_printf(LOG_LEVEL_ERROR, "IP header length adjustment of %d seems incorrect!\r\n", uIPHdrLenAdjust);
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "IP header length adjustment of %d seems incorrect!\r\n", uIPHdrLenAdjust);
             return PACKET_FILTER_ERROR;
           }
 
@@ -354,29 +354,29 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
           uUDPDstPort = uUDPDstPort | (pRxBuffer[uIPHdrLenAdjust + UDP_FRAME_BASE + UDP_DST_PORT_OFFSET + 1] & 0xff);
 
           if (uUDPDstPort == UDP_CONTROL_PORT){
-            log_printf(LOG_LEVEL_TRACE, "CTRL pkt\r\n");
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "CTRL pkt\r\n");
             pIFObjectPtr->uRxUdpCtrl++;
             uReturnType = PACKET_FILTER_CONTROL;
           } else if ((uUDPDstPort == BOOTP_CLIENT_PORT) && (uUDPSrcPort == BOOTP_SERVER_PORT)){
-            log_printf(LOG_LEVEL_TRACE, "DHCP pkt\r\n");
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "DHCP pkt\r\n");
             pIFObjectPtr->uRxUdpDhcp++;
             uReturnType = PACKET_FILTER_DHCP;
           } else if ((uUDPDstPort == BOOTP_SERVER_PORT) && (uUDPSrcPort == BOOTP_CLIENT_PORT)){
             /* These are probably broadcast DISCOVER / REQUEST packets from other network nodes / SKARABs
                destined for the dhcp server and can probably safely be dropped */
-            log_printf(LOG_LEVEL_TRACE, "DHCP packet destined for DHCP server received! Can probably safely drop packet!\r\n");
+            log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP packet destined for DHCP server received! Can probably safely drop packet!\r\n");
             pIFObjectPtr->uRxDhcpUnknown++;
             pIFObjectPtr->uRxUdpDhcp++;   /* increment total dhcp counter too since this is a dhcp packet (even tho not destined for us) */
             uReturnType = PACKET_FILTER_DROP;
           } else {
-            log_printf(LOG_LEVEL_DEBUG, "UNKNOWN UDP ports: [src] 0x%04x & [dst] 0x%04x!\r\n", uUDPSrcPort, uUDPDstPort);
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "UNKNOWN UDP ports: [src] 0x%04x & [dst] 0x%04x!\r\n", uUDPSrcPort, uUDPDstPort);
             pIFObjectPtr->uRxUdpUnknown++;
             uReturnType = PACKET_FILTER_UNKNOWN_UDP;
           }
           break;
 
         default:
-          log_printf(LOG_LEVEL_DEBUG, "UNKNOWN IP protocol 0x%02x received!\r\n", uL3Type);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "UNKNOWN IP protocol 0x%02x received!\r\n", uL3Type);
           pIFObjectPtr->uRxIpUnknown++;
           uReturnType = PACKET_FILTER_UNKNOWN_IP;
           break;
@@ -385,7 +385,7 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
 
     default:
       /* Handle unimplemented / unknown ethernet frames */
-      log_printf(LOG_LEVEL_DEBUG, "UNKNOWN ETH type 0x%04x packet received!\r\n", uL2Type);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "UNKNOWN ETH type 0x%04x packet received!\r\n", uL2Type);
       pIFObjectPtr->uRxEthUnknown++;
       uReturnType = PACKET_FILTER_UNKNOWN_ETH;
       break;
@@ -420,18 +420,18 @@ void IFConfig(struct sIFObject *pIFObjectPtr, u32 ip, u32 mask){
 
   /* convert ip to string and cache for later use / printing */
   if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrIP), ip) != 0){
-    log_printf(LOG_LEVEL_ERROR, "I/F  [%02x] Unable to convert IP %x to string.\r\n", id, ip);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "I/F  [%02x] Unable to convert IP %x to string.\r\n", id, ip);
   } else {
     pIFObjectPtr->stringIFAddrIP[15] = '\0';
-    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] Setting IP address to: %s\r\n", id, pIFObjectPtr->stringIFAddrIP);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Setting IP address to: %s\r\n", id, pIFObjectPtr->stringIFAddrIP);
   }
 
   /* convert netmask to string and cache for later use / printing */
   if (uIPV4_ntoa((char *) (pIFObjectPtr->stringIFAddrNetmask), mask) != 0){
-    log_printf(LOG_LEVEL_ERROR, "I/F  [%02x] Unable to convert Netmask %x to string.\r\n", id, mask);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "I/F  [%02x] Unable to convert Netmask %x to string.\r\n", id, mask);
   } else {
     pIFObjectPtr->stringIFAddrNetmask[15] = '\0';
-    log_printf(LOG_LEVEL_INFO, "I/F  [%02x] Setting Netmask address to: %s\r\n", id, pIFObjectPtr->stringIFAddrNetmask);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Setting Netmask address to: %s\r\n", id, pIFObjectPtr->stringIFAddrNetmask);
   }
 }
 

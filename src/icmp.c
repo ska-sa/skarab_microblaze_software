@@ -16,22 +16,22 @@
 u8 SanityCheckICMP(struct sIFObject *pIFObjectPtr){
 
   if (pIFObjectPtr == NULL){
-    log_printf(LOG_LEVEL_DEBUG, "No interface state handle\r\n");
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ALWAYS, "No interface state handle\r\n");
     return -1;
   }
 
   if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    log_printf(LOG_LEVEL_DEBUG, "Inconsistent interface state magic value\r\n");
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ALWAYS, "Inconsistent interface state magic value\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    log_printf(LOG_LEVEL_DEBUG, "Interface transmit buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ALWAYS, "Interface transmit buffer pointer undefined\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    log_printf(LOG_LEVEL_DEBUG, "Interface receive buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ALWAYS, "Interface receive buffer pointer undefined\r\n");
     return -1;
   }
 
@@ -137,7 +137,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    log_printf(LOG_LEVEL_ERROR, "ICMP: ECHO REQ - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ERROR, "ICMP: ECHO REQ - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
 #endif
@@ -147,7 +147,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   uICMPTotalLength |= (pUserBufferPtr[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
   uICMPTotalLength = uICMPTotalLength - 20 - uIPLenAdjust;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: Length = %d\r\n", uICMPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: Length = %d\r\n", uICMPTotalLength);
 
   /* now check the ICMP checksum */
   RetVal = uChecksum16Calc(pUserBufferPtr, ICMP_FRAME_BASE, ICMP_FRAME_BASE + uICMPTotalLength - 1, &uCheckTemp, 0, 0);
@@ -156,7 +156,7 @@ u8 uICMPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    log_printf(LOG_LEVEL_ERROR, "ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\r\n", uCheckTemp);
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ERROR, "ICMP: ECHO REQ - ICMP Checksum %04x - Invalid!\r\n", uCheckTemp);
     return ICMP_RETURN_INVALID;
   }
 
@@ -200,7 +200,7 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   uIPTotalLength = (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET] << 8) & 0xFF00;
   uIPTotalLength |= (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
 
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
   memset(pTxBuffer, 0, uSize);
@@ -236,18 +236,18 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
   uIPTotalLength = (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET] << 8) & 0xFF00;
   uIPTotalLength |= (pRxBuffer[IP_FRAME_BASE + IP_TLEN_OFFSET + 1]) & 0x00FF;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
 
   uIPRxHdrLength = (pRxBuffer[IP_FRAME_BASE] & 0x0F) * 4;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
 
   /* adjust ip base value if ip length greater than 20 bytes */
   uIPLenAdjust = uIPRxHdrLength - 20;
 
   uICMPTotalLength = uIPTotalLength - uIPRxHdrLength;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
 
   for (uIndex = 0; uIndex < (uICMPTotalLength - 4); uIndex++){  /* ICMP header length = 4 */
     /* copy ICMP payload */
@@ -278,15 +278,17 @@ u8 uICMPBuildReplyMessage(struct sIFObject *pIFObjectPtr){
 
   pIFObjectPtr->uMsgSize = uIPTotalLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
-  log_printf(LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
-  log_printf(LOG_LEVEL_TRACE, "ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: RX IP Hdr Len %d\r\n", uIPRxHdrLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: RX IP Total Len %d\r\n", uIPTotalLength);
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: ICMP Total Len %d\r\n", uICMPTotalLength);
 
-  log_printf(LOG_LEVEL_TRACE, "ICMP: packet\r\n");
+#if 0 /* tx buffer can now be traced at a lower level */
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "ICMP: packet\r\n");
   for (uIndex=ICMP_FRAME_BASE; uIndex < ICMP_FRAME_BASE + uICMPTotalLength; uIndex++){
-    log_printf(LOG_LEVEL_TRACE, " %02x", pTxBuffer[uIndex]);
+    log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, " %02x", pTxBuffer[uIndex]);
   }
-  log_printf(LOG_LEVEL_TRACE, "\r\n");
+  log_printf(LOG_SELECT_ICMP, LOG_LEVEL_TRACE, "\r\n");
+#endif
 
   return ICMP_RETURN_OK;
 }

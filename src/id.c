@@ -34,7 +34,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
       // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
       uRomCRC = OneWireCrc8(& uRom[0], 0x7);
       if (uRomCRC != uRom[7]){
-        log_printf(LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
         skarab_serial[0] = 0xFF;
         skarab_serial[1] = 0xFF;
         skarab_serial[2] = 0xFF;
@@ -44,7 +44,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
         ret = DS2433ReadMem(uRom, 0, skarab_serial, 4, 0, 0, MB_ONE_WIRE_PORT);
 
         if (ret == XST_FAILURE){
-          log_printf(LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
           skarab_serial[0] = 0xFF;
           skarab_serial[1] = 0xFF;
           skarab_serial[2] = 0xFF;
@@ -52,7 +52,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
         }
       }
     } else {
-      log_printf(LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
       skarab_serial[0] = 0xFF;
       skarab_serial[1] = 0xFF;
       skarab_serial[2] = 0xFF;
@@ -61,7 +61,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
 
     // GT 04/06/2015 BASIC SANITY CHECK, IF FAILS TRY TO READ ONE MORE TIME
     if (skarab_serial[0] != 0x50){    /* CHECK FOR 'P' */
-      log_printf(LOG_LEVEL_ERROR, "Trying again to read serial number.\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Trying again to read serial number.\r\n");
 
       ret = OneWireReadRom(uRom, MB_ONE_WIRE_PORT);
 
@@ -69,7 +69,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
         // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
         uRomCRC = OneWireCrc8(& uRom[0], 0x7);
         if (uRomCRC != uRom[7]){
-          log_printf(LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
           skarab_serial[0] = 0xFF;
           skarab_serial[1] = 0xFF;
           skarab_serial[2] = 0xFF;
@@ -79,7 +79,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
           ret = DS2433ReadMem(uRom, 0, skarab_serial, 4, 0, 0, MB_ONE_WIRE_PORT);
 
           if (ret == XST_FAILURE){
-            log_printf(LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
             skarab_serial[0] = 0xFF;
             skarab_serial[1] = 0xFF;
             skarab_serial[2] = 0xFF;
@@ -87,7 +87,7 @@ u8 get_skarab_serial(u8 *sk_buffer, u8 sk_length){
           }
         }
       } else {
-        log_printf(LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read skarab serial number.\r\n");
         skarab_serial[0] = 0xFF;
         skarab_serial[1] = 0xFF;
         skarab_serial[2] = 0xFF;
@@ -134,7 +134,7 @@ u8 get_peralex_serial(u8 *px_buffer, u8 px_length){
       // GT 05/06/2015 CHECK CRC OF ROM TO CONFIRM OK
       uRomCRC = OneWireCrc8(& uRom[0], 0x7);
       if (uRomCRC != uRom[7]){
-        log_printf(LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MB 1-wire CRC incorrect.\r\n");
         peralex_serial[0] = 0xFF;
         peralex_serial[1] = 0xFF;
         peralex_serial[2] = 0xFF;
@@ -143,14 +143,14 @@ u8 get_peralex_serial(u8 *px_buffer, u8 px_length){
         ret = DS2433ReadMem(uRom, 0, peralex_serial, 3, 7, 0, MB_ONE_WIRE_PORT);
 
         if (ret == XST_FAILURE){
-          log_printf(LOG_LEVEL_ERROR, "Failed to read motherboard serial number.\r\n");
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read motherboard serial number.\r\n");
           peralex_serial[0] = 0xFF;
           peralex_serial[1] = 0xFF;
           peralex_serial[2] = 0xFF;
         }
       }
     } else {
-      log_printf(LOG_LEVEL_ERROR, "Failed to read motherboard serial number.\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Failed to read motherboard serial number.\r\n");
       peralex_serial[0] = 0xFF;
       peralex_serial[1] = 0xFF;
       peralex_serial[2] = 0xFF;

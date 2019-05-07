@@ -73,7 +73,7 @@ u8 IsISPSPIReady()
 
   if (uTimeout == ISP_SPI_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Status timeout.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Status timeout.\r\n");
     return 0x0;
   }
 
@@ -84,7 +84,7 @@ u8 IsISPSPIReady()
   // Read the byte read
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + ISP_SPI_DATA_CTRL_REG_ADDRESS);
 
-  //log_printf(LOG_LEVEL_INFO, "Status register: %x\r\n", uReg);
+  //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Status register: %x\r\n", uReg);
 
   if ((uReg & ISP_SPI_STATUS_READY) == 0x0)
     return 0x0;
@@ -137,7 +137,7 @@ int ISPSPIReadPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes)
 
   if (uTimeout == ISP_SPI_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Timeout waiting for page read to start.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Timeout waiting for page read to start.\r\n");
     return XST_FAILURE;
   }
 
@@ -155,7 +155,7 @@ int ISPSPIReadPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes)
     uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + ISP_SPI_DATA_CTRL_REG_ADDRESS);
 
     puDataArray[uByteCount] = uReg & 0xFF;
-    //log_printf(LOG_LEVEL_INFO, "CNT: %x READ: %x\r\n", uByteCount, puDataArray[uByteCount]);
+    //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "CNT: %x READ: %x\r\n", uByteCount, puDataArray[uByteCount]);
   }
 
   return XST_SUCCESS;
@@ -219,7 +219,7 @@ int ISPSPIProgramPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes)
 
   if (uTimeout == ISP_SPI_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Timeout while transferring data to ISP SDRAM buffer.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Timeout while transferring data to ISP SDRAM buffer.\r\n");
     return XST_FAILURE;
   }
 
@@ -246,7 +246,7 @@ int ISPSPIProgramPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes)
 
   if (uTimeout == ISP_SPI_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Timeout while initiating programming.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Timeout while initiating programming.\r\n");
     return XST_FAILURE;
   }
 
@@ -262,7 +262,7 @@ int ISPSPIProgramPage(u32 uAddress, u16 * puDataArray, u16 uNumBytes)
 
   if (uTimeout == ISP_SPI_PROGRAM_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Timeout waiting for programming to complete.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Timeout waiting for programming to complete.\r\n");
     return XST_FAILURE;
   }
 
@@ -318,7 +318,7 @@ int ISPSPIEraseSector(u32 uSectorAddress)
 
   if (uTimeout == ISP_SPI_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Sector erase command timeout.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Sector erase command timeout.\r\n");
     return XST_FAILURE;
   }
 
@@ -334,11 +334,11 @@ int ISPSPIEraseSector(u32 uSectorAddress)
 
   if (uTimeout == ISP_SPI_ERASE_TIMEOUT)
   {
-    log_printf(LOG_LEVEL_INFO, "Sector erase timeout.\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Sector erase timeout.\r\n");
     return XST_FAILURE;
   }
 
-  //log_printf(LOG_LEVEL_INFO, "SECT ERASE SUCCESS!\r\n");
+  //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "SECT ERASE SUCCESS!\r\n");
   return XST_SUCCESS;
 
 }

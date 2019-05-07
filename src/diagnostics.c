@@ -41,55 +41,55 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
     pIFObj->uTxIpIcmpReplyOk + pIFObj->uTxIpIgmpOk + pIFObj->uTxUdpDhcpOk + pIFObj->uTxUdpCtrlOk;
 
   for (i = 0; i < 60; i++){
-    log_printf(LOG_LEVEL_DEBUG, "-");
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "-");
   }
-  log_printf(LOG_LEVEL_DEBUG, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "\r\n");
 
-  log_printf(LOG_LEVEL_DEBUG, "IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\r\n", pIFObj->uIFEthernetId,
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "IF [%d]:  STATUS: %s  IP: %s  Netmask: %s\r\n", pIFObj->uIFEthernetId,
       pIFObj->uIFLinkStatus == LINK_UP ? "UP" : "DOWN",
       pIFObj->stringIFAddrIP,
       pIFObj->stringIFAddrNetmask);
-  log_printf(LOG_LEVEL_DEBUG, " Rx%1s%-13s%11d%2s", "","Total:",         pIFObj->uRxTotal,           "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%1s%-13s%11d%2s", "","Total:",         pIFObj->uTxTotal,           "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "ETH Unknown:",  pIFObj->uRxEthUnknown,      "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sARP\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "ARP:",          pIFObj->uRxEthArp,          "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uTxEthArpReplyOk,   "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uRxArpReply,        "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Request:",      pIFObj->uTxEthArpRequestOk, "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Request:",      pIFObj->uRxArpRequest,      "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxEthArpErr,       "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Conflict:",     pIFObj->uRxArpConflict,     "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sLLDP\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Invalid:",      pIFObj->uRxArpInvalid,      "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxEthLldpOk,       "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "IP:",           pIFObj->uRxEthIp,           "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxEthLldpErr,      "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Chksm Err:",    pIFObj->uRxIpChecksumErrors,"|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sICMP\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Unknown:",      pIFObj->uRxIpUnknown,       "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uTxIpIcmpReplyOk,   "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "ICMP:",         pIFObj->uRxIpIcmp,          "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxIpIcmpReplyErr,  "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "Invalid:",      pIFObj->uRxIcmpInvalid,     "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sIGMP\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "UDP:",          pIFObj->uRxIpUdp,           "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxIpIgmpOk,        "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "Unknown:",      pIFObj->uRxUdpUnknown,      "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxIpIgmpErr,       "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "CTRL:",         pIFObj->uRxUdpCtrl,         "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sDHCP\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "DHCP:",         pIFObj->uRxUdpDhcp,         "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpDhcpOk,       "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%5s%-9s%11d%2s", "", "Invalid:",       pIFObj->uRxDhcpInvalid,     "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxUdpDhcpErr,      "\r\n");
-  log_printf(LOG_LEVEL_DEBUG, " Rx%5s%-9s%11d%2s", "", "Unknown:",       pIFObj->uRxDhcpUnknown,     "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%2sCTRL\r\n", "");
-  log_printf(LOG_LEVEL_DEBUG, "%30s", "|");
-  log_printf(LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpCtrlOk,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%1s%-13s%11d%2s", "","Total:",         pIFObj->uRxTotal,           "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%1s%-13s%11d%2s", "","Total:",         pIFObj->uTxTotal,           "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "ETH Unknown:",  pIFObj->uRxEthUnknown,      "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sARP\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "ARP:",          pIFObj->uRxEthArp,          "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uTxEthArpReplyOk,   "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uRxArpReply,        "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Request:",      pIFObj->uTxEthArpRequestOk, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Request:",      pIFObj->uRxArpRequest,      "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxEthArpErr,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Conflict:",     pIFObj->uRxArpConflict,     "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sLLDP\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Invalid:",      pIFObj->uRxArpInvalid,      "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxEthLldpOk,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%2s%-12s%11d%2s", "", "IP:",           pIFObj->uRxEthIp,           "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxEthLldpErr,      "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Chksm Err:",    pIFObj->uRxIpChecksumErrors,"|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sICMP\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "Unknown:",      pIFObj->uRxIpUnknown,       "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Reply:",        pIFObj->uTxIpIcmpReplyOk,   "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "ICMP:",         pIFObj->uRxIpIcmp,          "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxIpIcmpReplyErr,  "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "Invalid:",      pIFObj->uRxIcmpInvalid,     "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sIGMP\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%3s%-11s%11d%2s", "", "UDP:",          pIFObj->uRxIpUdp,           "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxIpIgmpOk,        "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "Unknown:",      pIFObj->uRxUdpUnknown,      "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxIpIgmpErr,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "CTRL:",         pIFObj->uRxUdpCtrl,         "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sDHCP\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%4s%-10s%11d%2s", "", "DHCP:",         pIFObj->uRxUdpDhcp,         "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpDhcpOk,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%5s%-9s%11d%2s", "", "Invalid:",       pIFObj->uRxDhcpInvalid,     "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxUdpDhcpErr,      "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Rx%5s%-9s%11d%2s", "", "Unknown:",       pIFObj->uRxDhcpUnknown,     "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%2sCTRL\r\n", "");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "%30s", "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpCtrlOk,       "\r\n");
 
   for (i = 0; i < 60; i++){
-    log_printf(LOG_LEVEL_DEBUG, "-");
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "-");
   }
-  log_printf(LOG_LEVEL_DEBUG, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "\r\n");
 }

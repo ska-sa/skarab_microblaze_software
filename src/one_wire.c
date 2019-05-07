@@ -137,7 +137,7 @@ int OneWireReset(u16 uOneWirePort)
 {
   u32 uReg;
 
-  log_printf(LOG_LEVEL_TRACE, "RST[");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "RST[");
 
   //uReg = uPower << ONE_WIRE_CTL_POWER_OFST;
   uReg = 0x0;
@@ -164,10 +164,10 @@ int OneWireReset(u16 uOneWirePort)
 
   // Presence detect is low
   if ((uReg & ONE_WIRE_CTL_DAT_MSK) == 0x0){
-    log_printf(LOG_LEVEL_TRACE, "D] ");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "D] ");
     return XST_SUCCESS;
   } else {
-    log_printf(LOG_LEVEL_TRACE, "E] ");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "E] ");
     return XST_FAILURE;
   }
 
@@ -281,7 +281,7 @@ void OneWireWrite(u16 uByte, u16 uOneWirePort)
   u16 uBitCount;
   u16 uSendByte = uByte;
 
-  log_printf(LOG_LEVEL_TRACE, "W ");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "W ");
 
   for (uBitCount = 0; uBitCount < 8; uBitCount++)
   {
@@ -310,7 +310,7 @@ u16 OneWireRead(u16 uOneWirePort)
   u16 uByteRead = 0x0;
   u16 uBitCount;
 
-  log_printf(LOG_LEVEL_TRACE, "R ");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "R ");
 
   for (uBitCount = 0; uBitCount < 8; uBitCount++)
   {
@@ -436,7 +436,7 @@ int OneWireReadRom(u16 uRom[8], u16 uOneWirePort)
   int RetVal = XST_FAILURE;
   u16 uIndex;
 
-  log_printf(LOG_LEVEL_TRACE, "[1WIRE] Read ROM...");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "[1WIRE] Read ROM...");
 
   if (OneWireReset(uOneWirePort) == XST_SUCCESS){
     OneWireWrite(ONE_WIRE_READ_ROM, uOneWirePort);           // Read ROM command
@@ -447,12 +447,12 @@ int OneWireReadRom(u16 uRom[8], u16 uOneWirePort)
 
     // 05/06/2015 INCLUDE FINAL RESET IN RETURN STATUS
     RetVal = OneWireReset(uOneWirePort); // Just in case
-    log_printf(LOG_LEVEL_TRACE, "%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
     return RetVal;
 
     //return XST_SUCCESS;
   } else {
-    log_printf(LOG_LEVEL_TRACE, " [FAIL]\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, " [FAIL]\r\n");
     return XST_FAILURE;
   }
 }
@@ -847,7 +847,7 @@ int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u
   u16 uIndex;
   int RetVal = XST_FAILURE;
 
-  log_printf(LOG_LEVEL_TRACE, "[1WIRE] Read Memory Page...");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "[1WIRE] Read Memory Page...");
 
   /* TODO: currently there is no failure mechanism when user enters incorrect
    * device ROM. Try to search for this ROM on the bus with existing function
@@ -872,10 +872,10 @@ int DS2433ReadMem(u16 * uDeviceAddress, u16 uSkipRomAddress, u16 * uMemBuffer, u
 
     // GT 05/06/2015 INCLUDE FINAL RESET IN RETURN STATUS
     RetVal = OneWireReset(uOneWirePort);
-    log_printf(LOG_LEVEL_TRACE, "%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "%s\r\n", RetVal == XST_SUCCESS ? " [DONE]" : " [FAIL]");
     return RetVal;
   } else {
-    log_printf(LOG_LEVEL_TRACE, " [FAIL]\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, " [FAIL]\r\n");
     return XST_FAILURE;
   }
 }

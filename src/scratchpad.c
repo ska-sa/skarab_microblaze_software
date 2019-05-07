@@ -1,6 +1,6 @@
 /*
  * Memory with persistent state between FPGA reconfigures is required to hold
- * programtic state between reconfigures (not between resets).
+ * programatic state between reconfigures (not between resets).
  * The fan controller MAX31785 chip on the SKARAB motherboard has RAM which
  * can be accessed and used for this purpose. This is done by writing to the
  * chip's registers (one's which do not influence operation).
@@ -205,6 +205,7 @@ static tPMemReturn PersistentMemory(tPMemOperation op, tPMemByteIndex byte_index
       for (block = 0; block < BLOCKS; block++){
         for (index = 0; index < MFR_REGISTER_LEN; index++){
           if (rd_bytes[block][index] != MFR_registers_default_values[block][index]){
+            /* FIXME: return value is being overwritten with only the latest byte checked! */
             ret = PMEM_RETURN_NON_DEFAULT;
             break;
           } else {
