@@ -18,7 +18,6 @@
 //#include <string.h>
 
 #include <xil_types.h>
-#include <xil_printf.h>
 #include <xenv_standalone.h>
 
 /* local includes */
@@ -28,7 +27,7 @@
 #include "udp.h"
 #include "net_utils.h"
 #include "if.h"
-#include "print.h"
+#include "logging.h"
 
 /* Local function prototypes  */
 static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr);
@@ -86,12 +85,12 @@ u8 SanityCheckDHCP(struct sIFObject *pIFObjectPtr){
   /* TODO: should we assert rather that return? */
 
   if (pIFObjectPtr == NULL){
-    debug_printf("No interface state handle\r\n");
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_FATAL, "No interface state handle\r\n");
     return -1;
   }
 
   if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    debug_printf("Inconsistent interface state magic value\r\n");
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_FATAL, "Inconsistent interface state magic value\r\n");
     return -1;
   }
 
@@ -108,17 +107,17 @@ u8 SanityCheckDHCP(struct sIFObject *pIFObjectPtr){
 #endif
 
   if (pDHCPObjectPtr->uDHCPMagic != DHCP_MAGIC){
-    debug_printf("Inconsistent DHCP state magic value\r\n");
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_FATAL, "Inconsistent DHCP state magic value\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    debug_printf("Interface transmit buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_FATAL, "Interface transmit buffer pointer undefined\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    debug_printf("Interface receive buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_FATAL, "Interface receive buffer pointer undefined\r\n");
     return -1;
   }
 
@@ -298,7 +297,7 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("DHCP: RX - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP: RX - IP Hdr Checksum %04x - Invalid!\r\n", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
 
@@ -331,7 +330,7 @@ u8 uDHCPMessageValidate(struct sIFObject *pIFObjectPtr){
   }
 
   if (uCheckTemp != 0xFFFF){
-    xil_printf("DHCP: RX - UDP Checksum %04x - Invalid!\r\n", uCheckTemp);
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP: RX - UDP Checksum %04x - Invalid!\r\n", uCheckTemp);
     return DHCP_RETURN_INVALID;
   }
 #endif
@@ -522,7 +521,7 @@ u8 uDHCPSetInitWait(struct sIFObject *pIFObjectPtr, u32 uInitWait){
 
   /* unsigned value so only have to check upper bound */
   if (uInitWait > 1200){
-    debug_printf("DHCP [%02x] DHCP init wait value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uInitWait * POLL_INTERVAL);
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [%02x] DHCP init wait value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uInitWait * POLL_INTERVAL);
     return DHCP_RETURN_FAIL;
   }
 
@@ -558,7 +557,7 @@ u8 uDHCPSetRetryInterval(struct sIFObject *pIFObjectPtr, u32 uRetryInterval){
   /* i.e. 5 x POLL_INTERVAL or 300 x POLL_INTERVAL when POLL_INTERVAL = 100 (ms)*/
   /* TODO: create a macro define for the following min/max values */
   if ((uRetryInterval < 5) || (uRetryInterval > 300)){
-    debug_printf("DHCP [%02x] DHCP retry value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uRetryInterval * POLL_INTERVAL);
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [%02x] DHCP retry value of %d ms out of bounds.\r\n", (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF, uRetryInterval * POLL_INTERVAL);
     return DHCP_RETURN_FAIL;
   }
 
@@ -598,7 +597,7 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
 
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
 
-  debug_printf("DHCP [%02x] setting cached IP to %d.%d.%d.%d\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] setting cached IP to %d.%d.%d.%d\r\n",
       pIFObjectPtr->uIFEthernetId,
       pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
       pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
@@ -819,7 +818,7 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
     pDHCPObjectPtr->uDHCPRandomWait += pDHCPObjectPtr->uDHCPSMInitWait; /* add an extra fixed offset to the dhcp init waiting time */
   }
 
-  debug_printf("DHCP [%02x] Waiting %d ms before starting DHCP at %d ms retry rate.\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] Waiting %d ms before starting DHCP at %d ms retry rate.\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL),
       (pDHCPObjectPtr->uDHCPSMRetryInterval * POLL_INTERVAL));
@@ -858,7 +857,7 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
        * attempt to acquire a pre-loaded / cached lease - skip discover step
        * RFC2131 allows for this - see INIT-REBOOT state (p35, RFC2131 Mar 1997)
        */
-      debug_printf("DHCP [%02x] Requesting cached lease %d.%d.%d.%d\r\n",
+      log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] Requesting cached lease %d.%d.%d.%d\r\n",
           (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
           pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
           pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
@@ -1473,11 +1472,11 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   uPseudoHdr[9] = pBuffer[IP_FRAME_BASE + IP_PROT_OFFSET];
   memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
-  trace_printf("DHCP: UDP pseudo header: \r\n");
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP: UDP pseudo header: \r\n");
   for (int i = 0; i < 12; i++){
-    trace_printf(" %02x", uPseudoHdr[i]);
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", uPseudoHdr[i]);
   }
-  trace_printf("\r\n");
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
 
   RetVal = uChecksum16Calc(&(uPseudoHdr[0]), 0, 11, &uCheckTemp, 0, 0);
   if(RetVal){
@@ -1490,7 +1489,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     return DHCP_RETURN_FAIL;
   }
 
-  trace_printf("DHCP: UDP checksum value = %04x\r\n", uCheckTemp);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP: UDP checksum value = %04x\r\n", uCheckTemp);
 
   pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET    ] = (u8) ((uCheckTemp & 0xff00) >> 8);
   pBuffer[UDP_FRAME_BASE + UDP_CHKSM_OFFSET + 1] = (u8) (uCheckTemp & 0xff);
@@ -1506,7 +1505,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 
   /* TODO: set a message ready flag */
 
-  debug_printf("DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
 
@@ -1669,7 +1668,7 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
     memcpy(pDHCPObjectPtr->arrDHCPAddrYIPCached, pBuffer + uIPLen + BOOTP_FRAME_BASE + BOOTP_YIPADDR_OFFSET, 4);
   }
 
-  debug_printf("DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       dhcp_msg_string_lookup[tDHCPMsgType], uDHCPTmpXid);
 

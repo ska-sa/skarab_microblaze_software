@@ -5,7 +5,7 @@
 
 #include "constant_defs.h"
 #include "adc.h"
-#include "print.h"
+#include "logging.h"
 #include "i2c_master.h"
 
 static typeAdcInitState adc_init_bootloader_version_wr_state(struct sAdcObject *pAdcObject);
@@ -75,7 +75,7 @@ static typeAdcInitState adc_init_bootloader_version_wr_state(struct sAdcObject *
 
   iStatus = WriteI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 7);
   if (iStatus != XST_SUCCESS){
-    error_printf("ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
   }
 
   return ADC_STATE_INIT_BOOTLOADER_VERSION_READ_MODE;
@@ -88,13 +88,13 @@ static typeAdcInitState adc_init_bootloader_version_rd_state(struct sAdcObject *
 
   iStatus = ReadI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS){
-    error_printf("ADC  [%02x] Bootloader I2C read [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C read [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
   }
 
   uADC32RF45X2BootloaderVersionMajor = (uReadBytes[0] >> 4) & 0xF;
   uADC32RF45X2BootloaderVersionMinor = uReadBytes[0] & 0xF;
 
-  info_printf("ADC  [%02x] Mezzanine bootloader version: %x.%x\r\n", uADC32RF45X2MezzanineLocation, uADC32RF45X2BootloaderVersionMajor, uADC32RF45X2BootloaderVersionMinor);
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine bootloader version: %x.%x\r\n", uADC32RF45X2MezzanineLocation, uADC32RF45X2BootloaderVersionMajor, uADC32RF45X2BootloaderVersionMinor);
 
   return ADC_STATE_INIT_BOOTLOADER_MODE;
 }
@@ -105,11 +105,11 @@ static typeAdcInitState adc_init_bootloader_state(struct sAdcObject *pAdcObject)
   int iStatus;
 
   uWriteBytes[0] = ADC32RF45X2_LEAVE_BOOTLOADER_MODE;
-  info_printf("ADC  [%02x] Mezzanine leaving bootloader mode.\r\n", uADC32RF45X2MezzanineLocation);
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine leaving bootloader mode.\r\n", uADC32RF45X2MezzanineLocation);
 
   iStatus = WriteI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS){
-    error_printf("ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
   }
 
   return ADC_STATE_INIT_STARTING_APPLICATION_MODE;

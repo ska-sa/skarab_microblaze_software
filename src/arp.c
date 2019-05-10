@@ -17,7 +17,8 @@
 #include "eth_mac.h"
 #include "if.h"
 #include "arp.h"
-#include "print.h"
+#include "logging.h"
+#include "constant_defs.h"
 
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
@@ -31,22 +32,22 @@
 u8 SanityCheckARP(struct sIFObject *pIFObjectPtr){
 
   if (pIFObjectPtr == NULL){
-    debug_printf("No interface state handle\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_FATAL, "No interface state handle\r\n");
     return -1;
   }
 
   if (pIFObjectPtr->uIFMagic != IF_MAGIC){
-    debug_printf("Inconsistent interface state magic value\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_FATAL, "Inconsistent interface state magic value\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserTxBufferPtr) == NULL){
-    debug_printf("Interface transmit buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_FATAL, "Interface transmit buffer pointer undefined\r\n");
     return -1;
   }
 
   if ((pIFObjectPtr->pUserRxBufferPtr) == NULL){
-    debug_printf("Interface receive buffer pointer undefined\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_FATAL, "Interface receive buffer pointer undefined\r\n");
     return -1;
   }
 
@@ -69,40 +70,40 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
 
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
-    debug_printf("ARP: Ethernet HW Type problem!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: Ethernet HW Type problem!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_PROTO_TYPE_OFFSET, uIPProtocolType, 2) != 0){
-    debug_printf("ARP: IPv4 Protocol Type problem!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: IPv4 Protocol Type problem!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* NOTE: expecting IP over Ethernet ARP messages, thus hard code following lengths */
   /* ethernet length */
   if (pUserBufferPtr[ARP_FRAME_BASE + ARP_HW_ADDR_LENGTH_OFFSET] != 6){
-    debug_printf("ARP: HW Addr length problem!!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: HW Addr length problem!!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* ipv4 length */
   if (pUserBufferPtr[ARP_FRAME_BASE + ARP_PROTO_ADDR_LENGTH_OFFSET] != 4){
-    debug_printf("ARP: Proto Addr length problem!!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: Proto Addr length problem!!\r\n");
     return ARP_RETURN_INVALID;
   }
 
   /* are we the intended target of this arp packet? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_TGT_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4) != 0 ){
-    trace_printf("ARP: ignore!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "ARP: ignore!\r\n");
     return ARP_RETURN_IGNORE;
   }
 
   /* is this an ARP reply? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_OPCODE_OFFSET, uReplyOpcode, 2) == 0){
-    trace_printf("ARP: reply!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "ARP: reply!\r\n");
     /* check for ip conflict between sender and us */
     if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET, pIFObjectPtr->arrIFAddrIP, 4) == 0){
-      trace_printf("ARP: address conflict!\r\n");
+      log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: conflict!\r\n");
       return ARP_RETURN_CONFLICT;
     }
     return ARP_RETURN_REPLY;
@@ -110,7 +111,7 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
 
   /* is this an ARP request? */
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_OPCODE_OFFSET, uRequestOpcode, 2) == 0){
-    trace_printf("ARP: request!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "ARP: request!\r\n");
     return ARP_RETURN_REQUEST;
   }
 
@@ -151,7 +152,7 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
     memset(pTxBuffer + ETH_DST_OFFSET, 0xff, 6);   /* broadcast */
   } else {
     /* unrecognized type */
-    trace_printf("ARP: invalid message type!\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP: invalid message type!\r\n");
     return ARP_RETURN_FAIL;
   }
 
@@ -201,11 +202,11 @@ u8 uARPBuildMessage(struct sIFObject *pIFObjectPtr, typeARPMessage tARPMsgType, 
   /* in our case, arp packets are fixed length (14 + 28 = 42) */
   pIFObjectPtr->uMsgSize = ETH_FRAME_TOTAL_LEN + ARP_FRAME_TOTAL_LEN + 24;
 
-  trace_printf("ARP  packet:\r\n");
+  log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "ARP  packet:\r\n");
   for (uIndex = 0; uIndex < pIFObjectPtr->uMsgSize; uIndex++){
-    trace_printf("%02x ", pTxBuffer[uIndex]);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "%02x ", pTxBuffer[uIndex]);
   }
-  trace_printf("\r\n");
+  log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "\r\n");
 
   return ARP_RETURN_OK;
 }
@@ -244,12 +245,12 @@ void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
   if (pIFObjectPtr->uIFEnableArpRequests == ARP_REQUESTS_ENABLE){
     RequestIP = pIFObjectPtr->uIFEthernetSubnet | pIFObjectPtr->uIFCurrentArpRequest;
     /* build the arp request */
-    trace_printf("build : 0x%08x ", RequestIP);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "build : 0x%08x ", RequestIP);
     uARPBuildMessage(pIFObjectPtr, ARP_OPCODE_REQUEST, RequestIP);
 
     size = (u32) (pIFObjectPtr->uMsgSize >> 1);    /* bytes to 16-bit words */
 
-    trace_printf("swap: %d ", size);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "swap: %d ", size);
     for (i = 0; i < size; i++){
       pBuffer[i] = Xil_EndianSwap16(pBuffer[i]);
     }
@@ -257,16 +258,16 @@ void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
     id = pIFObjectPtr->uIFEthernetId;
 
     size = size >> 1;   /*  32-bit words */
-    trace_printf("send: %d %d ", size, id);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "send: %d %d ", size, id);
     iStatus = TransmitHostPacket(id, (u32 *) pBuffer, size);
     if (iStatus == XST_SUCCESS){
       pIFObjectPtr->uTxEthArpRequestOk++;
     } else {
-      error_printf("ARP  [%02x] FAILED to send ARP REQUEST to target with IP 0x%08x\r\n", id, RequestIP);
+      log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP  [%02x] FAILED to send ARP REQUEST to target with IP 0x%08x\r\n", id, RequestIP);
       pIFObjectPtr->uTxEthArpErr++;
     }
 
-    trace_printf("done\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "done\r\n");
     /* cycle through IP's from .1 to .254 */
     if (pIFObjectPtr->uIFCurrentArpRequest == 254){
       pIFObjectPtr->uIFCurrentArpRequest = 1;

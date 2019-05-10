@@ -21,6 +21,8 @@
 *  This file contains global constant and type definitions.
 * ------------------------------------------------------------------------------*/
 
+#include <xil_types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -282,7 +284,11 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define SDRAM_PROGRAM_OVER_WISHBONE 0x0051
 #define SET_DHCP_TUNING_DEBUG       0x0053
 #define GET_DHCP_TUNING_DEBUG       0x0055
-#define HIGHEST_DEFINED_COMMAND     0x0055
+#define GET_CURRENT_LOGS            0x0057
+#define GET_VOLTAGE_LOGS            0x0059
+#define GET_FANCONTROLLER_LOGS      0x005B
+#define CLEAR_FANCONTROLLER_LOGS    0x005D
+#define HIGHEST_DEFINED_COMMAND     0x005D
 
 
 // ETHERNET TYPE CODES
@@ -1054,6 +1060,83 @@ typedef struct sGetDHCPTuningDebugResp {
   u16 uStatus;
   u16 uPadding[6];
 } sGetDHCPTuningDebugRespT;
+
+typedef struct sLogDataEntry{
+  u16 uPageSpecific;
+  u16 uFaultType;
+  u16 uPage;
+  u16 uFaultValue;
+  u16 uValueScale;
+  u16 uSeconds[2];     /* most significant word first - runtime seconds since fault */
+#if 0
+  u16 uMilliSeconds[2];   /* most-significant word first */
+  u16 uDays[2];           /* most-significant word first */
+#endif
+} sLogDataEntryT;
+
+typedef struct sGetCurrentLogsReq {
+  sCommandHeaderT Header;
+} sGetCurrentLogsReqT;
+
+typedef struct sGetCurrentLogsResp {
+  sCommandHeaderT Header;
+#define NUM_LOG_ENTRIES 16
+  sLogDataEntryT uCurrentLogEntries[NUM_LOG_ENTRIES];
+  u16 uLogEntrySuccess;
+} sGetCurrentLogsRespT;
+
+/* TODO: can't we use a union to collapse these two identical structs? (above and below) */
+
+typedef struct sGetVoltageLogsReq {
+  sCommandHeaderT Header;
+} sGetVoltageLogsReqT;
+
+typedef struct sGetVoltageLogsResp {
+  sCommandHeaderT Header;
+#define NUM_LOG_ENTRIES 16
+  sLogDataEntryT uVoltageLogEntries[NUM_LOG_ENTRIES];
+  u16 uLogEntrySuccess;
+} sGetVoltageLogsRespT;
+
+typedef struct sFanCtrlrLogDataEntry {
+  u16 uFaultLogIndex;
+  u16 uFaultLogCount;
+  u16 uStatusWord;
+  u16 uStatusVout_17_18;
+  u16 uStatusVout_19_20;
+  u16 uStatusVout_21_22;
+  u16 uStatusMfr_6_7;
+  u16 uStatusMfr_8_9;
+  u16 uStatusMfr_10_11;
+  u16 uStatusMfr_12_13;
+  u16 uStatusMfr_14_15;
+  u16 uStatusMfr_16_none;
+  u16 uStatusFans_0_1;
+  u16 uStatusFans_2_3;
+  u16 uStatusFans_4_5;
+} sFanCtrlrLogDataEntryT;
+
+typedef struct sGetFanControllerLogsReq {
+  sCommandHeaderT Header;
+} sGetFanControllerLogsReqT;
+
+#define NUM_FANCTRLR_LOG_ENTRIES  15
+typedef struct sGetFanControllerLogsResp {
+  sCommandHeaderT Header;
+  sFanCtrlrLogDataEntryT uFanCtrlrLogEntries[NUM_FANCTRLR_LOG_ENTRIES];
+  u16 uCompleteSuccess;      /* true if full log retrieval is successful */
+  u16 uPadding[3];
+} sGetFanControllerLogsRespT;
+
+typedef struct sClearFanControllerLogsReq {
+  sCommandHeaderT Header;
+} sClearFanControllerLogsReqT;
+
+typedef struct sClearFanControllerLogsResp {
+  sCommandHeaderT Header;
+  u16 uSuccess;      /* true if logs successfully cleared */
+  u16 uPadding[8];
+} sClearFanControllerLogsRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0
