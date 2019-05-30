@@ -808,7 +808,7 @@ int main()
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_M_AXI_D_EXCEPTION, &DBusException, NULL);
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_STACK_VIOLATION, &StackViolationException, NULL);
   microblaze_register_exception_handler(XIL_EXCEPTION_ID_ILLEGAL_OPCODE, &IllegalOpcodeException, NULL);
-  microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
+  //microblaze_register_exception_handler(XIL_EXCEPTION_ID_UNALIGNED_ACCESS, &UnalignedAccessException, NULL);
   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
   microblaze_enable_exceptions();
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "[DONE]\r\n");
@@ -2202,6 +2202,8 @@ void IllegalOpcodeException(void *Data){
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Illegal opcode exception\r\n");
 }
 
+#if 0
 void UnalignedAccessException(void *Data){
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Unaligned data access exception\r\n");
 }
+#endif
