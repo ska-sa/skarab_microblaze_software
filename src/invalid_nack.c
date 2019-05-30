@@ -52,7 +52,7 @@ int InvalidOpcodeHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
     Response->uPadding[uPaddingIndex] = 0;
   }
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "Created Response for NACK!!!!!\r\n");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Created Response for NACK!!!!!\r\n");
 
   *uResponseLength = sizeof(sInvalidOpcodeRespT);
 

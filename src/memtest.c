@@ -71,17 +71,17 @@ static inline u8 uAdler32Calc(const u8 *pDataPtr, const u32 uDataSize, u32 *pChe
 u8 uDoMemoryTest(const u8 *pDataPtr, const u32 uDataSize, u32 *pChecksum){
 #ifdef DO_SANITY_CHECKS
   if (NULL == pDataPtr){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "[Memory Test] Error - No data reference\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "[Memory Test] Error - No data reference\r\n");
     return -1;
   }
 
   if (0 == uDataSize){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "[Memory Test] Error - Zero data size\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "[Memory Test] Error - Zero data size\r\n");
     return -1;
   }
 
   if (NULL == pChecksum){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "[Memory Test] Error - No storage handle provided\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "[Memory Test] Error - No storage handle provided\r\n");
     return -1;
   }
 #endif
