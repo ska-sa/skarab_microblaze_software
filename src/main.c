@@ -732,6 +732,9 @@ int main()
 
 #ifdef LINK_MON_RX_40GBE
   u32 LinkTimeout = 1;
+#endif
+
+#if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
   u16 uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
 #endif
 
@@ -1095,11 +1098,11 @@ int main()
       uLinkTimeoutMax  = (data[0] & 0xff) | (data[1] << 8);
       /*
        * Now ensure that the link timeout is a reasonable value since this is
-       * user data in eeprom. Let's say a reasonable value is larger than 30s  since
+       * user data in eeprom. Let's say a reasonable value is larger than 60s  since
        * the switch may take some time to initialize the link before we see activity,
        * else leave as default value.
        */
-      uLinkTimeoutMax = (uLinkTimeoutMax >= 300) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
+      uLinkTimeoutMax = (uLinkTimeoutMax >= 600) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
     }
   }
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting 40gbe link timeout to %d ms\r\n", (u32) uLinkTimeoutMax * 100);
@@ -1801,7 +1804,6 @@ int main()
 #endif
 
 
-#if 0 /* Deprecated - replaced with link monitoring feature above */
     //----------------------------------------------------------------------------//
     //  CHECK DHCP BOUND TASK                                                     //
     //  Triggered on timer interrupt                                              //
@@ -1819,22 +1821,37 @@ int main()
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         /* TODO: create API function to get state */
         if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
-          if (uDHCPBoundCount[uEthernetId] < DHCP_BOUND_COUNTER_VALUE){ /*  prevent overflows */
+          if (uDHCPBoundCount[uEthernetId] < uLinkTimeoutMax){ /*  prevent overflows */
             uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
           }
         } else {
           uDHCPBoundCount[uEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
         }
-        if (uDHCPBoundCount[uEthernetId] >= DHCP_BOUND_COUNTER_VALUE){
+        if (uDHCPBoundCount[uEthernetId] >=  uLinkTimeoutMax){
           uDHCPBoundTimeout++;
         }
       }
       /*
-       * if we timeout on all the interfaces, line up a reset (...and reload the
-       * image in SDRAM if running a toolflow image)
+       * if we timeout on all the interfaces, line up a reset
        */
       if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "REBOOT - DHCP timed out on all interfaces!\r\n");
+        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] Timed out on all interfaces!\r\n");
+
+        /* Keep track of the number of DHCP caused reboots */
+        if (PMemState != PMEM_RETURN_ERROR){
+          PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
+          uDHCPReconfigCount = uDHCPReconfigCount + 1;
+          PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
+          log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [..] increment reset count to %d\r\n", uDHCPReconfigCount);
+        }
+
+        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_WARN, "DHCP [..] resetting firmware\r\n");
+
+        /* just wait a little while to enable serial port to finish writing out */
+        Delay(100000); /* 100ms */
+
+        WriteBoardRegister(C_WR_BRD_CTL_STAT_0_ADDR, 1 << 30);    /* set bit 30 of board ctl reg 0 to reset the fw */
+#if 0
         if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
           /* if it's a toolflow image */
           SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
@@ -1843,17 +1860,10 @@ int main()
           AboutToBootFromSdram();
         }
         uDoReboot = REBOOT_REQUESTED;
+#endif
 
-        /* Keep track of the number of DHCP caused reboots */
-        if (PMemState != PMEM_RETURN_ERROR){
-          PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
-          uDHCPReconfigCount = uDHCPReconfigCount + 1;
-          PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "REBOOT - increment count\r\n");
-        }
       }
     }
-#endif
 #endif
 
     //----------------------------------------------------------------------------//
