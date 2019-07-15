@@ -1,7 +1,11 @@
 #include <xil_printf.h>
+#include <xstatus.h>
 
 #include "cli.h"
 #include "logging.h"
+#include "register.h"
+#include "constant_defs.h"
+#include "i2c_master.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -21,6 +25,7 @@ struct cli{
 typedef enum {
   CMD_INDEX_LOG_LEVEL = 0,
   CMD_INDEX_LOG_SELECT,
+  CMD_INDEX_BOUNCE_LINK,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -30,26 +35,30 @@ typedef int (* cmd_callback)(struct cli *);
 static const char * const cli_cmd_map[] = {
   [CMD_INDEX_LOG_LEVEL]   = "log-level",
   [CMD_INDEX_LOG_SELECT]  = "log-select",
+  [CMD_INDEX_BOUNCE_LINK] = "bounce-link",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
 
 static const char * const cli_cmd_options[][11] = {
- [CMD_INDEX_LOG_LEVEL]  = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
- [CMD_INDEX_LOG_SELECT] = {"general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
- [CMD_INDEX_HELP]       = { NULL},
- [CMD_INDEX_END]        = { NULL }
+ [CMD_INDEX_LOG_LEVEL]    = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
+ [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
+ [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
+ [CMD_INDEX_HELP]         = { NULL},
+ [CMD_INDEX_END]          = { NULL}
 };
 
 int cli_log_level_exe(struct cli *_cli);
 int cli_log_select_exe(struct cli *_cli);
+int cli_bounce_link_exe(struct cli *_cli);
 int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
- [CMD_INDEX_LOG_LEVEL]  = cli_log_level_exe,
- [CMD_INDEX_LOG_SELECT] = cli_log_select_exe,
- [CMD_INDEX_HELP]       = cli_help_exe,
- [CMD_INDEX_END]        = NULL
+ [CMD_INDEX_LOG_LEVEL]    = cli_log_level_exe,
+ [CMD_INDEX_LOG_SELECT]   = cli_log_select_exe,
+ [CMD_INDEX_BOUNCE_LINK]  = cli_bounce_link_exe,
+ [CMD_INDEX_HELP]         = cli_help_exe,
+ [CMD_INDEX_END]          = NULL
 };
 
 
@@ -498,6 +507,90 @@ int cli_log_level_exe(struct cli *_cli){
   /* TODO: some error checking perhaps? */
   xil_printf("running log-level %d\r\n", _cli->opt_id);
   set_log_level(_cli->opt_id);
+  return 0;
+}
+
+int cli_bounce_link_exe(struct cli *_cli){
+  u32 l;
+  int r;
+  u16 config;
+  u16 wr[4], rd[4];
+
+  /* check if the link is present - the option parsing state will catch the other end of the error modes */
+  if (_cli->opt_id >= NUM_ETHERNET_INTERFACES){
+    xil_printf("link %d not present\r\n", _cli->opt_id);
+    return -1;
+  }
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "cli opt id: %d\r\n", _cli->opt_id);
+
+  if (_cli->opt_id == 0){
+    /* 1gbe - always link 0 */
+    /* FIXME: create a function for this since this was copy-pated from main.c -  UpdateGBEPHYConfiguration() */
+
+    /****************create function from here...**************************/
+    // Set the switch to the GBE PHY
+    wr[0] = ONE_GBE_SWITCH_SELECT;
+
+    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
+    if (r == XST_FAILURE){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to open I2C switch.\r\n");
+      return -1;
+    }
+
+    // Read register 0 to get current configuration
+    wr[0] = 0; // Address of register to read
+
+    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 1);
+
+    if (r == XST_FAILURE){
+      /* TODO: do we want to unwind the "open switch" command upon a failure here (and subsequent failures too)? */
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update current read register.\r\n");
+      return -1;
+    }
+
+    r = ReadI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, rd, 2);
+    if (r == XST_FAILURE){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
+      return -1;
+    }
+
+    config = ((rd[0] << 8) | rd[1]);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", config);
+
+    // Trigger a soft reset of 1GBE PHY to update configuration
+    // Do a soft reset
+    config = config | 0x8000;
+
+    wr[0] = 0; // Address of register to write
+    wr[1] = ((config >> 8) & 0xFF);
+    wr[2] = (config & 0xFF);
+
+    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 3);
+    if (r == XST_FAILURE){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to write CONTROL REG.\r\n");
+      return -1;
+    }
+
+    // Close I2C switch
+    wr[0] = 0x0;
+
+    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
+    if (r == XST_FAILURE){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to close I2C switch.\r\n");
+      return -1;
+    }
+    /****************...create function till here**************************/
+
+  } else {
+    /* 40gbe link */
+    l = 0x1 << _cli->opt_id;
+
+    /* FIXME: remove global scope of uQSFPCtrlReg */
+    uQSFPCtrlReg = uQSFPCtrlReg | l;
+    WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
+  }
+
   return 0;
 }
 
