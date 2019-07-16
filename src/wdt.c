@@ -31,9 +31,9 @@ void init_wdt(XWdtTb *WatchdogTimer){
     return;
   }
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] read 1...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] read 2...reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET));
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TBR_OFFSET));
 
   /* Initialize the AXI Timebase Watchdog Timer core */
   ret = XWdtTb_CfgInitialize(WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
@@ -50,13 +50,13 @@ void init_wdt(XWdtTb *WatchdogTimer){
     if (ret == XST_NO_FEATURE){
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "WDT  [..] the watchdog timer cannot be stopped, possibly due to 'enable-once' setting\r\n");
     } else if (ret == XST_SUCCESS){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] watchdog stopped\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] watchdog stopped\r\n");
       XWdtTb_CfgInitialize(WatchdogTimer, WatchdogTimerConfig, WatchdogTimerConfig->BaseAddr);
     }
 
     //XWdtTb_RestartWdt(WatchdogTimer);
     XWdtTb_Start(WatchdogTimer);
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] restart watchdog timer!\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] restart watchdog timer!\r\n");
   } else {
     if (XWdtTb_IsWdtExpired(WatchdogTimer) == TRUE){
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] previous reset was a result of a watchdog timeout!\r\n");
@@ -73,6 +73,6 @@ void init_wdt(XWdtTb *WatchdogTimer){
   }
 
   /* read wdt registers after setup */
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer->Config.BaseAddr, XWT_TWCSR0_OFFSET));
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer->Config.BaseAddr, XWT_TBR_OFFSET));
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] reg TWCSR0 is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer->Config.BaseAddr, XWT_TWCSR0_OFFSET));
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WDT  [..] reg TBR is 0x%08x\r\n", XWdtTb_ReadReg(WatchdogTimer->Config.BaseAddr, XWT_TBR_OFFSET));
 }

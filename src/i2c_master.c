@@ -129,7 +129,7 @@ int WriteI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uWriteBytes, u16 uNumBytes)
     if ((uReg & USB_I2C_CONTROL) != 0)
     {
       // USB PHY has control over I2C so return XST_FAILURE
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WriteI2CBytes: USB PHY has control of I2C\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "WriteI2CBytes: USB PHY has control of I2C\r\n");
       return XST_FAILURE;
     }
   }
@@ -152,14 +152,14 @@ int WriteI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uWriteBytes, u16 uNumBytes)
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WriteI2CBytes: Timeout waiting for address write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "WriteI2CBytes: Timeout waiting for address write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WriteI2CBytes: Address byte not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "WriteI2CBytes: Address byte not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -186,14 +186,14 @@ int WriteI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uWriteBytes, u16 uNumBytes)
 
     if (uTimeout == I2C_TIMEOUT)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WriteI2CBytes: Timeout waiting for data byte write to complete\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "WriteI2CBytes: Timeout waiting for data byte write to complete\r\n");
       return XST_FAILURE;
     }
 
     // Check the received ACK, should be '0'
     if ((uReg & OC_I2C_RXACK) != 0x0)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "WriteI2CBytes: Data byte not ACKed\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "WriteI2CBytes: Data byte not ACKed\r\n");
       return XST_FAILURE;
     }
 
@@ -236,7 +236,7 @@ int ReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadBytes, u16 uNumBytes)
     if ((uReg & USB_I2C_CONTROL) != 0)
     {
       // USB PHY has control over I2C so return XST_FAILURE
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ReadI2CBytes: USB PHY has control of I2C\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ReadI2CBytes: USB PHY has control of I2C\r\n");
       return XST_FAILURE;
     }
   }
@@ -259,14 +259,14 @@ int ReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadBytes, u16 uNumBytes)
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ReadI2CBytes: Timeout waiting for address write to complete.\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ReadI2CBytes: Timeout waiting for address write to complete.\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ReadI2CBytes: Address not ACKed.\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ReadI2CBytes: Address not ACKed.\r\n");
     return XST_FAILURE;
   }
 
@@ -291,7 +291,7 @@ int ReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadBytes, u16 uNumBytes)
 
     if (uTimeout == I2C_TIMEOUT)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ReadI2CBytes: Timeout waiting for read data bytes to complete.\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ReadI2CBytes: Timeout waiting for read data bytes to complete.\r\n");
       return XST_FAILURE;
     }
 
@@ -338,7 +338,7 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
     if ((uReg & USB_I2C_CONTROL) != 0)
     {
       // USB PHY has control over I2C so return XST_FAILURE
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: USB PHY has control of I2C\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: USB PHY has control of I2C\r\n");
       return XST_FAILURE;
     }
   }
@@ -361,14 +361,14 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Timeout waiting for first address write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Timeout waiting for first address write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: First Address write not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: First Address write not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -390,14 +390,14 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Timeout waiting for command write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Timeout waiting for command write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Command write not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Command write not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -419,14 +419,14 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Timeout waiting for second address write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Timeout waiting for second address write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Second address write not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Second address write not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -458,7 +458,7 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
 
     if (uTimeout == I2C_TIMEOUT)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PMBusReadI2CBytes: Timeout waiting for read data byte\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "PMBusReadI2CBytes: Timeout waiting for read data byte\r\n");
       return XST_FAILURE;
     }
 
@@ -503,7 +503,7 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
     if ((uReg & USB_I2C_CONTROL) != 0)
     {
       // USB PHY has control over I2C so return XST_FAILURE
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: USB PHY has control of I2C\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: USB PHY has control of I2C\r\n");
       return XST_FAILURE;
     }
   }
@@ -526,14 +526,14 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Timeout waiting for first address write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Timeout waiting for first address write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: First Address write not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: First Address write not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -557,14 +557,14 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 
     if (uTimeout == I2C_TIMEOUT)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Timeout waiting for address write to complete\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Timeout waiting for address write to complete\r\n");
       return XST_FAILURE;
     }
 
     // Check the received ACK, should be '0'
     if ((uReg & OC_I2C_RXACK) != 0x0)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Address write not ACKed\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Address write not ACKed\r\n");
       return XST_FAILURE;
     }
   }
@@ -587,14 +587,14 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 
   if (uTimeout == I2C_TIMEOUT)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Timeout waiting for second address write to complete\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Timeout waiting for second address write to complete\r\n");
     return XST_FAILURE;
   }
 
   // Check the received ACK, should be '0'
   if ((uReg & OC_I2C_RXACK) != 0x0)
   {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Second address write not ACKed\r\n");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Second address write not ACKed\r\n");
     return XST_FAILURE;
   }
 
@@ -619,7 +619,7 @@ int HMCReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 * uReadAddress, u16 * uReadB
 
     if (uTimeout == I2C_TIMEOUT)
     {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMCReadI2CBytes: Timeout waiting for read data byte\r\n");
+      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "HMCReadI2CBytes: Timeout waiting for read data byte\r\n");
       return XST_FAILURE;
     }
 

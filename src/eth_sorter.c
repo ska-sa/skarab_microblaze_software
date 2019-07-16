@@ -2360,7 +2360,7 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
   }
 
   if (Command->uReset == 0x1){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting Mezzanine.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+[%02x] Resetting Mezzanine.\r\n", uQSFPMezzanineLocation);
 
     uReg = uReg | (QSFP_MEZZANINE_RESET << uQSFPMezzanineLocation);
     WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
@@ -2373,13 +2373,13 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
      * interrupt */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
 
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
     if (Command->uProgram == 0x1){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP+[%02x] Mezzanine entering bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+[%02x] Mezzanine entering bootloader programming mode.\r\n", uQSFPMezzanineLocation);
       btldr_programming = 1;
       uQSFPStateMachinePause();
     }
@@ -2390,14 +2390,14 @@ int QSFPResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uR
      now finished */
     uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
 
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+[%02x] Resetting links.\r\n", uQSFPMezzanineLocation);
 
     uQSFPCtrlReg = QSFP0_RESET | QSFP1_RESET | QSFP2_RESET | QSFP3_RESET;
     WriteBoardRegister(C_WR_ETH_IF_CTL_ADDR, uQSFPCtrlReg);
 
     uQSFPStateMachineResume();
 
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP+[%02x] Mezzanine leaving bootloader programming mode.\r\n", uQSFPMezzanineLocation);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+[%02x] Mezzanine leaving bootloader programming mode.\r\n", uQSFPMezzanineLocation);
     btldr_programming = 0;
   }
 
@@ -2511,7 +2511,7 @@ int HMCWriteI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   uData = uData | ((Command->uWriteData[2] & 0xff) <<  8);
   uData = uData | ((Command->uWriteData[3] & 0xff));
 
-  //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "HMC WR[%x]: addr = %08x and data = %08x\n", Command->uId, uAddr, uData);
+  //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC WR[%x]: addr = %08x and data = %08x\n", Command->uId, uAddr, uData);
 #endif
 
   //iStatus = HMCWriteI2CBytes(Command->uId, Command->uSlaveAddress, uAddr, uData);
@@ -2522,11 +2522,11 @@ int HMCWriteI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     uWriteBytes[uIndex + 4] = Command->uWriteData[uIndex];
   }
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "HMC WR[%x]:", Command->uId);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC WR[%x]:", Command->uId);
   for (uIndex = 0; uIndex < 8; uIndex++){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, " %x", uWriteBytes[uIndex]);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, " %x", uWriteBytes[uIndex]);
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "\r\n");
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
 
   /* write the array of 8 bytes out directly to the i2c bus. */
   iStatus = WriteI2CBytes(Command->uId, Command->uSlaveAddress, uWriteBytes, 8);

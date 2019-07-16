@@ -597,7 +597,7 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
 
   vDHCPAuxSetFlag(&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_USE_CACHED_IP);
 
-  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] setting cached IP to %d.%d.%d.%d\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] setting cached IP to %d.%d.%d.%d\r\n",
       pIFObjectPtr->uIFEthernetId,
       pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
       pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
@@ -818,7 +818,7 @@ static typeDHCPState init_dhcp_state(struct sIFObject *pIFObjectPtr){
     pDHCPObjectPtr->uDHCPRandomWait += pDHCPObjectPtr->uDHCPSMInitWait; /* add an extra fixed offset to the dhcp init waiting time */
   }
 
-  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] Waiting %d ms before starting DHCP at %d ms retry rate.\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] Waiting %d ms before starting DHCP at %d ms retry rate.\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       (pDHCPObjectPtr->uDHCPRandomWait * POLL_INTERVAL),
       (pDHCPObjectPtr->uDHCPSMRetryInterval * POLL_INTERVAL));
@@ -857,7 +857,7 @@ static typeDHCPState randomize_dhcp_state(struct sIFObject *pIFObjectPtr){
        * attempt to acquire a pre-loaded / cached lease - skip discover step
        * RFC2131 allows for this - see INIT-REBOOT state (p35, RFC2131 Mar 1997)
        */
-      log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] Requesting cached lease %d.%d.%d.%d\r\n",
+      log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] Requesting cached lease %d.%d.%d.%d\r\n",
           (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
           pDHCPObjectPtr->arrDHCPAddrYIPCached[0],
           pDHCPObjectPtr->arrDHCPAddrYIPCached[1],
@@ -1505,7 +1505,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
 
   /* TODO: set a message ready flag */
 
-  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
 
@@ -1668,7 +1668,7 @@ static typeDHCPMessage tDHCPProcessMsg(struct sIFObject *pIFObjectPtr){
     memcpy(pDHCPObjectPtr->arrDHCPAddrYIPCached, pBuffer + uIPLen + BOOTP_FRAME_BASE + BOOTP_YIPADDR_OFFSET, 4);
   }
 
-  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_DEBUG, "DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] processed DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       dhcp_msg_string_lookup[tDHCPMsgType], uDHCPTmpXid);
 
