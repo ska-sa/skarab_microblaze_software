@@ -1845,12 +1845,19 @@ int main()
           log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [..] increment reset count to %d\r\n", uDHCPReconfigCount);
         }
 
+        /*********************REBOOT THE FPGA****************************/
+        sudo_reboot_now();
+        /****************************************************************/
+
+#if 0
         log_printf(LOG_SELECT_DHCP, LOG_LEVEL_WARN, "DHCP [..] resetting firmware\r\n");
 
         /* just wait a little while to enable serial port to finish writing out */
         Delay(100000); /* 100ms */
 
         WriteBoardRegister(C_WR_BRD_CTL_STAT_0_ADDR, 1 << 30);    /* set bit 30 of board ctl reg 0 to reset the fw */
+#endif
+
 #if 0
         if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
           /* if it's a toolflow image */
