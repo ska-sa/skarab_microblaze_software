@@ -123,6 +123,8 @@ u32 ReadSdramWord();
 
 u32 ContinuityTest(u32 uOutput);
 
+void sudo_reboot_now( void );
+
 void WriteFlashWord(u32 uAddress, u16 uData);
 u16 ReadFlashWord(u32 uAddress);
 

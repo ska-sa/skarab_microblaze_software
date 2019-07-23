@@ -27,6 +27,8 @@
 #include "constant_defs.h"
 #include "delay.h"
 #include "logging.h"
+#include "icape_controller.h"
+#include "register.h"
 
 //=================================================================================
 //  SetOutputMode
@@ -817,3 +819,34 @@ u32 ContinuityTest(u32 uOutput)
 }
 
 
+//=================================================================================
+//  sudo_reboot_now
+//--------------------------------------------------------------------------------
+//  This function reboots / reconfigures the fpga immediately. If the current
+//  bitstream is the bsp (multiboot / golden), then reboot from flash. Otherwise
+//  it's the toolflow and boot from SDRAM.
+//
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  void
+//
+//  Return
+//  ------
+//  void
+//=================================================================================
+void sudo_reboot_now( void ){
+
+  log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] rebooting now...\r\n");
+
+  if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+    SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+    ResetSdramReadAddress();
+    AboutToBootFromSdram();
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] toolflow image: reconfigure from SDRAM\r\n");
+  } else {
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] bsp image: reconfigure from FLASH\r\n");
+  }
+  /* just wait a little while to enable serial port to finish writing out */
+  Delay(100000);    /* 100ms */
+  IcapeControllerInSystemReconfiguration();
+}
