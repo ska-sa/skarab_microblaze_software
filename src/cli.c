@@ -28,6 +28,7 @@ typedef enum {
   CMD_INDEX_LOG_SELECT,
   CMD_INDEX_BOUNCE_LINK,
   CMD_INDEX_TEST_TIMER,
+  CMD_INDEX_GET_CONFIG,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -39,6 +40,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_LOG_SELECT]  = "log-select",
   [CMD_INDEX_BOUNCE_LINK] = "bounce-link",
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
+  [CMD_INDEX_GET_CONFIG]  = "get-config",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -48,6 +50,7 @@ static const char * const cli_cmd_options[][11] = {
  [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
  [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
  [CMD_INDEX_TEST_TIMER]   = { NULL },
+ [CMD_INDEX_GET_CONFIG]  =  { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -56,6 +59,7 @@ static int cli_log_level_exe(struct cli *_cli);
 static int cli_log_select_exe(struct cli *_cli);
 static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
+static int cli_get_config_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -63,6 +67,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_LOG_SELECT]   = cli_log_select_exe,
  [CMD_INDEX_BOUNCE_LINK]  = cli_bounce_link_exe,
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
+ [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -613,6 +618,62 @@ static int cli_test_timer_exe(struct cli *_cli){
   }
   return 0;
 }
+
+
+static int cli_get_config_exe(struct cli *_cli){
+
+#ifdef DO_SANITY_CHECKS
+  const char *str_sanity = "yes";
+#else
+  const char *str_sanity = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "do sanity checks: %s\r\n", str_sanity);
+
+#ifdef REDUCED_CLK_ARCH
+  const char *str_clk = "yes";
+#else
+  const char *str_clk = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "reduced clk: %s\r\n", str_clk);
+
+#ifdef WISHBONE_LEGACY_MAP
+  const char *str_wb = "yes";
+#else
+  const char *str_wb = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "wishb legacy map: %s\r\n", str_wb);
+
+#ifdef LINK_MON_RX_40GBE
+  const char *str_lmon = "yes";
+#else
+  const char *str_lmon = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "40gbe link 1 mon: %s\r\n", str_lmon);
+
+
+#ifdef RECONFIG_UPON_NO_DHCP
+  const char *str_dmon = "yes";
+#else
+  const char *str_dmon = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "dhcp mon: %s\r\n", str_dmon);
+
+#ifdef HMC_RECONFIG_RETRY
+  const char *str_hmc = "yes";
+#else
+  const char *str_hmc = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "hmc retry: %s\r\n", str_hmc);
+
+#ifdef PREEMPT_CONFIGURE_FABRIC_IF
+  const char *str_pre_ip = "yes";
+#else
+  const char *str_pre_ip = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "pre-config 40gbe link 1: %s\r\n", str_pre_ip);
+  return 0;
+}
+
 
 static int cli_help_exe(struct cli *_cli){
   cli_print_help();
