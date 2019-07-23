@@ -6,6 +6,7 @@
 #include "register.h"
 #include "constant_defs.h"
 #include "i2c_master.h"
+#include "delay.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -26,6 +27,7 @@ typedef enum {
   CMD_INDEX_LOG_LEVEL = 0,
   CMD_INDEX_LOG_SELECT,
   CMD_INDEX_BOUNCE_LINK,
+  CMD_INDEX_TEST_TIMER,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -36,6 +38,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_LOG_LEVEL]   = "log-level",
   [CMD_INDEX_LOG_SELECT]  = "log-select",
   [CMD_INDEX_BOUNCE_LINK] = "bounce-link",
+  [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -44,19 +47,22 @@ static const char * const cli_cmd_options[][11] = {
  [CMD_INDEX_LOG_LEVEL]    = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
  [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
  [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
- [CMD_INDEX_HELP]         = { NULL},
- [CMD_INDEX_END]          = { NULL}
+ [CMD_INDEX_TEST_TIMER]   = { NULL },
+ [CMD_INDEX_HELP]         = { NULL },
+ [CMD_INDEX_END]          = { NULL }
 };
 
-int cli_log_level_exe(struct cli *_cli);
-int cli_log_select_exe(struct cli *_cli);
-int cli_bounce_link_exe(struct cli *_cli);
-int cli_help_exe(struct cli *_cli);
+static int cli_log_level_exe(struct cli *_cli);
+static int cli_log_select_exe(struct cli *_cli);
+static int cli_bounce_link_exe(struct cli *_cli);
+static int cli_test_timer_exe(struct cli *_cli);
+static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_LOG_LEVEL]    = cli_log_level_exe,
  [CMD_INDEX_LOG_SELECT]   = cli_log_select_exe,
  [CMD_INDEX_BOUNCE_LINK]  = cli_bounce_link_exe,
+ [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -67,8 +73,8 @@ static int cli_filter(char c);
 static char ignore_case(char c);
 static void cli_print_help(void);
 static void cli_sm_run_again(struct cli *_cli);
-int cli_isspace(char c);
-int cli_strncmp(const char *first, const char *second, unsigned int n);
+static int cli_isspace(char c);
+static int cli_strncmp(const char *first, const char *second, unsigned int n);
 
 typedef CLI_STATE (* const cli_state_func_ptr)(struct cli *);
 
@@ -434,7 +440,7 @@ static int cli_filter(char c){
 /* FIXME: these string functions probably need work */
 
 /* return 1 if space, 0 if not */
-int cli_isspace(char c){
+static int cli_isspace(char c){
 
   switch(c){
     case ' ':
@@ -459,7 +465,7 @@ int cli_isspace(char c){
 }
 
 /* return 1 if equal, 0 if not */
-int cli_strncmp(const char *first, const char *second, unsigned int n){
+static int cli_strncmp(const char *first, const char *second, unsigned int n){
   unsigned int i;
 
   for (i = 0; i < n; i++){
@@ -496,21 +502,21 @@ static void cli_print_help(void){
 }
 
 
-int cli_log_select_exe(struct cli *_cli){
+static int cli_log_select_exe(struct cli *_cli){
   /* TODO: some error checking perhaps? */
   xil_printf("running log-select %d\r\n", _cli->opt_id);
   set_log_select(_cli->opt_id);
   return 0;
 }
 
-int cli_log_level_exe(struct cli *_cli){
+static int cli_log_level_exe(struct cli *_cli){
   /* TODO: some error checking perhaps? */
   xil_printf("running log-level %d\r\n", _cli->opt_id);
   set_log_level(_cli->opt_id);
   return 0;
 }
 
-int cli_bounce_link_exe(struct cli *_cli){
+static int cli_bounce_link_exe(struct cli *_cli){
   u32 l;
   int r;
   u16 config;
@@ -594,7 +600,21 @@ int cli_bounce_link_exe(struct cli *_cli){
   return 0;
 }
 
-int cli_help_exe(struct cli *_cli){
+/* This function simply prints out "0..1..2..3..4..5" with a one second delay between integers.
+ * It is used to verify that the timer infrastructure is built correctly and thus gives us
+ * the one second interval reference count as a sanity check
+ */
+static int cli_test_timer_exe(struct cli *_cli){
+  unsigned int i;
+#define COUNT 5
+  for (i = 0; i <= COUNT; i++){
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%d%s", i, i < COUNT ? ".." : "\r\n");
+    Delay(1000000);
+  }
+  return 0;
+}
+
+static int cli_help_exe(struct cli *_cli){
   cli_print_help();
   return 0;
 }
