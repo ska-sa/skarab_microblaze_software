@@ -36,6 +36,8 @@ ELF := EMB123701U1R1-$(VERSION).elf
 CROSS_COMPILE := mb-
 CC := $(CCPATH)$(CROSS_COMPILE)gcc
 
+OBJCOPY := $(CCPATH)$(CROSS_COMPILE)objcopy
+
 RM := rm -rf
 
 LIBS := -lxil,-lgcc,-lc
@@ -68,7 +70,7 @@ CFLAGS += -O2
 #CFLAGS += -ffunction-sections -fdata-sections
 
 #extra
-CFLAGS += $(MBFLAGS) -MMD -MP $(INC)
+CFLAGS += $(MBFLAGS) -MMD -MP
 
 #linker flags
 LDLIBS := -Wl,--start-group,$(LIBS),--end-group
@@ -97,6 +99,14 @@ else
 endif
 
 .build: $(ELF)
+	@echo "\nAdding compile-time flags to .cflags section (no-load) in elf"
+	@$(shell echo $(CFLAGS) $(CPPFLAGS) > .cflags.temp)
+	#run 'objdump -sj .cflags <elf>' to see the compiler flags the elf was built with
+	$(OBJCOPY) --add-section .cflags=.cflags.temp --set-section-flags .cflags=noload,readonly $(ELFDIR)$(ELF)
+	@$(RM) .cflags.temp
+	@echo $(RED_COLOUR)
+	@echo 'Finished building: $< in $(ELFDIR) directory'
+	@echo $(END_COLOUR)
 
 #link second time to insert checksum into elf
 $(ELF): $(addprefix $(OBJDIR), $(OBJ)) .temp.elf $(ADLER32)
@@ -109,9 +119,6 @@ $(ELF): $(addprefix $(OBJDIR), $(OBJ)) .temp.elf $(ADLER32)
 	$(eval LDSYM2 = -Wl,--defsym,CRC_VALUE=$(CALC_FMT))
 	$(eval DEPS = $(filter-out .temp.elf $(ADLER32), $?))
 	$(CC) $(LDFLAGS) $(LDSYM2) -o "$(ELFDIR)$@" $(DEPS) $(LDLIBS)
-	@echo $(RED_COLOUR)
-	@echo 'Finished building: $@ in $(ELFDIR) directory'
-	@echo $(END_COLOUR)
 
 #link first time to compile elf in order to calculate adler checksum
 .temp.elf: $(addprefix $(OBJDIR), $(OBJ))
@@ -120,7 +127,7 @@ $(ELF): $(addprefix $(OBJDIR), $(OBJ)) .temp.elf $(ADLER32)
 $(OBJDIR)%.o: $(SRCDIR)%.c .FORCE
 	@echo 'Compiling file: $<'
 	@echo 'Invoking: MicroBlaze gcc compiler'
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -fmessage-length=0  -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(INC) -c -fmessage-length=0  -MF"$(@:%.o=%.d)" -MT"$(@)" -o "$@" "$<"
 	@echo 'Finished building: $@'
 	@echo ' '
 
