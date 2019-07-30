@@ -751,6 +751,7 @@ int main()
   u8 dhcp_set = 0;
 
   u16 uHMCTimeout;
+  u8 uValidPacketRx = FALSE;
 
   /*
    * Initialize the uart driver
@@ -1408,8 +1409,15 @@ int main()
                 /* else no break statement - fall through */
 
               case PACKET_FILTER_ARP:
+                uValidPacketRx = TRUE;
                 uValidate = 1;
                 break;
+
+              case PACKET_FILTER_IGMP_UNHANDLED:
+              case PACKET_FILTER_PIM_UNHANDLED:
+              case PACKET_FILTER_LLDP_UNHANDLED:
+                /* disable the dhcp unbound monitor loop upon receipt of any valid known packet */
+                uValidPacketRx = TRUE;
 
               case PACKET_FILTER_UNKNOWN:
               case PACKET_FILTER_UNKNOWN_ETH:
@@ -1485,6 +1493,9 @@ int main()
                   }
                   break;
 
+                case PACKET_FILTER_IGMP_UNHANDLED:
+                case PACKET_FILTER_PIM_UNHANDLED:
+                case PACKET_FILTER_LLDP_UNHANDLED:
                 case PACKET_FILTER_UNKNOWN:
                 case PACKET_FILTER_UNKNOWN_ETH:
                 case PACKET_FILTER_UNKNOWN_IP:
@@ -1494,6 +1505,7 @@ int main()
                 case PACKET_FILTER_ERROR:
                   break;
 
+                case PACKET_FILTER_DROP:
                 default:
                   break;
               }
@@ -1821,11 +1833,12 @@ int main()
     /*
      * keep track of how long we have been "unbound" w.r.t. dhcp - this could be
      * an indication that the link did not come up cleanly and the only way to
-     * fix this is through a reset
+     * fix this is through a reset. Note: this loop stops upon receipt of a valid
+     * known packet
      */
 
 #ifdef RECONFIG_UPON_NO_DHCP
-    if(uFlagRunTask_CheckDHCPBound){
+    if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){

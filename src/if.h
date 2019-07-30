@@ -76,11 +76,17 @@ struct sIFObject{
           u32 uRxDhcpUnknown;   /* possible dhcp broadcasts from other nodes destined for the dhcp server */
         u32 uRxUdpUnknown;  /* packets dropped at UDP layer */
       u32 uRxIpUnknown;     /* packets dropped at IP layer */
+      u32 uRxIpPim;
+        u32 uRxIpPimDropped;
+      u32 uRxIpIgmp;
+        u32 uRxIpIgmpDropped;
+    u32 uRxEthLldp;         /* lldp packets */
+      u32 uRxEthLldpDropped;
     u32 uRxEthUnknown;      /* packets dropped at Ethernet layer */
 
   /* TX Packet Counters */
   u32 uTxTotal;   /* total packets sent */
-    
+
   /* layer 3 counters */
   u32 uTxEthArpRequestOk;
   u32 uTxEthArpReplyOk;
@@ -116,6 +122,12 @@ typedef enum {
   PACKET_FILTER_ICMP,
   PACKET_FILTER_DHCP,
   PACKET_FILTER_CONTROL,
+
+  /* known but unhandled / dropped protocols */
+  PACKET_FILTER_IGMP_UNHANDLED,
+  PACKET_FILTER_PIM_UNHANDLED,
+  PACKET_FILTER_LLDP_UNHANDLED,
+
   /* these are enumerations to handle unexpected packets or errors */
   PACKET_FILTER_UNKNOWN,
   PACKET_FILTER_ERROR,
