@@ -67,7 +67,7 @@
 #endif
 
 /* this is the default value for both dhcp unbound task and link mon task */
-#define LINK_MON_COUNTER_VALUE  1200
+#define LINK_MON_COUNTER_VALUE  600
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
