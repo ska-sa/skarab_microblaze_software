@@ -132,6 +132,14 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   pIFObjectPtr->uRxDhcpUnknown = 0;
   pIFObjectPtr->uRxUdpUnknown = 0;
   pIFObjectPtr->uRxIpUnknown = 0;
+  pIFObjectPtr->uRxIpPim = 0;
+  pIFObjectPtr->uRxIpPimDropped = 0;
+  pIFObjectPtr->uRxIpIgmp = 0;
+  pIFObjectPtr->uRxIpIgmpDropped = 0;
+  pIFObjectPtr->uRxIpTcp = 0;
+  pIFObjectPtr->uRxIpTcpDropped = 0;
+  pIFObjectPtr->uRxEthLldp = 0;
+  pIFObjectPtr->uRxEthLldpDropped = 0;
   pIFObjectPtr->uRxEthUnknown = 0;
 
   pIFObjectPtr->uTxTotal = 0;
@@ -379,17 +387,47 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
           }
           break;
 
+        /* unhandled cases - known packet types*/
+        case IPV4_TYPE_PIM:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] PIM pkt recvd & dropped!\r\n", uId);
+          pIFObjectPtr->uRxIpPim++;
+          pIFObjectPtr->uRxIpPimDropped++;
+          uReturnType = PACKET_FILTER_PIM_UNHANDLED;
+          break;
+
+        case IPV4_TYPE_IGMP:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] IGMP pkt recvd & dropped!\r\n", uId);
+          pIFObjectPtr->uRxIpIgmp++;
+          pIFObjectPtr->uRxIpIgmpDropped++;
+          uReturnType = PACKET_FILTER_IGMP_UNHANDLED;
+          break;
+
+        case IPV4_TYPE_TCP:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] TCP pkt recvd & dropped!\r\n", uId);
+          pIFObjectPtr->uRxIpTcp++;
+          pIFObjectPtr->uRxIpTcpDropped++;
+          uReturnType = PACKET_FILTER_TCP_UNHANDLED;
+          break;
+
+        /* ... unknown packet types */
         default:
-          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [%02x] UNKNOWN IP protocol 0x%02x received!\r\n", uId, uL3Type);
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] IP type 0x%02x recvd & dropped!\r\n", uId, uL3Type);
           pIFObjectPtr->uRxIpUnknown++;
           uReturnType = PACKET_FILTER_UNKNOWN_IP;
           break;
       }
       break;
 
+    case ETHER_TYPE_LLDP:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] LLDP pkt recvd & dropped!\r\n", uId);
+      pIFObjectPtr->uRxEthLldp++;
+      pIFObjectPtr->uRxEthLldpDropped++;
+      uReturnType = PACKET_FILTER_LLDP_UNHANDLED;
+      break;
+
     default:
       /* Handle unimplemented / unknown ethernet frames */
-      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [%02x] UNKNOWN ETH type 0x%04x packet received!\r\n", uId, uL2Type);
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] ETH type 0x%04x - dropped!\r\n", uId, uL2Type);
       pIFObjectPtr->uRxEthUnknown++;
       uReturnType = PACKET_FILTER_UNKNOWN_ETH;
       break;
@@ -550,6 +588,11 @@ void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c){
     default:
       break;
   }
+}
+
+u8 get_num_interfaces(void){
+  u8 n = NUM_ETHERNET_INTERFACES;
+  return n;
 }
 
 /* hide the interface state handles */

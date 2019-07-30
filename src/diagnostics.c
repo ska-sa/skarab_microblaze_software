@@ -85,8 +85,22 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Tx%3s%-11s%11d%2s", "", "Err:",          pIFObj->uTxUdpDhcpErr,      "\r\n");
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%5s%-9s%11d%2s", "", "Unknown:",       pIFObj->uRxDhcpUnknown,     "|");
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Tx%2sCTRL\r\n", "");
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "%30s", "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " RX%3s%-11s%11d%2s", "", "IGMP:",         pIFObj->uRxIpIgmp,          "|");
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Tx%3s%-11s%11d%2s", "", "Ok:",           pIFObj->uTxUdpCtrlOk,       "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%4s%-10s%11d%2s", "", "Dropped:",      pIFObj->uRxIpIgmpDropped,   "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " RX%3s%-11s%11d%2s", "", "PIM:",          pIFObj->uRxIpPim,           "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%4s%-10s%11d%2s", "", "Dropped:",      pIFObj->uRxIpPimDropped,    "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " RX%3s%-11s%11d%2s", "", "TCP:",          pIFObj->uRxIpTcp,           "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%4s%-10s%11d%2s", "", "Dropped:",      pIFObj->uRxIpTcpDropped,    "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%2s%-12s%11d%2s", "", "LLDP:",         pIFObj->uRxEthLldp,         "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " Rx%3s%-11s%11d%2s", "", "Dropped:",      pIFObj->uRxEthLldpDropped,  "|");
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
 
   for (i = 0; i < 60; i++){
     log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "-");

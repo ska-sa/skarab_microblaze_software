@@ -60,10 +60,14 @@
 #include "cli.h"
 #include "fault_log.h"
 
-#define DHCP_BOUND_COUNTER_VALUE  1200
 #define DHCP_MAX_RECONFIG_COUNT 2
 
-#define LINK_MON_COUNTER_VALUE  1200
+#if defined(LINK_MON_RX_40GBE) && defined(RECONFIG_UPON_NO_DHCP)
+#error "Cannot enable both link monitoring and dhcp unbound monitoring tasks - edit in Makefile.config"
+#endif
+
+/* this is the default value for both dhcp unbound task and link mon task */
+#define LINK_MON_COUNTER_VALUE  600
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
@@ -747,6 +751,7 @@ int main()
   u8 dhcp_set = 0;
 
   u16 uHMCTimeout;
+  u8 uValidPacketRx = FALSE;
 
   /*
    * Initialize the uart driver
@@ -1087,11 +1092,11 @@ int main()
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, 0);
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
 
-#ifdef LINK_MON_RX_40GBE
+#if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
   /* set default value */
   uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
 
-  /* read link monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
+  /* read link/dhcp monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
   if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
     if (DS2433ReadMem(rom, 0, data, 2, 0xE7, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
       /* overwrite default */
@@ -1105,8 +1110,14 @@ int main()
       uLinkTimeoutMax = (uLinkTimeoutMax >= 600) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
     }
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting 40gbe link timeout to %d ms\r\n", (u32) uLinkTimeoutMax * 100);
-#endif  /* LINK_MON_RX_40GBE */
+#ifdef LINK_MON_RX_40GBE
+  const char *const s = "40gbe-link-mon";
+#else
+  const char *const s = "no-dhcp-mon";
+#endif
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting %s timeout to %d ms\r\n", s, (u32) uLinkTimeoutMax * 100);
+#endif
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
@@ -1398,15 +1409,23 @@ int main()
                 /* else no break statement - fall through */
 
               case PACKET_FILTER_ARP:
+                uValidPacketRx = TRUE;
                 uValidate = 1;
                 break;
+
+              case PACKET_FILTER_IGMP_UNHANDLED:
+              case PACKET_FILTER_PIM_UNHANDLED:
+              case PACKET_FILTER_TCP_UNHANDLED:
+              case PACKET_FILTER_LLDP_UNHANDLED:
+                /* disable the dhcp unbound monitor loop upon receipt of any valid known packet */
+                uValidPacketRx = TRUE;
 
               case PACKET_FILTER_UNKNOWN:
               case PACKET_FILTER_UNKNOWN_ETH:
               case PACKET_FILTER_UNKNOWN_IP:
               case PACKET_FILTER_UNKNOWN_UDP:
               case PACKET_FILTER_ERROR:
-                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter returned: %s\r\n", uEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unknown");
+                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter: %s\r\n", uEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unhandled");
               case PACKET_FILTER_DROP:
               default:
                 /* do nothing */
@@ -1475,6 +1494,10 @@ int main()
                   }
                   break;
 
+                case PACKET_FILTER_IGMP_UNHANDLED:
+                case PACKET_FILTER_PIM_UNHANDLED:
+                case PACKET_FILTER_TCP_UNHANDLED:
+                case PACKET_FILTER_LLDP_UNHANDLED:
                 case PACKET_FILTER_UNKNOWN:
                 case PACKET_FILTER_UNKNOWN_ETH:
                 case PACKET_FILTER_UNKNOWN_IP:
@@ -1484,6 +1507,7 @@ int main()
                 case PACKET_FILTER_ERROR:
                   break;
 
+                case PACKET_FILTER_DROP:
                 default:
                   break;
               }
@@ -1811,11 +1835,12 @@ int main()
     /*
      * keep track of how long we have been "unbound" w.r.t. dhcp - this could be
      * an indication that the link did not come up cleanly and the only way to
-     * fix this is through a reset
+     * fix this is through a reset. Note: this loop stops upon receipt of a valid
+     * known packet
      */
 
 #ifdef RECONFIG_UPON_NO_DHCP
-    if(uFlagRunTask_CheckDHCPBound){
+    if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){

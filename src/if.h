@@ -76,11 +76,19 @@ struct sIFObject{
           u32 uRxDhcpUnknown;   /* possible dhcp broadcasts from other nodes destined for the dhcp server */
         u32 uRxUdpUnknown;  /* packets dropped at UDP layer */
       u32 uRxIpUnknown;     /* packets dropped at IP layer */
+      u32 uRxIpPim;
+        u32 uRxIpPimDropped;
+      u32 uRxIpIgmp;
+        u32 uRxIpIgmpDropped;
+      u32 uRxIpTcp;
+        u32 uRxIpTcpDropped;
+    u32 uRxEthLldp;         /* lldp packets */
+      u32 uRxEthLldpDropped;
     u32 uRxEthUnknown;      /* packets dropped at Ethernet layer */
 
   /* TX Packet Counters */
   u32 uTxTotal;   /* total packets sent */
-    
+
   /* layer 3 counters */
   u32 uTxEthArpRequestOk;
   u32 uTxEthArpReplyOk;
@@ -104,6 +112,7 @@ struct sIFObject{
 
 struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
 
+u8 get_num_interfaces(void);
 struct sIFObject *lookup_if_handle_by_id(u8 id);
 
 void IFConfig(struct sIFObject *pIFObjectPtr, u32 ip, u32 mask);
@@ -116,6 +125,13 @@ typedef enum {
   PACKET_FILTER_ICMP,
   PACKET_FILTER_DHCP,
   PACKET_FILTER_CONTROL,
+
+  /* known but unhandled / dropped protocols */
+  PACKET_FILTER_IGMP_UNHANDLED,
+  PACKET_FILTER_PIM_UNHANDLED,
+  PACKET_FILTER_TCP_UNHANDLED,
+  PACKET_FILTER_LLDP_UNHANDLED,
+
   /* these are enumerations to handle unexpected packets or errors */
   PACKET_FILTER_UNKNOWN,
   PACKET_FILTER_ERROR,
@@ -127,9 +143,13 @@ typedef enum {
 
 #define ETHER_TYPE_ARP    0x0806
 #define ETHER_TYPE_IPV4   0x0800
+#define ETHER_TYPE_LLDP   0x88cc
 
 #define IPV4_TYPE_ICMP   0x0001
+#define IPV4_TYPE_IGMP   0x0002
 #define IPV4_TYPE_UDP    0x0011
+#define IPV4_TYPE_TCP    0x0006
+#define IPV4_TYPE_PIM    0x0067
 
 #define UDP_CONTROL_PORT  0x7778
 #define BOOTP_CLIENT_PORT 0x44
