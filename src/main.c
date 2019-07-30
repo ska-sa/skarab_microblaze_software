@@ -60,9 +60,13 @@
 #include "cli.h"
 #include "fault_log.h"
 
-#define DHCP_BOUND_COUNTER_VALUE  1200
 #define DHCP_MAX_RECONFIG_COUNT 2
 
+#if defined(LINK_MON_RX_40GBE) && defined(RECONFIG_UPON_NO_DHCP)
+#error "Cannot enable both link monitoring and dhcp unbound monitoring tasks - edit in Makefile.config"
+#endif
+
+/* this is the default value for both dhcp unbound task and link mon task */
 #define LINK_MON_COUNTER_VALUE  1200
 
 /* local function prototypes */
@@ -1087,11 +1091,11 @@ int main()
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, 0);
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
 
-#ifdef LINK_MON_RX_40GBE
+#if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
   /* set default value */
   uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
 
-  /* read link monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
+  /* read link/dhcp monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
   if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
     if (DS2433ReadMem(rom, 0, data, 2, 0xE7, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
       /* overwrite default */
@@ -1105,8 +1109,14 @@ int main()
       uLinkTimeoutMax = (uLinkTimeoutMax >= 600) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
     }
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting 40gbe link timeout to %d ms\r\n", (u32) uLinkTimeoutMax * 100);
-#endif  /* LINK_MON_RX_40GBE */
+#ifdef LINK_MON_RX_40GBE
+  const char *const s = "40gbe-link-mon";
+#else
+  const char *const s = "no-dhcp-mon";
+#endif
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting %s timeout to %d ms\r\n", s, (u32) uLinkTimeoutMax * 100);
+#endif
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();

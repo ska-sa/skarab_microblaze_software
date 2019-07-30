@@ -662,12 +662,13 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   u32 uWriteData;
   u8 uPaddingIndex;
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Wishbone write...\r\n");
   if (uCommandLength < sizeof(sWriteWishboneReqT))
     return XST_FAILURE;
 
   uAddress = (Command->uAddressHigh << 16) | (Command->uAddressLow);
   uWriteData = (Command->uWriteDataHigh << 16) | (Command->uWriteDataLow);
+
+  log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "wb wr data 0x%08x @ 0x%08x\r\n", uWriteData, uAddress);
 
   // Execute the command
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);
