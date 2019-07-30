@@ -127,9 +127,12 @@ typedef enum {
 
 #define ETHER_TYPE_ARP    0x0806
 #define ETHER_TYPE_IPV4   0x0800
+#define ETHER_TYPE_LLDP   0x88cc
 
 #define IPV4_TYPE_ICMP   0x0001
+#define IPV4_TYPE_IGMP   0x0002
 #define IPV4_TYPE_UDP    0x0011
+#define IPV4_TYPE_PIM    0x0067
 
 #define UDP_CONTROL_PORT  0x7778
 #define BOOTP_CLIENT_PORT 0x44

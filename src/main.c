@@ -1416,7 +1416,7 @@ int main()
               case PACKET_FILTER_UNKNOWN_IP:
               case PACKET_FILTER_UNKNOWN_UDP:
               case PACKET_FILTER_ERROR:
-                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter returned: %s\r\n", uEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unknown");
+                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter: %s\r\n", uEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unhandled");
               case PACKET_FILTER_DROP:
               default:
                 /* do nothing */

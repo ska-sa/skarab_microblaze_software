@@ -379,17 +379,38 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
           }
           break;
 
+        /* unhandled cases - known packet types*/
+        case IPV4_TYPE_PIM:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] PIM pkt recvd!\r\n", uId);
+          goto ip_unhandled;
+          break;
+        case IPV4_TYPE_IGMP:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] IGMP pkt recvd!\r\n", uId);
+          goto ip_unhandled;
+          break;
+        /* ... unknown packet types */
         default:
-          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [%02x] UNKNOWN IP protocol 0x%02x received!\r\n", uId, uL3Type);
+ip_unhandled:
+          /* this label is to be used
+           * as a near-jump for known
+           * but unhandled ip types
+           * e.g. PIM
+           */
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] IP type 0x%02x - dropped!\r\n", uId, uL3Type);
           pIFObjectPtr->uRxIpUnknown++;
           uReturnType = PACKET_FILTER_UNKNOWN_IP;
           break;
       }
       break;
 
+    case ETHER_TYPE_LLDP:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] LLDP pkt recvd!\r\n", uId);
+      goto eth_unhandled; /* this goto is unnecessary for one fall-thru case but make provision for more... */
+      break;
     default:
+eth_unhandled:
       /* Handle unimplemented / unknown ethernet frames */
-      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [%02x] UNKNOWN ETH type 0x%04x packet received!\r\n", uId, uL2Type);
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] ETH type 0x%04x - dropped!\r\n", uId, uL2Type);
       pIFObjectPtr->uRxEthUnknown++;
       uReturnType = PACKET_FILTER_UNKNOWN_ETH;
       break;
