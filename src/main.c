@@ -1415,6 +1415,7 @@ int main()
 
               case PACKET_FILTER_IGMP_UNHANDLED:
               case PACKET_FILTER_PIM_UNHANDLED:
+              case PACKET_FILTER_TCP_UNHANDLED:
               case PACKET_FILTER_LLDP_UNHANDLED:
                 /* disable the dhcp unbound monitor loop upon receipt of any valid known packet */
                 uValidPacketRx = TRUE;
@@ -1495,6 +1496,7 @@ int main()
 
                 case PACKET_FILTER_IGMP_UNHANDLED:
                 case PACKET_FILTER_PIM_UNHANDLED:
+                case PACKET_FILTER_TCP_UNHANDLED:
                 case PACKET_FILTER_LLDP_UNHANDLED:
                 case PACKET_FILTER_UNKNOWN:
                 case PACKET_FILTER_UNKNOWN_ETH:

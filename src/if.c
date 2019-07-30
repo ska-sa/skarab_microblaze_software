@@ -132,6 +132,14 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   pIFObjectPtr->uRxDhcpUnknown = 0;
   pIFObjectPtr->uRxUdpUnknown = 0;
   pIFObjectPtr->uRxIpUnknown = 0;
+  pIFObjectPtr->uRxIpPim = 0;
+  pIFObjectPtr->uRxIpPimDropped = 0;
+  pIFObjectPtr->uRxIpIgmp = 0;
+  pIFObjectPtr->uRxIpIgmpDropped = 0;
+  pIFObjectPtr->uRxIpTcp = 0;
+  pIFObjectPtr->uRxIpTcpDropped = 0;
+  pIFObjectPtr->uRxEthLldp = 0;
+  pIFObjectPtr->uRxEthLldpDropped = 0;
   pIFObjectPtr->uRxEthUnknown = 0;
 
   pIFObjectPtr->uTxTotal = 0;
@@ -392,6 +400,13 @@ typePacketFilter uRecvPacketFilter(struct sIFObject *pIFObjectPtr){
           pIFObjectPtr->uRxIpIgmp++;
           pIFObjectPtr->uRxIpIgmpDropped++;
           uReturnType = PACKET_FILTER_IGMP_UNHANDLED;
+          break;
+
+        case IPV4_TYPE_TCP:
+          log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] TCP pkt recvd & dropped!\r\n", uId);
+          pIFObjectPtr->uRxIpTcp++;
+          pIFObjectPtr->uRxIpTcpDropped++;
+          uReturnType = PACKET_FILTER_TCP_UNHANDLED;
           break;
 
         /* ... unknown packet types */
