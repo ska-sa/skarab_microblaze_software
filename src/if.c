@@ -575,6 +575,11 @@ void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c){
   }
 }
 
+u8 get_num_interfaces(void){
+  u8 n = NUM_ETHERNET_INTERFACES;
+  return n;
+}
+
 /* hide the interface state handles */
 struct sIFObject *lookup_if_handle_by_id(u8 id){
   /*

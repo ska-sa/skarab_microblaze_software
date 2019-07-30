@@ -7,6 +7,7 @@
 #include "constant_defs.h"
 #include "i2c_master.h"
 #include "delay.h"
+#include "diagnostics.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -30,6 +31,7 @@ typedef enum {
   CMD_INDEX_TEST_TIMER,
   CMD_INDEX_GET_CONFIG,
   CMD_INDEX_RESET_FW,
+  CMD_INDEX_STATS,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -43,6 +45,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_GET_CONFIG]  = "get-config",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
+  [CMD_INDEX_STATS]       = "stats",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -54,6 +57,7 @@ static const char * const cli_cmd_options[][11] = {
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
+ [CMD_INDEX_STATS]        = { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -64,6 +68,7 @@ static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
+static int cli_stats_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -73,6 +78,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
+ [CMD_INDEX_STATS]        = cli_stats_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -687,6 +693,21 @@ static int cli_reset_fw_exe(struct cli *_cli){
   Delay(100000); /* 100ms */
 
   WriteBoardRegister(C_WR_BRD_CTL_STAT_0_ADDR, 1 << 30);    /* set bit 30 of board ctl reg 0 to reset the fw */
+
+  return 0;
+}
+
+
+static int cli_stats_exe(struct cli *_cli){
+  u8 n, i;
+  struct sIFObject *iface;
+
+  n = get_num_interfaces();
+
+  for (i = 0; i < n; i++){
+    iface = lookup_if_handle_by_id(i);
+    PrintInterfaceCounters(iface);
+  }
 
   return 0;
 }
