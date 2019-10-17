@@ -1043,11 +1043,12 @@ int main()
           [3] = MEZ_3_ONE_WIRE_PORT };
 
         for (uIndex = 0; uIndex < 4; uIndex++){
-          if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-            /* read from eeprom on respective hmc card */
-            if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-              if (uHMC_ReconfigCount[uIndex]){
-                /* write back to eeprom on the respective hmc card */
+          /* if this is an hmc card... */
+          if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
+            if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+              /* read from eeprom on respective hmc card */
+              if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                /* increment the hmc stats */
                 retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
                 total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
                 value[0] = retries & 0xff;
@@ -1058,17 +1059,18 @@ int main()
                 value[5] = (total >> 8) & 0xff;
                 value[6] = (total >> 16) & 0xff;
                 value[7] = (total >> 24) & 0xff;
+                /* write back to eeprom on the respective hmc card */
                 if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
                   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
                 } else {
                   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error writing to DS2433\r\n", uIndex);
                 }
+              } else {
+                log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
               }
             } else {
-              log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
+              log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
             }
-          } else {
-            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
           }
         }
 
