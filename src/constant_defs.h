@@ -288,7 +288,8 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define GET_VOLTAGE_LOGS            0x0059
 #define GET_FANCONTROLLER_LOGS      0x005B
 #define CLEAR_FANCONTROLLER_LOGS    0x005D
-#define HIGHEST_DEFINED_COMMAND     0x005D
+#define DHCP_RESET_STATE_MACHINE    0x005F
+#define HIGHEST_DEFINED_COMMAND     0x005F
 
 
 // ETHERNET TYPE CODES
@@ -1137,6 +1138,27 @@ typedef struct sClearFanControllerLogsResp {
   u16 uSuccess;      /* true if logs successfully cleared */
   u16 uPadding[8];
 } sClearFanControllerLogsRespT;
+
+typedef struct sDHCPResetStateMachineReq {
+  sCommandHeaderT Header;
+  u16 uLinkId;    /* this is the id of the interface
+                   * we want to reset dhcp on
+                   * e.g. 1 for 40gbe on site, 0 for 1gbe
+                   */
+} sDHCPResetStateMachineReqT;
+
+typedef struct sDHCPResetStateMachineResp {
+  sCommandHeaderT Header;
+  u16 uLinkId;
+  u16 uResetError;
+  /* uResetError:
+   * 0 => no errors
+   * 1 => link non-existent
+   * 2 => link currently down
+   */
+  u16 uPadding[7];
+} sDHCPResetStateMachineRespT;
+
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0

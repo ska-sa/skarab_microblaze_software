@@ -295,6 +295,7 @@ static int GetCurrentLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 *uResponseLength);
 static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 //=================================================================================
 //  CommandSorter
@@ -394,6 +395,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(GetFanControllerLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == CLEAR_FANCONTROLLER_LOGS)
       return(ClearFanControllerLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == DHCP_RESET_STATE_MACHINE)
+      return(ResetDHCPStateMachine(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3096,6 +3099,48 @@ static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 *
   }
 
 
+
+  return XST_SUCCESS;
+}
+
+
+static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  struct sIFObject *ifptr;
+  u8 n;
+
+  sDHCPResetStateMachineReqT *Command = (sDHCPResetStateMachineReqT *) pCommand;
+  sDHCPResetStateMachineRespT *Response = (sDHCPResetStateMachineRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sDHCPResetStateMachineReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sDHCPResetStateMachineRespT);
+  Response->uLinkId = Command->uLinkId;
+
+  n = get_num_interfaces();
+
+  /* check that the request link id is within bounds */
+  if (Command->uLinkId >= n){
+    /* check it here since the i/f handle lookup asserts this condition, which we don't want for user facing APIs */
+    Response->uResetError = 1;  /* link non-existent */
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] cmd 0x%04x - no such link id: %d\r\n", Command->Header.uCommandType, Command->uLinkId);
+  } else {
+    ifptr = lookup_if_handle_by_id(Command->uLinkId);
+
+    if (ifptr->uIFLinkStatus == LINK_DOWN){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] cmd 0x%04x - link %d is down\r\n", Command->Header.uCommandType, Command->uLinkId);
+      Response->uResetError = 2; /* link down */
+    } else {
+      vDHCPStateMachineReset(ifptr);
+      uDHCPSetStateMachineEnable(ifptr, SM_TRUE);
+
+      Response->uResetError = 0;  /* no errors */
+    }
+  }
 
   return XST_SUCCESS;
 }

@@ -400,6 +400,8 @@ u8 uDHCPSetStateMachineEnable(struct sIFObject *pIFObjectPtr, u8 uEnable){
       return DHCP_RETURN_FAIL;
   }
 
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] Enabling DHCP state machine\r\n", pIFObjectPtr->uIFEthernetId);
+
   return DHCP_RETURN_OK;
 }
 
@@ -427,6 +429,8 @@ u8 vDHCPStateMachineReset(struct sIFObject *pIFObjectPtr){
   vDHCPAuxClearFlag((u8 *)&(pDHCPObjectPtr->uDHCPRegisterFlags), flagDHCP_SM_STATE_MACHINE_EN);
   /* reset internal state */
   pDHCPObjectPtr->tDHCPCurrentState = INIT;
+
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] Resetting and disabling DHCP state machine\r\n", pIFObjectPtr->uIFEthernetId);
 
   return DHCP_RETURN_OK;
 }
