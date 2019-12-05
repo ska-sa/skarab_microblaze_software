@@ -148,7 +148,7 @@ static MezzHWType read_mezz_type_id(u8 mezz_site){
   }
 
   if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0x99)){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "QSFP+ MEZZANINE\r\n");
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+ MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_QSFP;
 
   } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
@@ -192,32 +192,32 @@ static MezzHWType read_mezz_type_id(u8 mezz_site){
   masked_byte = reg & mask;
   masked_byte = masked_byte >> (mezz_site * 8);
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
 
   switch (masked_byte){
     case BYTE_MASK_NONE_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_OPEN;
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "OPEN\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "OPEN\r\n");
       break;
 
     case BYTE_MASK_QSFP_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_QSFP;
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "QSFP\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP\r\n");
       break;
 
     case BYTE_MASK_HMC_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_HMC_R1000_0005;
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "HMC\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC\r\n");
       break;
 
     case BYTE_MASK_ADC_PRESENT:
       firmw_type = MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2;
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "ADC\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ADC\r\n");
       break;
 
     default:
       firmw_type = MEZ_FIRMW_TYPE_UNKNOWN;
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_DEBUG, "UNKNOWN\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "UNKNOWN\r\n");
       break;
   }
 

@@ -41,6 +41,7 @@
 #include "logging.h"
 #include "qsfp.h"
 #include "fault_log.h"
+#include "igmp.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -995,11 +996,16 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     // and send leave messages immediately
     for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
     {
+#if 0
       if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
       {
         uIGMPState[uIndex] = IGMP_STATE_LEAVING;
         uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
         uCurrentIGMPMessage[uIndex] = 0x0;
+      }
+#endif
+      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
+        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group.\r\n", uIndex);
       }
     }
 
@@ -1029,11 +1035,16 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     // and send leave messages immediately
     for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
     {
+#if 0
       if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
       {
         uIGMPState[uIndex] = IGMP_STATE_LEAVING;
         uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
         uCurrentIGMPMessage[uIndex] = 0x0;
+      }
+#endif
+      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
+        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }
     }
   }
@@ -1877,13 +1888,16 @@ int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRe
 
   uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
 
-#ifdef DEBUG_PRINT
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-#endif
+  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 
   // Execute the command
   SetMultiCastIPAddress(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 
+  if (XST_FAILURE == uIGMPJoinGroup(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to join multicast group with addr %08x and mask %08x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+  }
+
+#if 0
   uEthernetFabricMultiCastIPAddress[Command->uId] = uFabricMultiCastIPAddress;
   uEthernetFabricMultiCastIPAddressMask[Command->uId] = uFabricMultiCastIPAddressMask;
 
@@ -1891,6 +1905,7 @@ int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRe
   uIGMPState[Command->uId] = IGMP_STATE_JOINED_GROUP;
   uIGMPSendMessage[Command->uId] = IGMP_SEND_MESSAGE;
   uCurrentIGMPMessage[Command->uId] = 0x0;
+#endif
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -2624,14 +2639,17 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     // and send leave messages immediately
     for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
     {
+#if 0
       if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
       {
         uIGMPState[uIndex] = IGMP_STATE_LEAVING;
         uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
         uCurrentIGMPMessage[uIndex] = 0x0;
-#ifdef DEBUG_PRINT
         log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
+      }
 #endif
+      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
+        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }
     }
 

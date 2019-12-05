@@ -108,14 +108,14 @@ volatile u32 uEthernetGatewayIPAddress[NUM_ETHERNET_INTERFACES];
 volatile u32 uLLDPTimerCounter;
 volatile u8 uLLDPRetryTimer[NUM_ETHERNET_INTERFACES];
 
-volatile u32 uDHCPTimerCounter;
+//volatile u32 uDHCPTimerCounter;
 volatile u8 uDHCPState[NUM_ETHERNET_INTERFACES];
 /* volatile u8 uDHCPRetryTimer[NUM_ETHERNET_INTERFACES]; */
 
-volatile u8 uIGMPTimerCounter;
-volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
-volatile u8 uIGMPSendMessage[NUM_ETHERNET_INTERFACES];
-volatile u8 uCurrentIGMPMessage[NUM_ETHERNET_INTERFACES];
+//volatile u8 uIGMPTimerCounter;
+//volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
+//volatile u8 uIGMPSendMessage[NUM_ETHERNET_INTERFACES];
+//volatile u8 uCurrentIGMPMessage[NUM_ETHERNET_INTERFACES];
 
 volatile u32 uPrintStatsCounter;
 

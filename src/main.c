@@ -59,6 +59,7 @@
 #include "logging.h"
 #include "cli.h"
 #include "fault_log.h"
+#include "igmp.h"
 
 #define DHCP_MAX_RECONFIG_COUNT 2
 
@@ -82,6 +83,7 @@ void UnalignedAccessException(void *Data);
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
+static volatile u8 uFlagRunTask_IGMP = 0;
 static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
 #ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
@@ -165,6 +167,9 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
   uFlagRunTask_DHCP = 1;
 
+  /* set the igmp task flag every 100ms which in turn runs igmp state machine */
+  uFlagRunTask_IGMP = 1;
+
 #ifdef RECONFIG_UPON_NO_DHCP
   uFlagRunTask_CheckDHCPBound = 1;
 #endif
@@ -173,6 +178,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   uFlagRunTask_LinkWatchdog = 1;
 #endif
 
+#if 0
   // DHCP every 10 seconds (timer every 100 ms)
   if (uDHCPTimerCounter == 0x64)
   {
@@ -197,12 +203,13 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   }
   else
     uDHCPTimerCounter++;
+#endif
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
 
   uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
-  uFlagRunTask_WriteLEDStatus = 1; 
+  uFlagRunTask_WriteLEDStatus = 1;
 }
 
 
@@ -402,9 +409,9 @@ void InitialiseEthernetInterfaceParameters()
     SetFabricSourceMACAddress(uId, uEthernetFabricMacHigh[uId], ((uEthernetFabricMacMid[uId] << 16) | (uEthernetFabricMacLow[uId])));
     //SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
 
-    uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
-    uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
-    uCurrentIGMPMessage[uId] = 0x0;
+    //uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
+    //uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
+    //uCurrentIGMPMessage[uId] = 0x0;
 
     status = SoftReset(uId);
     if (status == XST_FAILURE){
@@ -607,8 +614,10 @@ void InitialiseInterruptControllerAndTimer(XTmrCtr * pTimer, XIntc * pInterruptC
   XTmrCtr_SetResetValue(pTimer, DHCP_RETRY_TIMER_ID, DHCP_TIMER_RESET_VALUE);
   XTmrCtr_Start(pTimer, DHCP_RETRY_TIMER_ID);
 
+#if 0
   uIGMPTimerCounter = 0;
   uIGMPTimerCounter = 0;
+#endif
 }
 
 //=================================================================================
@@ -1517,7 +1526,7 @@ int main()
             }
           }
         }
-
+#if 0
         if (uIGMPSendMessage[uEthernetId] == IGMP_SEND_MESSAGE)
         {
           if (uIGMPState[uEthernetId] == IGMP_STATE_JOINED_GROUP)
@@ -1560,7 +1569,7 @@ int main()
           }
 
         }
-
+#endif
       }
     }
 
@@ -1575,6 +1584,17 @@ int main()
       uFlagRunTask_DHCP = 0;     /* reset task flag */
       for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         uDHCPStateMachine(pIFObjectPtr[uEthernetId]);
+      }
+    }
+
+    //----------------------------------------------------------------------------//
+    //  IGMP TASK                                                                 //
+    //  Triggered on timer interrupt and IGMP control command                     //
+    //----------------------------------------------------------------------------//
+    if (uFlagRunTask_IGMP){
+      uFlagRunTask_IGMP = 0;     /* reset task flag */
+      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+        uIGMPStateMachine(uEthernetId);
       }
     }
 
@@ -1945,9 +1965,11 @@ int main()
 
       for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
       {
+#if 0
         if (uIGMPState[uEthernetId] != IGMP_STATE_NOT_JOINED){
           uOKToReboot = 0;
         }
+#endif
       }
       if (uOKToReboot == 1){
         /* just wait a little while to enable serial port to finish writing out */
@@ -2208,16 +2230,22 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
 
     PersistentMemory_WriteByte(DHCP_CACHED_IP_STATE_INDEX, 1);
 
-    /*
-     *  If we were previously part of a multicast group, try to resend igmp
-     *  subscriptions as soon as we obtain a lease. This will allow us to rejoin
-     *  the multicast group if the link "flaps" or the switch is rebooted.
-     */
+#if 0
     if (uIGMPState[id] == IGMP_STATE_JOINED_GROUP){
       log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] resubscribing to previous multicast groups!\r\n", id);
       uIGMPSendMessage[id] = IGMP_SEND_MESSAGE;
       uCurrentIGMPMessage[id] = 0x0;
     }
+#endif
+  }
+
+  /*
+   *  If we were previously part of a multicast group, try to resend igmp
+   *  subscriptions as soon as we obtain a lease. This will allow us to rejoin
+   *  the multicast group if the link "flaps" or the switch is rebooted.
+   */
+  if (XST_FAILURE == uIGMPRejoinPrevGroup(id)){
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02x] FAILED to rejoin multicast group\r\n", id);
   }
 
   return 0;

@@ -18,6 +18,7 @@
 #include "net_utils.h"
 #include "logging.h"
 #include "constant_defs.h"
+#include "igmp.h"
 
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
@@ -158,6 +159,9 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   pIFObjectPtr->uTxUdpCtrlAck = 0;  /*TODO*/
   pIFObjectPtr->uTxUdpCtrlNack = 0; /*TODO*/
 
+  /* initialize the igmp object */
+  pIGMPInit(uEthernetId);
+
   pIFObjectPtr->uIFMagic = IF_MAGIC;
 
   return pIFObjectPtr;
@@ -268,7 +272,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
     pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
     pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
 
-    uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
+    //uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
     /*
      *  Leave IGMP in it's current state but simply stop sending the messages.
      *  This is to combat a link "flap" or switch reboot. We will resend the
