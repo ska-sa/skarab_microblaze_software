@@ -135,7 +135,7 @@ static struct sMezzObject *MezzHandle[4];   /* holds the handle to the state of 
 //=================================================================================
 void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 {
-  u8 uIndex;
+  //u8 uIndex;
 
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
@@ -692,7 +692,7 @@ int main()
   u8 ReceivedCount = 0;
 
 
-  u32 uIGMPGroupAddress;
+  //u32 uIGMPGroupAddress;
   u8 uOKToReboot;
 #ifdef RECONFIG_UPON_NO_DHCP
   u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0};

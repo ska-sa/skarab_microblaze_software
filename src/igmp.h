@@ -28,8 +28,8 @@ struct sIGMPObject {
   u32 uIGMPMulticastAddress;      /* base multicast address */
   u32 uIGMPMulticastAddressMask;  /* mask to be applied to the base multicast addr above */
 
-  u8 uIGMPJoinRequestFlag;
-  u8 uIGMPLeaveRequestFlag;
+  volatile u8 uIGMPJoinRequestFlag;
+  volatile u8 uIGMPLeaveRequestFlag;
 };
 
 struct sIGMPObject *pIGMPInit(u8 uId);

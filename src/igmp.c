@@ -217,14 +217,14 @@ static typeIGMPState igmp_send_membership_reports_state(struct sIGMPObject *pIGM
 
   CreateIGMPPacket(id, txbuf, &pktlen, IGMP_MEMBERSHIP_REPORT, groupaddr);
   pktlen = (pktlen >> 2);
-  iStatus =  TransmitHostPacket(id, txbuf, pktlen);
+  iStatus =  TransmitHostPacket(id, (u32 *) txbuf, pktlen);
 
   if (iStatus != XST_SUCCESS){
     IFCounterIncr(ifptr, TX_IP_IGMP_ERR);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent membership report for ip %08x\r\n", id, groupaddr);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send membership report for ip %08x\r\n", id, groupaddr);
   } else {
     IFCounterIncr(ifptr, TX_IP_IGMP_OK);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send membership report for ip %08x\r\n", id, groupaddr);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent membership report for ip %08x\r\n", id, groupaddr);
   }
 
   pIGMPObjectPtr->uIGMPCurrentMessage++;
@@ -281,14 +281,14 @@ static typeIGMPState igmp_leaving_state(struct sIGMPObject *pIGMPObjectPtr){
 
   CreateIGMPPacket(id, txbuf, &pktlen, IGMP_LEAVE_REPORT, groupaddr);
   pktlen = (pktlen >> 2);
-  iStatus =  TransmitHostPacket(id, txbuf, pktlen);
+  iStatus =  TransmitHostPacket(id, (u32 *) txbuf, pktlen);
 
   if (iStatus != XST_SUCCESS){
     IFCounterIncr(ifptr, TX_IP_IGMP_ERR);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent leave report for ip %08x\r\n", id, groupaddr);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send leave report for ip %08x\r\n", id, groupaddr);
   } else {
     IFCounterIncr(ifptr, TX_IP_IGMP_OK);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send leave report for ip %08x\r\n", id, groupaddr);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent leave report for ip %08x\r\n", id, groupaddr);
   }
 
   pIGMPObjectPtr->uIGMPCurrentMessage++;
