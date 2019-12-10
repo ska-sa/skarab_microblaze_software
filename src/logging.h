@@ -39,6 +39,7 @@ LOG_SELECT_GENERAL = 0,
 LOG_SELECT_DHCP,
 LOG_SELECT_ARP,
 LOG_SELECT_ICMP,
+LOG_SELECT_IGMP,
 LOG_SELECT_LLDP,
 LOG_SELECT_CTRL,
 LOG_SELECT_BUFF,
@@ -48,8 +49,6 @@ LOG_SELECT_ALL,
 LOG_SELECT_MAX
 } tLogSelect;
 
-/* TODO: log-select options yet to be implemented */
-#define LOG_SELECT_IGMP LOG_SELECT_GENERAL
 
 #ifdef __cplusplus
 extern "C" {
