@@ -22,7 +22,7 @@ struct sIGMPObject {
   typeIGMPState tIGMPCurrentState;
 
   u8 uIGMPCurrentMessage;
-  u8 uIGMPCurrentClkTick;     /* internal timer tick */
+  u32 uIGMPCurrentClkTick;     /* internal timer tick */
   u8 uIGMPIfId;               /* interface id associated with this igmp context */
 
   u32 uIGMPMulticastAddress;      /* base multicast address */
