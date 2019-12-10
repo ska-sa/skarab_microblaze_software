@@ -1195,9 +1195,7 @@ int ProgramFlashWordsCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
   u32 uAddress = (Command->uAddressHigh << 16) | Command->uAddressLow;
   int iStatus = XST_SUCCESS;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PRGRM FLASH: %x\r\n", uAddress);
-#endif
 
   if (uCommandLength < sizeof(sProgramFlashWordsReqT))
     return XST_FAILURE;
@@ -1268,9 +1266,7 @@ int EraseFlashBlockCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
   if (uCommandLength < sizeof(sEraseFlashBlockReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "BLK ADDR: %x\r\n", uBlockAddress);
-#endif
 
   // Execute the command
   iStatus = EraseBlock(uBlockAddress);
@@ -1320,9 +1316,7 @@ int ReadSpiPageCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponseP
   if (uCommandLength < sizeof(sReadSpiPageReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "SPI READ ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
-#endif
 
   // Execute the command
   iStatus = ISPSPIReadPage(uAddress, Response->uReadBytes, Command->uNumBytes);
@@ -1372,9 +1366,7 @@ int ProgramSpiPageCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
   if (uCommandLength < sizeof(sProgramSpiPageReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ADDR: %x NUM BYTES: %x\r\n", uAddress, Command->uNumBytes);
-#endif
 
   // Execute the command
   iStatus = ISPSPIProgramPage(uAddress, Command->uWriteBytes, Command->uNumBytes);
@@ -1488,10 +1480,8 @@ int OneWireReadRomCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
   // Execute the command
   iStatus = OneWireReadRom(Response->uRom, Command->uOneWirePort);
 
-#ifdef DEBUG_PRINT
   for (uIndex = 0; uIndex < 8; uIndex++)
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INDX: %x ROM: %x\r\n", uIndex, Response->uRom[uIndex]);
-#endif
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -1538,9 +1528,7 @@ int OneWireDS2433WriteMemCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * 
   if (uCommandLength < sizeof(sOneWireDS2433WriteMemReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "SKP ROM: %x, NUM BYTES: %x TA1: %x TA2: %x ID: %x", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
-#endif
 
   // Execute the command
   iStatus = DS2433WriteMem(Command->uDeviceRom, Command->uSkipRomAddress, Command->uWriteBytes, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
@@ -1601,9 +1589,7 @@ int OneWireDS2433ReadMemCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * u
   if (uCommandLength < sizeof(sOneWireDS2433ReadMemReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "SKIP: %x NUMBYTES: %x TA1: %x TA2: %x ID: %x\r\n", Command->uSkipRomAddress, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
-#endif
 
   // Execute the command
   iStatus = DS2433ReadMem(Command->uDeviceRom, Command->uSkipRomAddress, Response->uReadBytes, Command->uNumBytes, Command->uTA1, Command->uTA2, Command->uOneWirePort);
@@ -1661,10 +1647,8 @@ int DebugConfigureEthernetCommandHandler(u8 * pCommand, u32 uCommandLength, u8 *
   if (uCommandLength < sizeof(sDebugConfigureEthernetReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ID: %x MAC: %x %x %x ENABLE: %x\r\n", Command->uId, Command->uFabricMacHigh, Command->uFabricMacMid, Command->uFabricMacLow, Command->uEnableFabricInterface);
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "PORT: %x GTWAY: %x %x IP: %x MCSTIP: %x MCSTIPMSK: %x\r\n", Command->uFabricPortAddress, Command->uGatewayIPAddressHigh, Command->uGatewayIPAddressLow, uFabricIPAddress, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-#endif
 
   // Execute the command
 
@@ -1743,9 +1727,7 @@ int DebugAddARPCacheEntryCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * 
   if (uCommandLength < sizeof(sDebugAddARPCacheEntryReqT))
     return XST_FAILURE;
 
-#ifdef DEBUG_PRINT
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ID: %x INDX: %x MAC: %x %x %x\r\n", Command->uId, Command->uIPAddressLower8Bits, Command->uMacHigh, Command->uMacMid, Command->uMacLow);
-#endif
 
   // Execute the command
   ProgramARPCacheEntry(Command->uId, Command->uIPAddressLower8Bits, Command->uMacHigh, (Command->uMacMid << 16)|(Command->uMacLow));
@@ -2635,6 +2617,9 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   if(Command->uChunkNum == 0x0){
     uChunkSizeBytesCached = uCommandLength - 8;
 
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "IGMP [%02d] About to send IGMP leave messages.\r\n", uId);
+
+#if 0
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
     for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
@@ -2651,6 +2636,12 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }
+    }
+#endif
+
+    /* TODO - should we unsubscribe on all interfaces?? See code commented out above */
+    if (XST_FAILURE == uIGMPLeaveGroup(uId)){
+      log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uId);
     }
 
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);

@@ -278,6 +278,7 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
      *  This is to combat a link "flap" or switch reboot. We will resend the
      *  igmp messages again when the link / IP is reconfigured.
      */
+    /* FIXME - should we pause / reset the state machine here until the link comes up again ?? */
 #if 0
     uIGMPState[uId] = IGMP_STATE_NOT_JOINED;      /* TODO: remove global */
 #endif

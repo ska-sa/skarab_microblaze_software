@@ -27,6 +27,12 @@ static igmp_state_func_ptr igmp_state_table[] = {
   [IGMP_LEAVING_STATE]                  = igmp_leaving_state
 };
 
+static const char *igmp_state_name_lookup[] = {
+  [IGMP_IDLE_STATE]                     = "igmp_idle_state",
+  [IGMP_SEND_MEMBERSHIP_REPORTS_STATE]  = "igmp_send_membership_reports_state",
+  [IGMP_JOINED_STATE]                   = "igmp_joined_state",
+  [IGMP_LEAVING_STATE]                  = "igmp_leaving_state"
+};
 
 static struct sIGMPObject *pIGMPGetContext(u8 uId);
 
@@ -101,7 +107,7 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
   struct sIGMPObject *pIGMPObjectPtr;
 
   if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
     return XST_FAILURE;
   }
 
@@ -167,6 +173,8 @@ u8 uIGMPStateMachine(u8 uId)
 
   SANE_IGMP(pIGMPObjectPtr);
 
+  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_TRACE, "IGMP [%02d] entering state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[pIGMPObjectPtr->tIGMPCurrentState]);
+
   pIGMPObjectPtr->tIGMPCurrentState = igmp_state_table[pIGMPObjectPtr->tIGMPCurrentState](pIGMPObjectPtr);
 
   return XST_SUCCESS;
@@ -182,6 +190,7 @@ static typeIGMPState igmp_idle_state(struct sIGMPObject *pIGMPObjectPtr)
   if (pIGMPObjectPtr->uIGMPJoinRequestFlag == TRUE){
     /* clear the join request flag here to prevent ejoining once a leave is requested later creating a cycle */
     pIGMPObjectPtr->uIGMPJoinRequestFlag = FALSE;
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_SEND_MEMBERSHIP_REPORTS_STATE]);
     return IGMP_SEND_MEMBERSHIP_REPORTS_STATE;
   }
 
@@ -202,6 +211,7 @@ static typeIGMPState igmp_send_membership_reports_state(struct sIGMPObject *pIGM
   /* have we cycled through all the masked addresses? */
   if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPMulticastAddressMask))){
     /* pIGMPObjectPtr->uIGMPCurrentMessage = 0; */
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_JOINED_STATE]);
     return IGMP_JOINED_STATE;
   }
 
@@ -224,7 +234,8 @@ static typeIGMPState igmp_send_membership_reports_state(struct sIGMPObject *pIGM
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send membership report for ip %08x\r\n", id, groupaddr);
   } else {
     IFCounterIncr(ifptr, TX_IP_IGMP_OK);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent membership report for ip %08x\r\n", id, groupaddr);
+    /* log-level set to WARN in order to display during programming */
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_WARN, "IGMP [%02d] sent membership report for ip %08x\r\n", id, groupaddr);
   }
 
   pIGMPObjectPtr->uIGMPCurrentMessage++;
@@ -239,14 +250,18 @@ static typeIGMPState igmp_joined_state(struct sIGMPObject *pIGMPObjectPtr)
   pIGMPObjectPtr->uIGMPCurrentClkTick++;
   pIGMPObjectPtr->uIGMPCurrentMessage = 0;
 
+  /* TODO: SANE_IGMP_TICK() - check that the igmp state will actually fire since timeout may be larger than sizeof(tick) */
+
   /* is it time to send IGMP reports to the router/switch? */
-  if (pIGMPObjectPtr->uIGMPCurrentClkTick >= IGMP_REPORT_TIMER * IGMP_SM_POLL_INTERVAL) {
+  if (pIGMPObjectPtr->uIGMPCurrentClkTick >= IGMP_REPORT_TIMER) {
     pIGMPObjectPtr->uIGMPCurrentClkTick = 0;
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_SEND_MEMBERSHIP_REPORTS_STATE]);
     return IGMP_SEND_MEMBERSHIP_REPORTS_STATE;
   }
 
   if (pIGMPObjectPtr->uIGMPLeaveRequestFlag == TRUE){
     pIGMPObjectPtr->uIGMPLeaveRequestFlag = FALSE;
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_LEAVING_STATE]);
     return IGMP_LEAVING_STATE;
   }
 
@@ -266,6 +281,7 @@ static typeIGMPState igmp_leaving_state(struct sIGMPObject *pIGMPObjectPtr){
 
   /* have we unsubscribed from all multicast group addresses? */
   if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPMulticastAddressMask))){
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_IDLE_STATE]);
     return IGMP_IDLE_STATE;
   }
 
@@ -288,7 +304,8 @@ static typeIGMPState igmp_leaving_state(struct sIGMPObject *pIGMPObjectPtr){
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] FAILED to send leave report for ip %08x\r\n", id, groupaddr);
   } else {
     IFCounterIncr(ifptr, TX_IP_IGMP_OK);
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] sent leave report for ip %08x\r\n", id, groupaddr);
+    /* log-level set to WARN in order to display during programming */
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_WARN, "IGMP [%02d] sent leave report for ip %08x\r\n", id, groupaddr);
   }
 
   pIGMPObjectPtr->uIGMPCurrentMessage++;
