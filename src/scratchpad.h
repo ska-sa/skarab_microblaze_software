@@ -17,7 +17,7 @@ typedef enum {
 /* indexing map of persistent memory usage */
 typedef enum {
   /* start of byte-block 0 */
-  PMEM_BLOCK0_BYTE0_INDEX = 0,  /* unused */
+  LOG_LEVEL_STARTUP_INDEX = 0,  /* log-level, if changed via cli, is retained across fpga reconfigures or mb resets - not power cycles */
   DHCP_RECONFIG_COUNT_INDEX,    /* deprecated - count the DHCP triggered reconfigurations */
   DHCP_CACHED_IP_STATE_INDEX,   /* indicates whether ip lease has been cached previously */
   DHCP_CACHED_IP_OCT0_INDEX,    /* next four indices store ip between reconfigs */

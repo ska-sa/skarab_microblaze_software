@@ -8,6 +8,7 @@
 #include "i2c_master.h"
 #include "delay.h"
 #include "diagnostics.h"
+#include "scratchpad.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -526,8 +527,19 @@ static int cli_log_select_exe(struct cli *_cli){
 }
 
 static int cli_log_level_exe(struct cli *_cli){
+  u8 cache_log_level = 0;
   /* TODO: some error checking perhaps? */
   xil_printf("running log-level %d\r\n", _cli->opt_id);
+
+  /* cache the log level in persistent memory
+   * bit8 => set when this cmd issued to indicate a manual change in log-level upon reset
+   * bit7-0 => cached log level
+   */
+  cache_log_level = (_cli->opt_id) | 0x80;
+
+  xil_printf("caching value 0x%02x to pmem\r\n", cache_log_level);
+  PersistentMemory_WriteByte(LOG_LEVEL_STARTUP_INDEX, cache_log_level);
+
   set_log_level(_cli->opt_id);
   return 0;
 }

@@ -799,7 +799,21 @@ int main()
   InitI2C(0x3, SPEED_400kHz);
   InitI2C(0x4, SPEED_400kHz);
 
-  set_log_level(LOG_LEVEL_INFO);
+  /* initialise the log level */
+  u8 log_level_cached = 0;
+  tLogLevel log_level = LOG_LEVEL_INFO;
+
+  PersistentMemory_ReadByte(LOG_LEVEL_STARTUP_INDEX, &log_level_cached);
+  /* if the msb is set, then we know that the log-level command was issued before the reset */
+  if (log_level_cached & 0x80){
+    /* the cached log-level is stored in the lower 7 bits */
+    log_level = (tLogLevel) (log_level_cached & 0x7f);
+  } else {
+    /* otherwise default to *info* */
+    log_level = LOG_LEVEL_INFO;
+  }
+
+  set_log_level(log_level);
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "---Entering main---\r\n");
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Embedded software version: %d.%d.%d\r\n",
