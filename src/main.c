@@ -1977,52 +1977,6 @@ int main()
     ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
 		if (ReceivedCount){
       cli_sm(RecvBuffer);
-#if 0
-      switch (RecvBuffer){
-        case '1': /* TRACE */
-        case '2': /* DEBUG */
-        case '3': /* INFO */
-        case '4': /* WARN */
-        case '5': /* ERROR */
-        case '6': /* FATAL */
-          set_log_level(RecvBuffer - 49u);
-          break;
-        case '0': /* OFF */
-          set_log_level(LOG_LEVEL_OFF);
-          break;
-        case 'd': /* DHCP */
-          set_log_select(LOG_SELECT_DHCP);
-          break;
-        case 'a': /* ARP */
-          set_log_select(LOG_SELECT_ARP);
-          break;
-        case 'p': /* PING */
-          set_log_select(LOG_SELECT_ICMP);
-          break;
-        case 'l': /* LLDP */
-          set_log_select(LOG_SELECT_LLDP);
-          break;
-        case 'c': /* CTRL */
-          set_log_select(LOG_SELECT_CTRL);
-          break;
-        case 'b': /* BUFFER */
-          set_log_select(LOG_SELECT_BUFF);
-          break;
-        case 'h': /* HARDW */
-          set_log_select(LOG_SELECT_HARDW);
-          break;
-        case 'i': /* IFACE */
-          set_log_select(LOG_SELECT_IFACE);
-          break;
-        case '*': /* ALL */
-          set_log_select(LOG_SELECT_ALL);
-          break;
-        case 0x09:  /* tab */
-        default:
-          break;
-      }
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Serial Out: %c\r\n", RecvBuffer);
-#endif
 		}
 
     /* to test the watchdog timer - uncomment the following */

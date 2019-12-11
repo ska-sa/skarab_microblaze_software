@@ -170,13 +170,6 @@ static CLI_STATE cli_idle_state(struct cli *cli){
       return CLI_BUILD_LINE;
       break;
 
-#define CLI_EXIT_EN
-#ifdef CLI_EXIT_EN
-    case '.':
-      return CLI_EXIT;
-      break;
-#endif
-
     default:
       break;
   }
