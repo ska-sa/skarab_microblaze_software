@@ -297,6 +297,7 @@ static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 *uResponseLength);
 static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 //=================================================================================
 //  CommandSorter
@@ -398,6 +399,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(ClearFanControllerLogsHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == DHCP_RESET_STATE_MACHINE)
       return(ResetDHCPStateMachine(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == MULTICAST_LEAVE_GROUP)
+      return(MulticastLeaveGroup(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3150,4 +3153,34 @@ static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uRespon
   }
 
   return XST_SUCCESS;
+}
+
+
+static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u8 status;
+
+  sMulticastLeaveGroupReqT *Command = (sMulticastLeaveGroupReqT *) pCommand;
+  sMulticastLeaveGroupRespT *Response = (sMulticastLeaveGroupRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sMulticastLeaveGroupReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sMulticastLeaveGroupRespT);
+
+  Response->uLinkId = Command->uLinkId;
+
+  status = uIGMPLeaveGroup(Command->uLinkId);
+
+  if (XST_SUCCESS == status){
+    Response->uSuccess = 1;
+  } else {
+    Response->uSuccess = 0;
+  }
+
+  return XST_SUCCESS;
+
 }

@@ -115,7 +115,18 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 
   SANE_IGMP(pIGMPObjectPtr);    /* TODO: should we assert here or throw a runtime error? */
 
+  /* TODO: Q: should we check for sane ip and mask? e.g. it may not be useful to invoke the join state with a mask of 0xffffffff
+           A: there may actually be a use case for a mask of 0xffffffff -> when you want to subscribe
+               to only one specific addr, this will do it */
+
   pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
+
+  /* if this function is called with an already configured addr and mask, this will merely reconfigure it. Currently the
+   * s/m will not leave that previously configured group, but will simply issue membership reports for the new group
+   * while the old group will time out. Also, it will not send out the new igmp reports immediately but olny after the
+   * time out period. TODO: Should we not rather immediately send explicit leave messages for the old group and
+   * re-initialise the s/m with the new mc address? -> we could add a 'reconfigure igmp state' to the s/m
+   */
 
   pIGMPObjectPtr->uIGMPMulticastAddress = uMulticastBaseAddr;
   pIGMPObjectPtr->uIGMPMulticastAddressMask = uMulticastAddrMask;
@@ -135,13 +146,16 @@ u8 uIGMPLeaveGroup(u8 uId){
 
   pIGMPObjectPtr = pIGMPGetContext(uId);
 
-  SANE_IGMP(pIGMPObjectPtr);    /* TODO: should we assert here or throw a runtime error? */
+  SANE_IGMP(pIGMPObjectPtr);    /* TODO: should we assert here or throw a runtime error to the console? Bearing in mind
+                                 that this is a function called from a user command but also that the ptr should have
+                                 been initialised first i.e. an assert would catch this in development... */
 
   pIGMPObjectPtr->uIGMPLeaveRequestFlag = TRUE;
 
   return XST_SUCCESS;
 }
 
+/* This function was introduced to deal with link-flap scenarios and rejoin the mc group */
 u8 uIGMPRejoinPrevGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
@@ -152,7 +166,7 @@ u8 uIGMPRejoinPrevGroup(u8 uId){
 
   pIGMPObjectPtr = pIGMPGetContext(uId);
 
-  SANE_IGMP(pIGMPObjectPtr);    /* TODO: should we assert here or throw a runtime error? */
+  SANE_IGMP(pIGMPObjectPtr);    /* TODO: should we assert here or throw a runtime error? same reason as above... */
 
   if ((pIGMPObjectPtr->tIGMPCurrentState == IGMP_JOINED_STATE) || (pIGMPObjectPtr->tIGMPCurrentState == IGMP_SEND_MEMBERSHIP_REPORTS_STATE)){
     pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
@@ -188,7 +202,7 @@ static typeIGMPState igmp_idle_state(struct sIGMPObject *pIGMPObjectPtr)
   pIGMPObjectPtr->uIGMPLeaveRequestFlag = FALSE;
 
   if (pIGMPObjectPtr->uIGMPJoinRequestFlag == TRUE){
-    /* clear the join request flag here to prevent ejoining once a leave is requested later creating a cycle */
+    /* clear the join request flag here to prevent rejoining once a leave is requested later, creating a cycle */
     pIGMPObjectPtr->uIGMPJoinRequestFlag = FALSE;
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_SEND_MEMBERSHIP_REPORTS_STATE]);
     return IGMP_SEND_MEMBERSHIP_REPORTS_STATE;
