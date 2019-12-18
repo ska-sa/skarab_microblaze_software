@@ -81,8 +81,12 @@ struct sIGMPObject *pIGMPInit(u8 uId){
   pIGMPObjectPtr->uIGMPCurrentClkTick = 0;
   pIGMPObjectPtr->uIGMPIfId = uId;
 
-  pIGMPObjectPtr->uIGMPMulticastAddress = 0;
-  pIGMPObjectPtr->uIGMPMulticastAddressMask = 0xffffffff;
+  /* FIXME - double check the assignment of join and leave mc addr and mask throughout the s/m */
+  pIGMPObjectPtr->uIGMPJoinMulticastAddress = 0;
+  pIGMPObjectPtr->uIGMPJoinMulticastAddressMask = 0xffffffff;
+
+  pIGMPObjectPtr->uIGMPLeaveMulticastAddress = 0;
+  pIGMPObjectPtr->uIGMPLeaveMulticastAddressMask = 0xffffffff;
 
   pIGMPObjectPtr->uIGMPJoinRequestFlag = FALSE;
   pIGMPObjectPtr->uIGMPLeaveRequestFlag = FALSE;
@@ -118,23 +122,26 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
   /* TODO: Q: should we check for sane ip and mask? e.g. it may not be useful to invoke the join state with a mask of 0xffffffff
            A: there may actually be a use case for a mask of 0xffffffff -> when you want to subscribe
                to only one specific addr, this will do it */
+          /* however, perhaps we should guard against extra-ordinarily large  groups, like a mask of 0xffff0000*/
 
-  pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
+  /* only set mc parameters and invoke s/m if there's a change... */
+  if ((pIGMPObjectPtr->uIGMPJoinMulticastAddress != uMulticastBaseAddr) ||
+     (pIGMPObjectPtr->uIGMPJoinMulticastAddressMask != uMulticastAddrMask )){
 
-  /* if this function is called with an already configured addr and mask, this will merely reconfigure it. Currently the
-   * s/m will not leave that previously configured group, but will simply issue membership reports for the new group
-   * while the old group will time out. Also, it will not send out the new igmp reports immediately but olny after the
-   * time out period. TODO: Should we not rather immediately send explicit leave messages for the old group and
-   * re-initialise the s/m with the new mc address? -> we could add a 'reconfigure igmp state' to the s/m
-   */
+    pIGMPObjectPtr->uIGMPLeaveMulticastAddress = pIGMPObjectPtr->uIGMPJoinMulticastAddress;
+    pIGMPObjectPtr->uIGMPLeaveMulticastAddressMask = pIGMPObjectPtr->uIGMPJoinMulticastAddressMask;
 
-  pIGMPObjectPtr->uIGMPMulticastAddress = uMulticastBaseAddr;
-  pIGMPObjectPtr->uIGMPMulticastAddressMask = uMulticastAddrMask;
+    pIGMPObjectPtr->uIGMPJoinMulticastAddress = uMulticastBaseAddr;
+    pIGMPObjectPtr->uIGMPJoinMulticastAddressMask = uMulticastAddrMask;
+
+    pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
+    /*pIGMPObjectPtr->tIGMPCurrentState = IGMP_IDLE_STATE;*/
+  }
 
   return XST_SUCCESS;
 }
 
-/*FIXME roll leave and join flag into one variable */
+/* TODO roll leave and join flag into one variable */
 
 u8 uIGMPLeaveGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
@@ -151,6 +158,12 @@ u8 uIGMPLeaveGroup(u8 uId){
                                  been initialised first i.e. an assert would catch this in development... */
 
   pIGMPObjectPtr->uIGMPLeaveRequestFlag = TRUE;
+
+  pIGMPObjectPtr->uIGMPLeaveMulticastAddress = pIGMPObjectPtr->uIGMPJoinMulticastAddress;
+  pIGMPObjectPtr->uIGMPLeaveMulticastAddressMask = pIGMPObjectPtr->uIGMPJoinMulticastAddressMask;
+
+  pIGMPObjectPtr->uIGMPJoinMulticastAddress = 0;
+  pIGMPObjectPtr->uIGMPJoinMulticastAddressMask = 0xffffffff;
 
   return XST_SUCCESS;
 }
@@ -180,6 +193,7 @@ u8 uIGMPRejoinPrevGroup(u8 uId){
 u8 uIGMPStateMachine(u8 uId)
 {
   struct sIGMPObject *pIGMPObjectPtr;
+  typeIGMPState tIGMPNextState;   /* temp intermediate state variable to evaluate a state change */
 
   SANE_IGMP_IF_ID(uId);
 
@@ -189,7 +203,15 @@ u8 uIGMPStateMachine(u8 uId)
 
   log_printf(LOG_SELECT_IGMP, LOG_LEVEL_TRACE, "IGMP [%02d] entering state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[pIGMPObjectPtr->tIGMPCurrentState]);
 
-  pIGMPObjectPtr->tIGMPCurrentState = igmp_state_table[pIGMPObjectPtr->tIGMPCurrentState](pIGMPObjectPtr);
+  tIGMPNextState = igmp_state_table[pIGMPObjectPtr->tIGMPCurrentState](pIGMPObjectPtr);
+
+  /* only upon a state change, print debug info... */
+  if (tIGMPNextState != pIGMPObjectPtr->tIGMPCurrentState){
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[tIGMPNextState]);
+  }
+
+  /* update the state variable */
+  pIGMPObjectPtr->tIGMPCurrentState = tIGMPNextState;
 
   return XST_SUCCESS;
 }
@@ -204,7 +226,6 @@ static typeIGMPState igmp_idle_state(struct sIGMPObject *pIGMPObjectPtr)
   if (pIGMPObjectPtr->uIGMPJoinRequestFlag == TRUE){
     /* clear the join request flag here to prevent rejoining once a leave is requested later, creating a cycle */
     pIGMPObjectPtr->uIGMPJoinRequestFlag = FALSE;
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_SEND_MEMBERSHIP_REPORTS_STATE]);
     return IGMP_SEND_MEMBERSHIP_REPORTS_STATE;
   }
 
@@ -223,14 +244,13 @@ static typeIGMPState igmp_send_membership_reports_state(struct sIGMPObject *pIGM
   u8 *txbuf;
 
   /* have we cycled through all the masked addresses? */
-  if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPMulticastAddressMask))){
+  if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPJoinMulticastAddressMask))){
     /* pIGMPObjectPtr->uIGMPCurrentMessage = 0; */
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_JOINED_STATE]);
     return IGMP_JOINED_STATE;
   }
 
-  baseip = pIGMPObjectPtr->uIGMPMulticastAddress;
-  mask = pIGMPObjectPtr->uIGMPMulticastAddressMask;
+  baseip = pIGMPObjectPtr->uIGMPJoinMulticastAddress;
+  mask = pIGMPObjectPtr->uIGMPJoinMulticastAddressMask;
 
   groupaddr = (baseip & mask) | pIGMPObjectPtr->uIGMPCurrentMessage;
 
@@ -269,13 +289,19 @@ static typeIGMPState igmp_joined_state(struct sIGMPObject *pIGMPObjectPtr)
   /* is it time to send IGMP reports to the router/switch? */
   if (pIGMPObjectPtr->uIGMPCurrentClkTick >= IGMP_REPORT_TIMER) {
     pIGMPObjectPtr->uIGMPCurrentClkTick = 0;
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_SEND_MEMBERSHIP_REPORTS_STATE]);
     return IGMP_SEND_MEMBERSHIP_REPORTS_STATE;
   }
 
   if (pIGMPObjectPtr->uIGMPLeaveRequestFlag == TRUE){
     pIGMPObjectPtr->uIGMPLeaveRequestFlag = FALSE;
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_LEAVING_STATE]);
+    return IGMP_LEAVING_STATE;
+  }
+
+  /* if the uIGMPJoinRequestFlag flag is set while in 'joined state', a new multicast configuration (addr and mask) was
+   * most likely requested. We have to leave current group and re-issue new igmp join requests...  */
+  if (pIGMPObjectPtr->uIGMPJoinRequestFlag == TRUE){
+    /* NOTE DO NOT clear the join request flag here since we want the s/m to filter back to the joined state after the
+     * next leave state and this flag will allow us to do this when we get back to 'idle state'. */
     return IGMP_LEAVING_STATE;
   }
 
@@ -294,13 +320,12 @@ static typeIGMPState igmp_leaving_state(struct sIGMPObject *pIGMPObjectPtr){
   u8 *txbuf;
 
   /* have we unsubscribed from all multicast group addresses? */
-  if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPMulticastAddressMask))){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [%02d] about to enter state %s\r\n", pIGMPObjectPtr->uIGMPIfId, igmp_state_name_lookup[IGMP_IDLE_STATE]);
+  if (pIGMPObjectPtr->uIGMPCurrentMessage > (~((unsigned) pIGMPObjectPtr->uIGMPLeaveMulticastAddressMask))){
     return IGMP_IDLE_STATE;
   }
 
-  baseip = pIGMPObjectPtr->uIGMPMulticastAddress;
-  mask = pIGMPObjectPtr->uIGMPMulticastAddressMask;
+  baseip = pIGMPObjectPtr->uIGMPLeaveMulticastAddress;
+  mask = pIGMPObjectPtr->uIGMPLeaveMulticastAddressMask;
 
   groupaddr = (baseip & mask) | pIGMPObjectPtr->uIGMPCurrentMessage;
 
@@ -323,7 +348,6 @@ static typeIGMPState igmp_leaving_state(struct sIGMPObject *pIGMPObjectPtr){
   }
 
   pIGMPObjectPtr->uIGMPCurrentMessage++;
-  pIGMPObjectPtr->uIGMPJoinRequestFlag = FALSE;
 
   return IGMP_LEAVING_STATE;
 }

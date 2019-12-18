@@ -21,12 +21,15 @@ struct sIGMPObject {
 
   typeIGMPState tIGMPCurrentState;
 
-  u8 uIGMPCurrentMessage;
+  u32 uIGMPCurrentMessage;
   u32 uIGMPCurrentClkTick;     /* internal timer tick */
   u8 uIGMPIfId;               /* interface id associated with this igmp context */
 
-  u32 uIGMPMulticastAddress;      /* base multicast address */
-  u32 uIGMPMulticastAddressMask;  /* mask to be applied to the base multicast addr above */
+  u32 uIGMPJoinMulticastAddress;      /* base multicast address */
+  u32 uIGMPJoinMulticastAddressMask;  /* mask to be applied to the base multicast addr above */
+
+  u32 uIGMPLeaveMulticastAddress;
+  u32 uIGMPLeaveMulticastAddressMask;
 
   volatile u8 uIGMPJoinRequestFlag;
   volatile u8 uIGMPLeaveRequestFlag;
