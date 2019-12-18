@@ -799,7 +799,21 @@ int main()
   InitI2C(0x3, SPEED_400kHz);
   InitI2C(0x4, SPEED_400kHz);
 
-  set_log_level(LOG_LEVEL_INFO);
+  /* initialise the log level */
+  u8 log_level_cached = 0;
+  tLogLevel log_level = LOG_LEVEL_INFO;
+
+  PersistentMemory_ReadByte(LOG_LEVEL_STARTUP_INDEX, &log_level_cached);
+  /* if the msb is set, then we know that the log-level command was issued before the reset */
+  if (log_level_cached & 0x80){
+    /* the cached log-level is stored in the lower 7 bits */
+    log_level = (tLogLevel) (log_level_cached & 0x7f);
+  } else {
+    /* otherwise default to *info* */
+    log_level = LOG_LEVEL_INFO;
+  }
+
+  set_log_level(log_level);
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "---Entering main---\r\n");
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Embedded software version: %d.%d.%d\r\n",
@@ -1963,52 +1977,6 @@ int main()
     ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
 		if (ReceivedCount){
       cli_sm(RecvBuffer);
-#if 0
-      switch (RecvBuffer){
-        case '1': /* TRACE */
-        case '2': /* DEBUG */
-        case '3': /* INFO */
-        case '4': /* WARN */
-        case '5': /* ERROR */
-        case '6': /* FATAL */
-          set_log_level(RecvBuffer - 49u);
-          break;
-        case '0': /* OFF */
-          set_log_level(LOG_LEVEL_OFF);
-          break;
-        case 'd': /* DHCP */
-          set_log_select(LOG_SELECT_DHCP);
-          break;
-        case 'a': /* ARP */
-          set_log_select(LOG_SELECT_ARP);
-          break;
-        case 'p': /* PING */
-          set_log_select(LOG_SELECT_ICMP);
-          break;
-        case 'l': /* LLDP */
-          set_log_select(LOG_SELECT_LLDP);
-          break;
-        case 'c': /* CTRL */
-          set_log_select(LOG_SELECT_CTRL);
-          break;
-        case 'b': /* BUFFER */
-          set_log_select(LOG_SELECT_BUFF);
-          break;
-        case 'h': /* HARDW */
-          set_log_select(LOG_SELECT_HARDW);
-          break;
-        case 'i': /* IFACE */
-          set_log_select(LOG_SELECT_IFACE);
-          break;
-        case '*': /* ALL */
-          set_log_select(LOG_SELECT_ALL);
-          break;
-        case 0x09:  /* tab */
-        default:
-          break;
-      }
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Serial Out: %c\r\n", RecvBuffer);
-#endif
 		}
 
     /* to test the watchdog timer - uncomment the following */

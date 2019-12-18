@@ -27,6 +27,7 @@
 #include "register.h"
 #include "delay.h"
 #include "logging.h"
+#include "custom_constants.h"
 
 //=================================================================================
 //  GetI2CAddressOffset
@@ -328,6 +329,10 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
   u32 uAddressOffset = GetI2CAddressOffset(uId);
   u32 uTimeout = 0;
   u16 uByteCount;
+
+  if (MAX31785_I2C_DEVICE_ADDRESS == uSlaveAddress){
+    Delay(1400);
+  }
 
   // USB PHY only has control over MB I2C
   if (uId == MB_I2C_BUS_ID)

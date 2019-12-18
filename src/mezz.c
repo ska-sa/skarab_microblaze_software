@@ -54,6 +54,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
   switch(mt){
     case MEZ_BOARD_TYPE_QSFP:
+    case MEZ_BOARD_TYPE_QSFP_PHY:
       if (MEZ_FIRMW_TYPE_QSFP == ft){   /* firmware support? */
         MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
         if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
@@ -93,7 +94,6 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
       break;
 
     /* unhandled cases */
-    case MEZ_BOARD_TYPE_QSFP_PHY:
     case MEZ_BOARD_TYPE_OPEN:
     case MEZ_BOARD_TYPE_UNKNOWN:
     default:
