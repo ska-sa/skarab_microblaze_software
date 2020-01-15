@@ -51,9 +51,9 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_END]         = NULL
 };
 
-static const char * const cli_cmd_options[][11] = {
+static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_LOG_LEVEL]    = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
- [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
+ [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "igmp",  "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
  [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },

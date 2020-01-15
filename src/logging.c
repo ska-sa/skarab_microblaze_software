@@ -21,6 +21,7 @@ static const char *select_str[LOG_SELECT_MAX] = {
   [LOG_SELECT_DHCP]    = "dhcp",
   [LOG_SELECT_ARP]     = "arp",
   [LOG_SELECT_ICMP]    = "icmp",
+  [LOG_SELECT_IGMP]    = "igmp",
   [LOG_SELECT_LLDP]    = "lldp",
   [LOG_SELECT_CTRL]    = "control",
   [LOG_SELECT_BUFF]    = "buffer",
