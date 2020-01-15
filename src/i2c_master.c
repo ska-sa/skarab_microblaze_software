@@ -331,7 +331,7 @@ int PMBusReadI2CBytes(u16 uId, u16 uSlaveAddress, u16 uCommandCode, u16 * uReadB
   u16 uByteCount;
 
   if (MAX31785_I2C_DEVICE_ADDRESS == uSlaveAddress){
-    Delay(1400);
+    Delay(5000);
   }
 
   // USB PHY only has control over MB I2C

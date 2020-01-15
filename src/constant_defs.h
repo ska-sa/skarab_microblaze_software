@@ -108,14 +108,14 @@ volatile u32 uEthernetGatewayIPAddress[NUM_ETHERNET_INTERFACES];
 volatile u32 uLLDPTimerCounter;
 volatile u8 uLLDPRetryTimer[NUM_ETHERNET_INTERFACES];
 
-volatile u32 uDHCPTimerCounter;
+//volatile u32 uDHCPTimerCounter;
 volatile u8 uDHCPState[NUM_ETHERNET_INTERFACES];
 /* volatile u8 uDHCPRetryTimer[NUM_ETHERNET_INTERFACES]; */
 
-volatile u8 uIGMPTimerCounter;
-volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
-volatile u8 uIGMPSendMessage[NUM_ETHERNET_INTERFACES];
-volatile u8 uCurrentIGMPMessage[NUM_ETHERNET_INTERFACES];
+//volatile u8 uIGMPTimerCounter;
+//volatile u8 uIGMPState[NUM_ETHERNET_INTERFACES];
+//volatile u8 uIGMPSendMessage[NUM_ETHERNET_INTERFACES];
+//volatile u8 uCurrentIGMPMessage[NUM_ETHERNET_INTERFACES];
 
 volatile u32 uPrintStatsCounter;
 
@@ -289,7 +289,8 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define GET_FANCONTROLLER_LOGS      0x005B
 #define CLEAR_FANCONTROLLER_LOGS    0x005D
 #define DHCP_RESET_STATE_MACHINE    0x005F
-#define HIGHEST_DEFINED_COMMAND     0x005F
+#define MULTICAST_LEAVE_GROUP       0x0061
+#define HIGHEST_DEFINED_COMMAND     0x0061
 
 
 // ETHERNET TYPE CODES
@@ -1159,6 +1160,18 @@ typedef struct sDHCPResetStateMachineResp {
   u16 uPadding[7];
 } sDHCPResetStateMachineRespT;
 
+/* TODO */
+typedef struct sMulticastLeaveGroupReq {
+  sCommandHeaderT Header;
+  u16 uLinkId;    /* this is the id of the interface */
+} sMulticastLeaveGroupReqT;
+
+typedef struct sMulticastLeaveGroupResp {
+  sCommandHeaderT Header;
+  u16 uLinkId;
+  u16 uSuccess;
+  u16 uPadding[7];
+} sMulticastLeaveGroupRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0
