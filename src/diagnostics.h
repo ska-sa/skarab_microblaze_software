@@ -20,7 +20,12 @@
 extern "C" {
 #endif
 
+/* Network */
 void PrintInterfaceCounters(struct sIFObject *pIFObj);
+
+/* General */
+void PrintVersionInfo();
+const char *GetVersionInfo();
 
 #ifdef __cplusplus
 }

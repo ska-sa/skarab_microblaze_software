@@ -825,11 +825,7 @@ int main()
   set_log_level(log_level);
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "---Entering main---\r\n");
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Embedded software version: %d.%d.%d\r\n",
-      EMBEDDED_SOFTWARE_VERSION_MAJOR,
-      EMBEDDED_SOFTWARE_VERSION_MINOR,
-      EMBEDDED_SOFTWARE_VERSION_PATCH);
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "Running ELF version: %s\r\n", VENDOR_ID);
+  PrintVersionInfo();
 
   init_wdt(&WatchdogTimer);
 

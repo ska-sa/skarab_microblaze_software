@@ -107,3 +107,17 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj){
   }
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
 }
+
+static const char * const version = VENDOR_ID;
+
+void PrintVersionInfo(){
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Embedded software version: %d.%d.%d\r\n",
+      EMBEDDED_SOFTWARE_VERSION_MAJOR,
+      EMBEDDED_SOFTWARE_VERSION_MINOR,
+      EMBEDDED_SOFTWARE_VERSION_PATCH);
+  log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "Running ELF version: %s\r\n", version);
+}
+
+const char *GetVersionInfo(){
+  return version;
+}
