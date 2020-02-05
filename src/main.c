@@ -67,8 +67,11 @@
 #error "Cannot enable both link monitoring and dhcp unbound monitoring tasks - edit in Makefile.config"
 #endif
 
-/* this is the default value for both dhcp unbound task and link mon task */
-#define LINK_MON_COUNTER_VALUE  600
+#define LINK_MON_COUNTER_DEFAULT_VALUE  600
+#define LINK_MON_COUNTER_MIN_VALUE  600
+
+#define DHCP_MON_COUNTER_DEFAULT_VALUE  450 /* 45 seconds */
+#define DHCP_MON_COUNTER_MIN_VALUE  50    /* 5 seconds */
 
 /* local function prototypes */
 static int vSendDHCPMsg(struct sIFObject *pIFObjectPtr, void *pUserData);
@@ -79,7 +82,7 @@ void IBusException(void *Data);
 void DBusException(void *Data);
 void StackViolationException(void *Data);
 void IllegalOpcodeException(void *Data);
-void UnalignedAccessException(void *Data);
+/* void UnalignedAccessException(void *Data); */
 
 /* temp global definition */
 static volatile u8 uFlagRunTask_DHCP = 0;
@@ -745,10 +748,18 @@ int main()
 
 #ifdef LINK_MON_RX_40GBE
   u32 LinkTimeout = 1;
+  u16 uLinkTimeoutMax = LINK_MON_COUNTER_DEFAULT_VALUE;
 #endif
 
+#ifdef RECONFIG_UPON_NO_DHCP
+  u16 uDHCPTimeoutMax = DHCP_MON_COUNTER_DEFAULT_VALUE;
+  tPMemReturn ret;
+#endif
+
+#if 0
 #if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
-  u16 uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
+  u16 uLinkTimeoutMax = LINK_MON_COUNTER_DEFAULT_VALUE;
+#endif
 #endif
 
   unsigned char *buf,temp;
@@ -1114,30 +1125,50 @@ int main()
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
 
 #if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
-  /* set default value */
-  uLinkTimeoutMax = LINK_MON_COUNTER_VALUE;
+  u16 timeout;
 
   /* read link/dhcp monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
   if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
     if (DS2433ReadMem(rom, 0, data, 2, 0xE7, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
       /* overwrite default */
-      uLinkTimeoutMax  = (data[0] & 0xff) | (data[1] << 8);
+      timeout = (data[0] & 0xff) | (data[1] << 8);
       /*
-       * Now ensure that the link timeout is a reasonable value since this is
-       * user data in eeprom. Let's say a reasonable value is larger than 60s  since
-       * the switch may take some time to initialize the link before we see activity,
-       * else leave as default value.
+       * The link/dhcp timeout value is a user set parameter in eeprom. We
+       * therefore have to ensure that it is always set to a sane value which is
+       * determined by the amount time a switch can potentially take to set up
+       * the link. To ensure that we do not get ourselves into a link-reset loop
+       * where we do not allow the switch sufficient time to set up the link, we
+       * will progressively increment this timeout value based on the previous
+       * number of link/dhcp timeouts.
+       * Now ensure that the link timeout is a reasonable (minimum) value since this is user data in eeprom and the
+       * switch may take some time to initialize the link before we see activity, else leave as default value.
        */
-      uLinkTimeoutMax = (uLinkTimeoutMax >= 600) ? uLinkTimeoutMax : LINK_MON_COUNTER_VALUE;
+#ifdef LINK_MON_RX_40GBE
+      uLinkTimeoutMax = (timeout >= LINK_MON_COUNTER_MIN_VALUE) ? timeout : LINK_MON_COUNTER_DEFAULT_VALUE;
+#elif defined(RECONFIG_UPON_NO_DHCP)
+
+      if (PMemState != PMEM_RETURN_ERROR){
+        ret = PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
+      }
+
+      if ((PMemState == PMEM_RETURN_ERROR) || (ret != PMEM_RETURN_OK)){
+        uDHCPReconfigCount = 25; /* ensure that this var is always a sane value */
+      }
+
+      uDHCPTimeoutMax = (timeout >= DHCP_MON_COUNTER_MIN_VALUE) ? timeout : DHCP_MON_COUNTER_DEFAULT_VALUE;
+      uDHCPTimeoutMax = uDHCPTimeoutMax + (uDHCPReconfigCount * 10);   /* times 10 to convert to seconds */
+#endif
     }
   }
 #ifdef LINK_MON_RX_40GBE
   const char *const s = "40gbe-link-mon";
+  timeout = uLinkTimeoutMax;
 #else
   const char *const s = "no-dhcp-mon";
+  timeout = uDHCPTimeoutMax;
 #endif
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting %s timeout to %d ms\r\n", s, (u32) uLinkTimeoutMax * 100);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting %s timeout to %d ms\r\n", s, (u32) timeout * 100);
 #endif
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
@@ -1844,7 +1875,7 @@ int main()
 
       /* timeout after n seconds */
       if (LinkTimeout > uLinkTimeoutMax){
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "REBOOT - 40gbe rx link-1 inactive for %ds!\r\n", uLinkTimeoutMax * 100);
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "REBOOT - 40gbe rx link-1 inactive for %dms!\r\n", uLinkTimeoutMax * 100);
         if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
           /* if it's a toolflow image */
           SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
@@ -1878,13 +1909,13 @@ int main()
       for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
         /* TODO: create API function to get state */
         if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
-          if (uDHCPBoundCount[uEthernetId] < uLinkTimeoutMax){ /*  prevent overflows */
+          if (uDHCPBoundCount[uEthernetId] < uDHCPTimeoutMax){ /*  prevent overflows */
             uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
           }
         } else {
           uDHCPBoundCount[uEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
         }
-        if (uDHCPBoundCount[uEthernetId] >=  uLinkTimeoutMax){
+        if (uDHCPBoundCount[uEthernetId] >=  uDHCPTimeoutMax){
           uDHCPBoundTimeout++;
         }
       }
@@ -1892,14 +1923,22 @@ int main()
        * if we timeout on all the interfaces, line up a reset
        */
       if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
-        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] Timed out on all interfaces!\r\n");
+        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] Timed out on all interfaces after %dms!\r\n", uDHCPTimeoutMax * 100);
 
         /* Keep track of the number of DHCP caused reboots */
         if (PMemState != PMEM_RETURN_ERROR){
-          PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
-          uDHCPReconfigCount = uDHCPReconfigCount + 1;
-          PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
-          log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [..] increment reset count to %d\r\n", uDHCPReconfigCount);
+          ret = PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
+          if (PMEM_RETURN_OK == ret){
+            uDHCPReconfigCount = uDHCPReconfigCount + 1;
+            ret = PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
+            if (PMEM_RETURN_OK == ret){
+              log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [..] increment reset count to %d\r\n", uDHCPReconfigCount);
+            }
+          }
+          /* print error message if pmem read or write fails */
+          if (ret != PMEM_RETURN_OK){
+            log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] failed to store reset count in pmem\r\n");
+          }
         }
 
         /*********************REBOOT THE FPGA****************************/
