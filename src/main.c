@@ -1157,6 +1157,11 @@ int main()
 
       uDHCPTimeoutMax = (timeout >= DHCP_MON_COUNTER_MIN_VALUE) ? timeout : DHCP_MON_COUNTER_DEFAULT_VALUE;
       uDHCPTimeoutMax = uDHCPTimeoutMax + (uDHCPReconfigCount * 10);   /* times 10 to convert to seconds */
+
+      /* cache the max dhcp timeout value in order for eth cmd to send later
+       * TODO: wrap in module functions and remove global scope
+       */
+      GlobalDHCPMonitorTimeout = uDHCPTimeoutMax;
 #endif
     }
   }

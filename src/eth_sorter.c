@@ -298,6 +298,7 @@ static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * u
 static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 //=================================================================================
 //  CommandSorter
@@ -401,6 +402,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(ResetDHCPStateMachine(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == MULTICAST_LEAVE_GROUP)
       return(MulticastLeaveGroup(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_DHCP_MONITOR_TIMEOUT)
+      return(GetDHCPMonitorTimeout(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3183,4 +3186,23 @@ static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponse
 
   return XST_SUCCESS;
 
+}
+
+
+static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  sGetDHCPMonitorTimeoutReqT *Command = (sGetDHCPMonitorTimeoutReqT*) pCommand;
+  sGetDHCPMonitorTimeoutRespT *Response = (sGetDHCPMonitorTimeoutRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetDHCPMonitorTimeoutReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetDHCPMonitorTimeoutRespT);
+
+  Response->uDHCPMonitorTimeout = GlobalDHCPMonitorTimeout;
+
+  return XST_SUCCESS;
 }

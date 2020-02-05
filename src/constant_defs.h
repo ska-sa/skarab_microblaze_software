@@ -130,6 +130,8 @@ volatile u8 uQSFPI2CMicroblazeAccess;
 /* volatile u32 uQSFPStateCounter; */
 /* volatile u8 uQSFPState; */
 
+volatile u16 GlobalDHCPMonitorTimeout;   /* TODO: hide/wrap this global var in a module*/
+
 volatile u16 uQSFPBootloaderVersionMajor;
 volatile u16 uQSFPBootloaderVersionMinor;
 
@@ -290,7 +292,8 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define CLEAR_FANCONTROLLER_LOGS    0x005D
 #define DHCP_RESET_STATE_MACHINE    0x005F
 #define MULTICAST_LEAVE_GROUP       0x0061
-#define HIGHEST_DEFINED_COMMAND     0x0061
+#define GET_DHCP_MONITOR_TIMEOUT    0x0063
+#define HIGHEST_DEFINED_COMMAND     0x0063
 
 
 // ETHERNET TYPE CODES
@@ -1172,6 +1175,16 @@ typedef struct sMulticastLeaveGroupResp {
   u16 uSuccess;
   u16 uPadding[7];
 } sMulticastLeaveGroupRespT;
+
+typedef struct sGetDHCPMonitorTimeoutReq {
+  sCommandHeaderT Header;
+} sGetDHCPMonitorTimeoutReqT;
+
+typedef struct sGetDHCPMonitorTimeoutResp {
+  sCommandHeaderT Header;
+  u16 uDHCPMonitorTimeout;
+  u16 uPadding[8];
+} sGetDHCPMonitorTimeoutRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0
