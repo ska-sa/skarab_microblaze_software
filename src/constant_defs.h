@@ -147,8 +147,8 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 
 /* <major>.<minor>.<patch> */
 #define EMBEDDED_SOFTWARE_VERSION_MAJOR   3
-#define EMBEDDED_SOFTWARE_VERSION_MINOR   14
-#define EMBEDDED_SOFTWARE_VERSION_PATCH   4
+#define EMBEDDED_SOFTWARE_VERSION_MINOR   20      /* year */
+#define EMBEDDED_SOFTWARE_VERSION_PATCH   36      /* day of the year */
 
 // WISHBONE SLAVE ADDRESSES
 #define BOARD_REGISTER_ADDR     0x00000000
