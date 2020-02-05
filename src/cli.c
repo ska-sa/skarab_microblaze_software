@@ -9,6 +9,7 @@
 #include "delay.h"
 #include "diagnostics.h"
 #include "scratchpad.h"
+#include "id.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -33,6 +34,8 @@ typedef enum {
   CMD_INDEX_GET_CONFIG,
   CMD_INDEX_RESET_FW,
   CMD_INDEX_STATS,
+  CMD_INDEX_WHOAMI,
+  CMD_INDEX_UNAME,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -47,6 +50,8 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_GET_CONFIG]  = "get-config",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
   [CMD_INDEX_STATS]       = "stats",
+  [CMD_INDEX_WHOAMI]      = "whoami",
+  [CMD_INDEX_UNAME]       = "uname",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -59,6 +64,8 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_GET_CONFIG]   = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
  [CMD_INDEX_STATS]        = { NULL },
+ [CMD_INDEX_WHOAMI]       = { NULL },
+ [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -70,6 +77,8 @@ static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
 static int cli_stats_exe(struct cli *_cli);
+static int cli_whoami_exe(struct cli *_cli);
+static int cli_uname_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -80,6 +89,8 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
  [CMD_INDEX_STATS]        = cli_stats_exe,
+ [CMD_INDEX_WHOAMI]       = cli_whoami_exe,
+ [CMD_INDEX_UNAME]        = cli_uname_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -717,6 +728,28 @@ static int cli_stats_exe(struct cli *_cli){
   return 0;
 }
 
+static int cli_whoami_exe(struct cli *_cli){
+  u8 uSerial[ID_SK_SERIAL_LEN];
+  int status;
+
+  status = get_skarab_serial(uSerial, ID_SK_SERIAL_LEN);
+  if (status != XST_SUCCESS){
+    xil_printf("failed\r\n");
+    return -1;
+  }
+
+  xil_printf("skarab%02x%02x%02x\r\n", uSerial[1], uSerial[2], uSerial[3]);
+
+  return 0;
+}
+
+static int cli_uname_exe(struct cli *_cli){
+  char *v = (char *) GetVersionInfo();
+
+  xil_printf("%s\r\n", v);
+
+  return 0;
+}
 
 static int cli_help_exe(struct cli *_cli){
   cli_print_help();
