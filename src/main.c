@@ -60,6 +60,7 @@
 #include "cli.h"
 #include "fault_log.h"
 #include "igmp.h"
+#include "time.h"
 
 #define DHCP_MAX_RECONFIG_COUNT 2
 
@@ -103,6 +104,7 @@ static volatile u8 uFlagRunTask_LinkWatchdog = 0;
 #endif
 
 static volatile u16 uTimeoutCounter = 255;
+static volatile u8 uTick_100ms = 0;
 
 //u32 __attribute__ ((section(".rodata.memtest"))) __attribute__ ((aligned (32))) uMemPlace = 0xAABBCCDD ;
 
@@ -143,6 +145,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
   }
+
+  uTick_100ms = 1;
 
   // Every 100 ms, send another ARP request
   uUpdateArpRequests = ARP_REQUEST_UPDATE;
@@ -772,6 +776,8 @@ int main()
 
   u16 uHMCTimeout;
   u8 uValidPacketRx = FALSE;
+
+  u8 post_scale = 0;
 
   /*
    * Initialize the uart driver
@@ -2011,6 +2017,18 @@ int main()
     }
 #endif
 
+    /* General 100ms task */
+    if (uTick_100ms){
+      uTick_100ms = 0;
+
+      /* tick uptime every second */
+      if (post_scale < 9){
+        post_scale++;
+      } else {
+        post_scale = 0;
+        incr_microblaze_uptime_seconds();
+      }
+    }
 
     if (uDoReboot == REBOOT_REQUESTED)
     {

@@ -293,7 +293,8 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define DHCP_RESET_STATE_MACHINE    0x005F
 #define MULTICAST_LEAVE_GROUP       0x0061
 #define GET_DHCP_MONITOR_TIMEOUT    0x0063
-#define HIGHEST_DEFINED_COMMAND     0x0063
+#define GET_MICROBLAZE_UPTIME       0x0065
+#define HIGHEST_DEFINED_COMMAND     0x0065
 
 
 // ETHERNET TYPE CODES
@@ -1185,6 +1186,17 @@ typedef struct sGetDHCPMonitorTimeoutResp {
   u16 uDHCPMonitorTimeout;
   u16 uPadding[8];
 } sGetDHCPMonitorTimeoutRespT;
+
+typedef struct sGetMicroblazeUptimeReq {
+  sCommandHeaderT Header;
+} sGetMicroblazeUptimeReqT;
+
+typedef struct sGetMicroblazeUptimeResp {
+  sCommandHeaderT Header;
+  u16 uMicroblazeUptimeHigh;
+  u16 uMicroblazeUptimeLow;
+  u16 uPadding[7];
+} sGetMicroblazeUptimeRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0
