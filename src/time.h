@@ -12,6 +12,7 @@ extern "C" {
 
 void incr_microblaze_uptime_seconds(void);
 u32 get_microblaze_uptime_seconds(void);
+void test_timer_enable(void);
 
 #ifdef __cplusplus
 }

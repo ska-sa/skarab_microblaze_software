@@ -643,12 +643,15 @@ static int cli_bounce_link_exe(struct cli *_cli){
  * the one second interval reference count as a sanity check
  */
 static int cli_test_timer_exe(struct cli *_cli){
+#if 0
   unsigned int i;
 #define COUNT 5
   for (i = 0; i <= COUNT; i++){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%d%s", i, i < COUNT ? ".." : "\r\n");
     Delay(1000000);
   }
+#endif
+  test_timer_enable();
   return 0;
 }
 
