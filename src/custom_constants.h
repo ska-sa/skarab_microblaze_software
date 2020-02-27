@@ -143,6 +143,64 @@ typedef struct sNewOpCodeRespT{
 
 // request and response packet structures
 
+/* fan speed status bits */
+#define STAT_BIT_FAN_RPM_LF           0
+#define STAT_BIT_FAN_RPM_LM           1
+#define STAT_BIT_FAN_RPM_LB           2
+#define STAT_BIT_FAN_RPM_RB           3
+#define STAT_BIT_FAN_RPM_FPGA         4
+/* fan duty cycle status bits */
+#define STAT_BIT_FAN_PWM_LF           5
+#define STAT_BIT_FAN_PWM_LM           6
+#define STAT_BIT_FAN_PWM_LB           7
+#define STAT_BIT_FAN_PWM_RB           8
+#define STAT_BIT_FAN_PWM_FPGA         9
+/* temp sensors status bits */
+#define STAT_BIT_TEMP_INLET           10
+#define STAT_BIT_TEMP_OUTLET          11
+#define STAT_BIT_TEMP_FPGA            12
+#define STAT_BIT_TEMP_FAN_CTL         13
+#define STAT_BIT_TEMP_VMON            14
+#define STAT_BIT_TEMP_CMON            15
+
+/* voltage mon status bits */
+#define STAT_BIT_VMON_P12V2           16
+#define STAT_BIT_VMON_P12V            17
+#define STAT_BIT_VMON_P5V             18
+#define STAT_BIT_VMON_P3V3            19
+#define STAT_BIT_VMON_P2V5            20
+#define STAT_BIT_VMON_P1V8            21
+#define STAT_BIT_VMON_P1V2            22
+#define STAT_BIT_VMON_P1V0            23
+#define STAT_BIT_VMON_P1V8_MGTVCCAUX  24
+#define STAT_BIT_VMON_P1V0_MGTAVCC    25
+#define STAT_BIT_VMON_P1V2_MGTAVTT    26
+#define STAT_BIT_VMON_P5VAUX          27
+#define STAT_BIT_VMON_PLUS3V3CFG      28
+/* current mon status bits */
+#define STAT_BIT_CMON_P12V2           29
+#define STAT_BIT_CMON_P12V            30
+#define STAT_BIT_CMON_P5V             31
+
+#define STAT_BIT_CMON_P3V3            32
+#define STAT_BIT_CMON_P2V5            33
+#define STAT_BIT_CMON_P1V8            34
+#define STAT_BIT_CMON_P1V2            35
+#define STAT_BIT_CMON_P1V0            36
+#define STAT_BIT_CMON_P1V8_MGTVCCAUX  37
+#define STAT_BIT_CMON_P1V0_MGTAVCC    38
+#define STAT_BIT_CMON_P1V2_MGTAVTT    39
+#define STAT_BIT_CMON_P3V3_CFG        40
+/* reserved for mezz temp adc sensos - currently not parsed by casperfpga */
+#define STAT_BIT_MEZZ_0_TEMP_ADC      41
+#define STAT_BIT_MEZZ_1_TEMP_ADC      42
+#define STAT_BIT_MEZZ_2_TEMP_ADC      43
+#define STAT_BIT_MEZZ_3_TEMP_ADC      44
+/* hmc die temp status bits */
+#define STAT_BIT_HMC_0_DIE_TEMP       45
+#define STAT_BIT_HMC_1_DIE_TEMP       46
+#define STAT_BIT_HMC_2_DIE_TEMP       47
+
 // GetSensorData
 typedef struct sGetSensorDataReq {
   sCommandHeaderT Header;
@@ -151,7 +209,9 @@ typedef struct sGetSensorDataReq {
 typedef struct sGetSensorDataResp {
 	sCommandHeaderT Header;
 	u16				uSensorData[106];
-	u16				uPadding[3];
+	u16				uStatusBits[3];       /* previously these were the padding bytes but now implement the
+                                   * status bits per sensor data field - see #define STAT_BIT_... above
+                                   */
 } sGetSensorDataRespT;
 
 // SetFanSpeed

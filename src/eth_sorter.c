@@ -42,6 +42,7 @@
 #include "qsfp.h"
 #include "fault_log.h"
 #include "igmp.h"
+#include "time.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -299,6 +300,7 @@ static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 *
 static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 //=================================================================================
 //  CommandSorter
@@ -404,6 +406,8 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(MulticastLeaveGroup(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_DHCP_MONITOR_TIMEOUT)
       return(GetDHCPMonitorTimeout(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_MICROBLAZE_UPTIME)
+      return(GetMicroblazeUptime(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -3203,6 +3207,30 @@ static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uRespon
   *uResponseLength = sizeof(sGetDHCPMonitorTimeoutRespT);
 
   Response->uDHCPMonitorTimeout = GlobalDHCPMonitorTimeout;
+
+  return XST_SUCCESS;
+}
+
+
+static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u32 uptime;
+
+  sGetMicroblazeUptimeReqT *Command = (sGetMicroblazeUptimeReqT*) pCommand;
+  sGetMicroblazeUptimeRespT *Response = (sGetMicroblazeUptimeRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetMicroblazeUptimeReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetMicroblazeUptimeRespT);
+
+  uptime = get_microblaze_uptime_seconds();
+
+  Response->uMicroblazeUptimeHigh = (uptime >> 16) & 0xffff;
+  Response->uMicroblazeUptimeLow = (uptime & 0xffff);
 
   return XST_SUCCESS;
 }

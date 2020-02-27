@@ -311,6 +311,8 @@ static int set_all_monitor_run_time_count_seconds(const u32 seconds){
   write_buff[8] = (days >>  8) & 0xff;
   write_buff[9] = (days      ) & 0xff;
 
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_DEBUG, "TIME [..] Setting monitor times to: %d days %d ms\r\n", days, milliseconds);
+
   /* set current monitor counter */
   status = WriteI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, write_buff, MONITOR_TIME_COUNT_WR_LEN);
   if (XST_SUCCESS != status){
@@ -511,11 +513,11 @@ static int read_next_fault_log_page_MAX31785_raw(u16 *const data_out){
 
   /* print the raw data */
   for (i = 0; i < 255; i++){
-    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "%4x%s", data_out[i], ((i % 16 == 0) && (i != 0)) ? "\r\n" : " ");
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_TRACE, "%4x%s", data_out[i], ((i % 16 == 0) && (i != 0)) ? "\r\n" : " ");
     //xil_printf("%4x", buffer[i]);
     //xil_printf("%s", i % 16 == 0 ? "\r\n" : " ");
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "\r\n");
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_TRACE, "\r\n");
 
   return XST_SUCCESS;
 }
