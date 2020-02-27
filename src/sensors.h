@@ -22,26 +22,27 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 int SetFanSpeedHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 // sensor related functions
-void ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch);
+int ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch);
+int ReadFanSpeedPWM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch);
 void GetAllFanSpeeds(sGetSensorDataRespT *Response);
 void GetAllFanSpeedsPWM(sGetSensorDataRespT *Response);
-void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch);
-void ReadVoltageMonTemperature(u16 * ReadBytes, bool OpenSwitch);
-void ReadCurrentMonTemperature(u16 * ReadBytes, bool OpenSwitch);
+int ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch);
+int ReadVoltageMonTemperature(u16 * ReadBytes, bool OpenSwitch);
+int ReadCurrentMonTemperature(u16 * ReadBytes, bool OpenSwitch);
 void GetAllTempSensors(sGetSensorDataRespT *Response);
-void ReadVoltage(u16 * ReadBytes, unsigned Voltage, bool OpenSwitch);
-void Read3V3Voltage(u16 * ReadBytes, bool OpenSwitch);
+int ReadVoltage(u16 * ReadBytes, unsigned Voltage, bool OpenSwitch);
+int Read3V3Voltage(u16 * ReadBytes, bool OpenSwitch);
 void GetAllVoltages(sGetSensorDataRespT *Response);
-void ReadCurrent(u16 * ReadBytes, unsigned Current, bool OpenSwitch);
+int ReadCurrent(u16 * ReadBytes, unsigned Current, bool OpenSwitch);
 void GetAllCurrents(sGetSensorDataRespT *Response);
 void SetFanSpeed(unsigned FanPage, float PWMPercentage, bool OpenSwitch);
-void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch);
+int ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch);
 void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response);
 void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response);
 
 
 // auxiliary functions
-void ConfigureSwitch(unsigned SwitchSelection);
+int ConfigureSwitch(unsigned SwitchSelection);
 
 #ifdef __cplusplus
 }

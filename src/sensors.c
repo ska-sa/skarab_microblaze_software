@@ -40,7 +40,7 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 
   sGetSensorDataReqT *Command = (sGetSensorDataReqT *) pCommand;
   sGetSensorDataRespT *Response = (sGetSensorDataRespT *) uResponsePacketPtr;
-  u8 uPaddingIndex;
+  u8 i;
 
   if (uCommandLength < sizeof(sGetSensorDataReqT)){
     return XST_FAILURE;
@@ -49,6 +49,11 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
   // Create response packet header
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  /* clear all status bits - will be set upon error */
+  for (i = 0; i < 2; i++){
+    Response->uStatusBits[i] = 0;
+  }
 
 	// sensor reads
 	// automatically populates the fields for the reponse packet
@@ -60,9 +65,11 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 	GetAllMezzanineTempSensors(Response); // mezzanine temperatures
   GetAllHMCDieTemperatures(Response); // HMC Die Temperatures
 
+#if 0   /* Now used for status bits */
   // add padding to 64-bit boundary
   for (uPaddingIndex = 0; uPaddingIndex < 2; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
+#endif
 
   *uResponseLength = sizeof(sGetSensorDataRespT);
 
@@ -83,11 +90,12 @@ int GetSensorDataHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacket
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
+int ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
 
   u16 WriteBytes[3];
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = FanPage;
@@ -95,14 +103,16 @@ void ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
   // open the I2C switch if required
   if (OpenSwitch)
   {
-    ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+    stat += ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
   }
 
   // request a fan speed read
-  WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // read the fan speed
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_FAN_SPEED_1_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_FAN_SPEED_1_CMD, ReadBytes, 2);
+
+  return stat;
 }
 //=================================================================================
 //  ReadFanSpeedPWM
@@ -118,11 +128,12 @@ void ReadFanSpeedRPM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadFanSpeedPWM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
+int ReadFanSpeedPWM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
 
   u16 WriteBytes[3];
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = FanPage;
@@ -130,15 +141,18 @@ void ReadFanSpeedPWM(u16 * ReadBytes, unsigned FanPage, bool OpenSwitch){
   // open the I2C switch if required
   if (OpenSwitch)
   {
-    ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+    stat += ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
   }
 
   // request a fan speed read
-  WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // read the fan speed
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, MFR_READ_FAN_PWM_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, MFR_READ_FAN_PWM_CMD, ReadBytes, 2);
+
+  return stat;
 }
+
 //=================================================================================
 //  GetAllFanSpeeds
 //--------------------------------------------------------------------------------
@@ -157,6 +171,7 @@ void GetAllFanSpeeds(sGetSensorDataRespT *Response)
   u16 ReadBytes[3];
   u16 fanSpeed;
   int i;
+  int ret;
 
   // list of fan pages
   unsigned fanPages[5] = {LEFT_FRONT_FAN_PAGE, LEFT_MIDDLE_FAN_PAGE,
@@ -165,9 +180,13 @@ void GetAllFanSpeeds(sGetSensorDataRespT *Response)
   // read the speed of each fan on the motherboard
   // append the data to the response packet
   for (i = 0; i<5; i++){
-    ReadFanSpeedRPM(ReadBytes, fanPages[i], true);
+    ret = ReadFanSpeedRPM(ReadBytes, fanPages[i], true);
     fanSpeed = (ReadBytes[0] + (ReadBytes[1] << 8));
     Response->uSensorData[i] = fanSpeed;
+    if (ret){
+      /* upon error - set error status bit */
+      Response->uStatusBits[0] = Response->uStatusBits[0] | (1u << i);
+    }
   }
 
   /*
@@ -215,6 +234,7 @@ void GetAllFanSpeedsPWM(sGetSensorDataRespT *Response)
   u16 ReadBytes[3];
   u16 fanSpeed;
   int i;
+  int ret;
 
   // list of fan pages
   unsigned fanPages[5] = {LEFT_FRONT_FAN_PAGE, LEFT_MIDDLE_FAN_PAGE,
@@ -223,9 +243,13 @@ void GetAllFanSpeedsPWM(sGetSensorDataRespT *Response)
   // read the speed of each fan on the motherboard
   // append the data to the response packet
   for (i = 0; i<5; i++){
-    ReadFanSpeedPWM(ReadBytes, fanPages[i], true);
+    ret = ReadFanSpeedPWM(ReadBytes, fanPages[i], true);
     fanSpeed = (ReadBytes[0] + (ReadBytes[1] << 8));
     Response->uSensorData[i+5] = fanSpeed; // offset of 5 to account for previous sensor data
+    if (ret){
+      /* upon error - set error status bit */
+        Response->uStatusBits[0] = Response->uStatusBits[0] | (1u << (i+5));
+    }
   }
 
   /*
@@ -270,25 +294,28 @@ void GetAllFanSpeedsPWM(sGetSensorDataRespT *Response)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
+int ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 {
   u16 WriteBytes[3];
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = TempSensorPage;
 
   if (OpenSwitch)
   {
-    ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+    stat += ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
   }
 
   // request temperature read
-  WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // read temperature
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+
+  return stat;
 }
 //=================================================================================
 //  ReadVoltageMonTemperature
@@ -303,18 +330,20 @@ void ReadTemperature(u16 * ReadBytes, unsigned TempSensorPage, bool OpenSwitch)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadVoltageMonTemperature(u16 * ReadBytes, bool OpenSwitch)
+int ReadVoltageMonTemperature(u16 * ReadBytes, bool OpenSwitch)
 {
+  int stat = 0;
   if (OpenSwitch)
   {
-    ConfigureSwitch(MONITOR_SWITCH_SELECT);
+    stat += ConfigureSwitch(MONITOR_SWITCH_SELECT);
   }
 
   // read voltage monitor temperature
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
 
+  return stat;
 }
 ///=================================================================================
 //  ReadCurrentMonTemperature
@@ -329,17 +358,20 @@ void ReadVoltageMonTemperature(u16 * ReadBytes, bool OpenSwitch)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadCurrentMonTemperature(u16 * ReadBytes, bool OpenSwitch)
+int ReadCurrentMonTemperature(u16 * ReadBytes, bool OpenSwitch)
 {
+  int stat = 0;
   if (OpenSwitch)
   {
-    ConfigureSwitch(MONITOR_SWITCH_SELECT);
+    stat += ConfigureSwitch(MONITOR_SWITCH_SELECT);
   }
 
   // read current monitor temperature
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, READ_TEMPERATURE_1_CMD, ReadBytes, 2);
+
+  return stat;
 }
 //=================================================================================
 //  GetAllTempSensors
@@ -359,6 +391,7 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
   u16 ReadBytes[3];
   u16 temperature;
   int i;
+  int ret;
 
   unsigned TempSensorPages[6] = {INLET_TEMP_SENSOR_PAGE, OUTLET_TEMP_SENSOR_PAGE, FPGA_TEMP_DIODE_ADC_PAGE,
     FAN_CONT_TEMP_SENSOR_PAGE, VOLTAGE_MON_TEMP_SENSOR_PAGE,
@@ -367,22 +400,26 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 
   for (i = 0; i<6; i++){
     if(i == 0){
-      ReadTemperature(ReadBytes, TempSensorPages[i], true);
+      ret = ReadTemperature(ReadBytes, TempSensorPages[i], true);
     }
     else{
       if (TempSensorPages[i] == VOLTAGE_MON_TEMP_SENSOR_PAGE)
       {
-        ReadVoltageMonTemperature(ReadBytes, true);
+        ret = ReadVoltageMonTemperature(ReadBytes, true);
       }
       else if (TempSensorPages[i] == CURRENT_MON_TEMP_SENSOR_PAGE){
-        ReadCurrentMonTemperature(ReadBytes, false);
+        ret = ReadCurrentMonTemperature(ReadBytes, false);
       }
       else{
-        ReadTemperature(ReadBytes, TempSensorPages[i], false);
+        ret = ReadTemperature(ReadBytes, TempSensorPages[i], false);
       }
     }
     temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
     Response->uSensorData[i+10] = temperature; // offset of 10 to account for previous sensor data
+    if (ret){
+      /* upon error - set error status bit */
+      Response->uStatusBits[0] = Response->uStatusBits[0] | (1u << (i+10));
+    }
   }
 
   /*
@@ -432,31 +469,34 @@ void GetAllTempSensors(sGetSensorDataRespT *Response)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadVoltage(u16 * ReadBytes, unsigned Voltage, bool OpenSwitch)
+int ReadVoltage(u16 * ReadBytes, unsigned Voltage, bool OpenSwitch)
 {
   u16 WriteBytes[2];
   u16 VoltageScale;
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = Voltage; // select which voltage is to be read
 
   if (OpenSwitch)
   {
-    ConfigureSwitch(MONITOR_SWITCH_SELECT);
+    stat += ConfigureSwitch(MONITOR_SWITCH_SELECT);
   }
 
   // request voltage sensor read
-  WriteI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // first read the voltage scaling factor
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, VOUT_MODE_CMD, ReadBytes, 1);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, VOUT_MODE_CMD, ReadBytes, 1);
   VoltageScale = ReadBytes[0];
 
   // read the voltage
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_VMON_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
   ReadBytes[2] = VoltageScale;
+
+  return stat;
 }
 //=================================================================================
 //  Read3V3Voltage
@@ -471,26 +511,28 @@ void ReadVoltage(u16 * ReadBytes, unsigned Voltage, bool OpenSwitch)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void Read3V3Voltage(u16 * ReadBytes, bool OpenSwitch)
+int Read3V3Voltage(u16 * ReadBytes, bool OpenSwitch)
 {
   u16 WriteBytes[2];
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = PLUS3V3CONFIG02_ADC_PAGE; // select which voltage is to be read
 
   if (OpenSwitch)
   {
-    ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+    stat += ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
   }
 
   // request a voltage read
-  WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // read the voltage
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 
+  return stat;
 }
 //=================================================================================
 //  GetAllVoltages
@@ -511,6 +553,7 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
   u16 VoltageScaleFactor;
   u16 Voltage;
   int i;
+  int ret;
 
   unsigned VoltagePages[13] = {P12V2_VOLTAGE_MON_PAGE, P12V_VOLTAGE_MON_PAGE, P5V_VOLTAGE_MON_PAGE,
     P3V3_VOLTAGE_MON_PAGE, P2V5_VOLTAGE_MON_PAGE, P1V8_VOLTAGE_MON_PAGE, P1V2_VOLTAGE_MON_PAGE,
@@ -521,16 +564,16 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
   {
     if (i == 0)
     {
-      ReadVoltage(ReadBytes, VoltagePages[i], true);
+      ret = ReadVoltage(ReadBytes, VoltagePages[i], true);
     }
     else if (VoltagePages[i] == PLUS3V3CONFIG02_ADC_PAGE)
     {
-      Read3V3Voltage(ReadBytes, true);
+      ret = Read3V3Voltage(ReadBytes, true);
       ReadBytes[2] = 0; // dummy scale factor
     }
     else
     {
-      ReadVoltage(ReadBytes, VoltagePages[i], false);
+      ret = ReadVoltage(ReadBytes, VoltagePages[i], false);
     }
 
     Voltage = (ReadBytes[0] + (ReadBytes[1] << 8));
@@ -538,6 +581,10 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
     Response->uSensorData[(i*3)+16] = Voltage;
     Response->uSensorData[(i*3)+17] = VoltageScaleFactor;
     Response->uSensorData[(i*3)+18] = VoltagePages[i];
+    if (ret){
+      /* upon error - set error status bit */
+      Response->uStatusBits[1] = Response->uStatusBits[1] | (1u << i);
+    }
   }
 
   /*// 12V2 Voltage
@@ -667,31 +714,34 @@ void GetAllVoltages(sGetSensorDataRespT *Response)
 //
 //  Return
 //  ------
-//  None
+//  status
 //=================================================================================
-void ReadCurrent(u16 * ReadBytes, unsigned Current, bool OpenSwitch)
+int ReadCurrent(u16 * ReadBytes, unsigned Current, bool OpenSwitch)
 {
   u16 WriteBytes[2];
   u16 VoltageScale;
+  int stat = 0;
 
   WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
   WriteBytes[1] = Current; // select which voltage is to be read
 
   if (OpenSwitch)
   {
-    ConfigureSwitch(MONITOR_SWITCH_SELECT);
+    stat += ConfigureSwitch(MONITOR_SWITCH_SELECT);
   }
 
   // request voltage sensor read
-  WriteI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+  stat += WriteI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
   // first read the voltage scaling factor
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, VOUT_MODE_CMD, ReadBytes, 1);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, VOUT_MODE_CMD, ReadBytes, 1);
   VoltageScale = ReadBytes[0];
 
   // read the voltage
-  PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+  stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, UCD90120A_CMON_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
   ReadBytes[2] = VoltageScale;
+
+  return stat;
 }
 //=================================================================================
 //  GetAllCurrents
@@ -711,7 +761,8 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
   u16 ReadBytes[3];
   u16 ScaleFactor;
   u16 Current;
-  int i;
+  int i,j;
+  int ret;
 
   unsigned CurrentPages[12] = {P12V2_CURRENT_MON_PAGE, P12V_CURRENT_MON_PAGE, P5V_CURRENT_MON_PAGE,
     P3V3_CURRENT_MON_PAGE, P2V5_CURRENT_MON_PAGE, P1V8_CURRENT_MON_PAGE, P1V2_CURRENT_MON_PAGE,
@@ -722,11 +773,11 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
   {
     if (i == 0)
     {
-      ReadCurrent(ReadBytes, CurrentPages[i], true);
+      ret = ReadCurrent(ReadBytes, CurrentPages[i], true);
     }
     else
     {
-      ReadCurrent(ReadBytes, CurrentPages[i], false);
+      ret = ReadCurrent(ReadBytes, CurrentPages[i], false);
     }
 
     Current = (ReadBytes[0] + (ReadBytes[1] << 8));
@@ -734,6 +785,17 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
     Response->uSensorData[(i*3)+55] = Current;
     Response->uSensorData[(i*3)+56] = ScaleFactor;
     Response->uSensorData[(i*3)+57] = CurrentPages[i];
+
+    j = i + 13;
+
+    if (ret){
+      /* upon error - set error status bit */
+      if (j < 16) {
+        Response->uStatusBits[1] = Response->uStatusBits[1] | (1u << j);
+      } else {
+        Response->uStatusBits[2] = Response->uStatusBits[2] | (1u << (j-16));
+      }
+    }
   }
   /*
   // 12V2 Current
@@ -847,23 +909,24 @@ void GetAllCurrents(sGetSensorDataRespT *Response)
 //
 //	Return
 //	------
-//	None
+// 	status
 //=================================================================================
-void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch)
+int ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool OpenSwitch)
 {
 	u16 WriteBytes[3];
 	u16 Mez3WriteBytes[3];
+  int stat = 0;
 
 	WriteBytes[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
 	WriteBytes[1] = MezzaninePage;
 
 	if (OpenSwitch)
 	{
-		ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+		stat += ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
 	}
 
 	// request temperature read
-	WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
+	stat += WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, WriteBytes, 2);
 
 	// read mezzanine temperatures - QSFP card hardcoded to mezzanine 3
 	if (MezzaninePage == MEZZANINE_3_TEMP_ADC_PAGE)
@@ -872,18 +935,20 @@ void ReadMezzanineTemperature(u16 * ReadBytes, unsigned MezzaninePage, bool Open
 		Mez3WriteBytes[1] = 0x00;
 
 		// configure the QSFP to have it's temperature read
-		WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, Mez3WriteBytes, 2);
+		stat += WriteI2CBytes(MEZZANINE_3_I2C_BUS_ID, STM_I2C_DEVICE_ADDRESS, Mez3WriteBytes, 2);
 
 		//Delay(5000000);
-		
-		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+
+		stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 	}
 	// read mezzanine temperatures - HMC cards hardcoded to mezzanine 0, 1 and 2
 	if ((MezzaninePage == MEZZANINE_0_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_1_TEMP_ADC_PAGE) || (MezzaninePage == MEZZANINE_2_TEMP_ADC_PAGE))
 	{
-		PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
+		stat += PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, READ_VOUT_CMD, ReadBytes, 2);
 
 	}
+
+  return stat;
 }
 
 //=================================================================================
@@ -904,6 +969,7 @@ void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
 		u16 ReadBytes[3];
 		u16 temperature;
 		int i;
+    int ret;
 
 		unsigned MezzanineSensorPages[3] = {MEZZANINE_0_TEMP_ADC_PAGE,
 											MEZZANINE_1_TEMP_ADC_PAGE,
@@ -912,9 +978,14 @@ void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
 
 		for (i = 0; i<3; i++)
 		{
-			ReadMezzanineTemperature(ReadBytes, MezzanineSensorPages[i], true);			
+			ret = ReadMezzanineTemperature(ReadBytes, MezzanineSensorPages[i], true);
 			temperature = (ReadBytes[0] + (ReadBytes[1] << 8));
 			Response->uSensorData[i+91] = temperature; // offset of 91 to account for previous sensor data
+
+      if (ret){
+        /* upon error - set error status bit */
+        Response->uStatusBits[2] = Response->uStatusBits[2] | (1u << (i+9));
+      }
 		}
 }
 
@@ -931,14 +1002,14 @@ void GetAllMezzanineTempSensors(sGetSensorDataRespT *Response)
 //  ------
 //  None
 //=================================================================================
-void ConfigureSwitch(unsigned SwitchSelection){
+int ConfigureSwitch(unsigned SwitchSelection){
 
   u16 WriteBytes[1];
 
   WriteBytes[0] = SwitchSelection;
 
   // configure the PCA9546 I2C switch to the desired selection
-  WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, WriteBytes, 1);
+  return WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, WriteBytes, 1);
 }
 
 //=================================================================================
@@ -1058,9 +1129,7 @@ void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response)
 	u16 uWriteBytes[8];
   u16 uReadAddress[4];
 	int i;
-  int tmp;
-  int iStatus;
-  int uIndex;
+  int stat;
 
 	unsigned HMC_Mezzanine_Sites[3] = {HMC_Mezzanine_Site_1,
 									   HMC_Mezzanine_Site_2,
@@ -1081,24 +1150,31 @@ void GetAllHMCDieTemperatures(sGetSensorDataRespT *Response)
     /* Determine if the hmc cores have been compiled into the firmware */
     if (get_mezz_firmware_type(i) == MEZ_FIRMW_TYPE_HMC_R1000_0005){
 
-      iStatus = WriteI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uWriteBytes, 8);
+      stat = WriteI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uWriteBytes, 8);
 
       uReadAddress[0] = (HMC_Die_Temperature_Reg >> 24) & 0xff;
       uReadAddress[1] = (HMC_Die_Temperature_Reg >> 16) & 0xff;
       uReadAddress[2] = (HMC_Die_Temperature_Reg >>  8) & 0xff;
       uReadAddress[3] = (HMC_Die_Temperature_Reg      ) & 0xff;
 
-      tmp = HMCReadI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uReadAddress, ReadBytes);
+      stat += HMCReadI2CBytes(HMC_Mezzanine_Sites[i], HMC_I2C_Address, uReadAddress, ReadBytes);
 
       Response->uSensorData[(i*4)+94] = ReadBytes[0]; // offset of 94 to account for previous sensor data
       Response->uSensorData[(i*4)+95] = ReadBytes[1];
       Response->uSensorData[(i*4)+96] = ReadBytes[2];
       Response->uSensorData[(i*4)+97] = ReadBytes[3];
+
+      if (stat){
+        Response->uStatusBits[2] = Response->uStatusBits[2] | (1u << (i+13));
+      }
     } else {
       Response->uSensorData[(i*4)+94] = 0xff; // offset of 94 to account for previous sensor data
       Response->uSensorData[(i*4)+95] = 0xee;
       Response->uSensorData[(i*4)+96] = 0xdd;
       Response->uSensorData[(i*4)+97] = 0xcc;
+
+      /* should we set error bits for hmc's not present? */
+      Response->uStatusBits[2] = Response->uStatusBits[2] | (1u << (i+13));
 
     }
   }
