@@ -803,12 +803,19 @@ int main()
   if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n"\
                                  "[Memory Test] expected value {@0x%08x}: 0x%08x\r\n"\
-                                 "[Memory Test] computed value              : 0x%08x\r\n"\
-                                 "[Memory Test] %s\r\n",\
+                                 "[Memory Test] computed value              : 0x%08x\r\n",\
                                  0x50, &_text_section_end_, &_location_checksum_,\
-                                 _location_checksum_, uMemTest,\
-                                 (uMemTest == _location_checksum_) ? "***PASSED***" : "***FAILED***");
-    /* TODO: do not allow failure to go unnoticed - perhaps Assert()! */
+                                 _location_checksum_, uMemTest);
+    /* do not allow failure to go unnoticed - Assert()! */
+    if (uMemTest != _location_checksum_){
+      while(1){
+        /* enter endless printout loop in order to debug with serial console */
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS,  "[Memory Test] ***FAILED*** expect: 0x%08x compute: 0x%08x\r\n", _location_checksum_, uMemTest);
+        Delay(1000000);
+      }
+    } else {
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] ***PASSED***\r\n");
+    }
   } else {
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] Error - could not execute\r\n");
   }
