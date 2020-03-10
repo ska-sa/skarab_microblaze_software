@@ -755,7 +755,15 @@ static int cli_whoami_exe(struct cli *_cli){
 static int cli_uname_exe(struct cli *_cli){
   char *v = (char *) GetVersionInfo();
 
-  xil_printf("%s\r\n", v);
+  xil_printf("%s ", v);
+
+  if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+    xil_printf("toolflow");
+  } else {
+    xil_printf("bsp");
+  }
+
+  xil_printf("\r\n");
 
   return 0;
 }
