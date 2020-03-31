@@ -634,8 +634,8 @@ void if_enumerate_interfaces(void){
    * octet/hostname of the interface will not be the same
    */
 
-  //reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
-  reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
+  reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
+  //reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
 
   /* check which cores are present... */
 
