@@ -11,6 +11,7 @@
 #include "scratchpad.h"
 #include "id.h"
 #include "time.h"
+#include "flash_sdram_controller.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -28,7 +29,7 @@ struct cli{
   unsigned int index;
   char curr_char;
   unsigned int cmd_id;
-  unsigned int curr_index; 
+  unsigned int curr_index;
   unsigned int opt_id;
   CLI_STATE state;
   unsigned int run_again;    /* used to run the state machine again interneally before
@@ -42,6 +43,7 @@ typedef enum {
   CMD_INDEX_TEST_TIMER,
   CMD_INDEX_GET_CONFIG,
   CMD_INDEX_RESET_FW,
+  CMD_INDEX_REBOOT_FPGA,
   CMD_INDEX_STATS,
   CMD_INDEX_WHOAMI,
   CMD_INDEX_UNAME,
@@ -60,6 +62,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_GET_CONFIG]  = "get-config",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
+  [CMD_INDEX_REBOOT_FPGA] = "reboot-fpga",
   [CMD_INDEX_STATS]       = "stats",
   [CMD_INDEX_WHOAMI]      = "whoami",
   [CMD_INDEX_UNAME]       = "uname",
@@ -76,6 +79,7 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
+ [CMD_INDEX_REBOOT_FPGA]  = { "",       "flash",  "sdram"},
  [CMD_INDEX_STATS]        = { NULL },
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
@@ -91,6 +95,7 @@ static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
+static int cli_reboot_fpga_exe(struct cli *_cli);
 static int cli_stats_exe(struct cli *_cli);
 static int cli_whoami_exe(struct cli *_cli);
 static int cli_uname_exe(struct cli *_cli);
@@ -105,6 +110,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
+ [CMD_INDEX_REBOOT_FPGA]  = cli_reboot_fpga_exe,
  [CMD_INDEX_STATS]        = cli_stats_exe,
  [CMD_INDEX_WHOAMI]       = cli_whoami_exe,
  [CMD_INDEX_UNAME]        = cli_uname_exe,
@@ -875,6 +881,37 @@ static int cli_dump_exe(struct cli *_cli){
   return 0;
 }
 
+#define CLI_RBT_NOARG 0
+#define CLI_RBT_FLASH 1
+#define CLI_RBT_SDRAM 2
+
+static int cli_reboot_fpga_exe(struct cli *_cli){
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+
+  switch(_cli->opt_id){
+    case CLI_RBT_NOARG:
+      xil_printf("rebooting from previous location\r\n");
+      sudo_reboot_now_from_last_location();
+      break;
+
+    case CLI_RBT_FLASH:
+      xil_printf("rebooting from flash\r\n");
+      sudo_reboot_now_from_flash_location();
+      break;
+
+    case CLI_RBT_SDRAM:
+      xil_printf("rebooting from sdram\r\n");
+      sudo_reboot_now_from_sdram_location();
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
 
 #if 0
 static const char * const cmd_map[][12] = {

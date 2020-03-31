@@ -779,6 +779,10 @@ int main()
 
   u8 post_scale = 0;
 
+  /* need to cache the current reconfiguration location for later use - e.g. when issuing reboot from last location cmd
+   * this read has to happen early in the boot seq before the value is cleared in firmware */
+  u32 uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_CONFIG_IO_REG_ADDRESS);
+
   /*
    * Initialize the uart driver
    */
@@ -796,6 +800,25 @@ int main()
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "UART [..] Initialized successfully!\r\n");
     }
   }
+
+  /* print only after the uart initialized */
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] C_CONFIG_IO_REG = 0x%08x\r\n", uReg);
+
+  FinishedBootingFromSdram();
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Waiting 2s...\r\n");
+  Delay(2000000);
+
+  ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
+  if (ReceivedCount){
+    while (1){
+      ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
+      if (ReceivedCount){
+        cli_sm(RecvBuffer);
+      }
+    }
+  }
+
 
   /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
@@ -867,7 +890,6 @@ int main()
   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
   microblaze_enable_exceptions();
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "[DONE]\r\n");
-  FinishedBootingFromSdram();
 
   // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
   UpdateGBEPHYConfiguration();
@@ -1363,6 +1385,30 @@ int main()
   iStatus = log_time_sync_devices();
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "TIME [..] {%s} sync monitoring run time counters\r\n", XST_SUCCESS == iStatus ? "OK" : "FAIL");
 
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+
+  if ((aux_flags & 0x2) == 0){  /* if write protection bit is not set - then this code section can write to it */
+    if (uReg & 0x40){
+      aux_flags = aux_flags | 0x3;   /* set the location bit for sdram and the protection bit*/
+      xil_printf("set sdram prev loc %d\r\n", aux_flags);
+    } else {
+      aux_flags = aux_flags & 0xE;   /* clear the bit - booted from flash */
+      aux_flags = aux_flags | 0x2;   /* and set the protection bit */
+      xil_printf("set flash prev loc\r\n");
+    }
+  } /* else do nothing - this bringup was probably caused by
+       a reset of some sort (register, wdt, etc.) and in this
+       case the FLASH_SDRAM_CONFIG_IO_REG_ADDRESS register
+       will not truly reflect where the previous reconfigure
+       was from.
+     */
+  PersistentMemory_WriteByte(AUX_SKARAB_FLAGS_INDEX, aux_flags);
+#if 0
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+#endif
 
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
