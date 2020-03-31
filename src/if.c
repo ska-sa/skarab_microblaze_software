@@ -595,10 +595,93 @@ void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c){
   }
 }
 
+#define MOCK_C_RD_ETH_IF_LINK_UP_ADDR 0x60
+
+static u8 runtime_num_interfaces = 0;
+
 u8 get_num_interfaces(void){
-  u8 n = NUM_ETHERNET_INTERFACES;
-  return n;
+  return runtime_num_interfaces;
 }
+
+
+/* we need an array of interfaces that staores the physical id in a logically indexed array */
+
+static u8 logical_interface_set[NUM_ETHERNET_INTERFACES];
+
+u8 get_interface_id(u8 logical_if_id){
+  /* TODO: assert sane logical_if_id */
+  return logical_interface_set[logical_if_id];
+}
+
+
+void if_enumerate_interfaces(void){
+  u32 reg;
+  u8 n = 0;   /*
+               * this n is essentially a count of the number of
+               * interfaces present at runtime. It is also used
+               * to keep track of the index into the array of
+               * memory offsets during enumeration i.e.
+               * the
+               * interface id
+               */
+
+  /*
+   * NOTE: we enumerate the interfaces in such a way that we
+   * have a contiguous list of interfaces(id's) regardless of whether
+   * the hardware/firmware implementation is not contiguous
+   * TODO: should we maintain the current interface mac
+   * assigning wrt the last octet??? - if so the id and last mac
+   * octet/hostname of the interface will not be the same
+   */
+
+  //reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
+  reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
+
+  /* check which cores are present... */
+
+  if (reg & 0x20){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0\r\n", n);
+    //SetAddressOffset(n, ONE_GBE_MAC_ADDR);
+    logical_interface_set[n] = 0;
+    n++;
+  }
+
+  if (reg & 0x40){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1\r\n", n);
+    //SetAddressOffset(n, FORTY_GBE_MAC_0_ADDR);
+    logical_interface_set[n] = 1;
+    n++;
+  }
+
+  if (reg & 0x80){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2\r\n", n);
+    //SetAddressOffset(n, FORTY_GBE_MAC_1_ADDR);
+    logical_interface_set[n] = 2;
+    n++;
+  }
+
+  if (reg & 0x100){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3\r\n", n);
+    //SetAddressOffset(n, FORTY_GBE_MAC_2_ADDR);
+    logical_interface_set[n] = 3;
+    n++;
+  }
+
+  if (reg & 0x200){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4\r\n", n);
+    //SetAddressOffset(n, FORTY_GBE_MAC_3_ADDR);
+    logical_interface_set[n] = 4;
+    n++;
+  }
+
+  /* probably more elegant to shift bits out and test ... TODO */
+
+
+  /* TODO: assert(n < NUM_ETHERNET_INTERFACE) */
+
+  runtime_num_interfaces = n;
+}
+
 
 /* hide the interface state handles */
 struct sIFObject *lookup_if_handle_by_id(u8 id){

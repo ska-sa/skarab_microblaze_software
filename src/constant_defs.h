@@ -29,15 +29,8 @@ extern "C" {
 
 // GLOBAL VARIABLES
 
-//#define SKARAB_BSP
-
-#ifdef SKARAB_BSP
-#define NUM_ETHERNET_INTERFACES     0x1
-#define DO_1GBE_LOOPBACK_TEST
-#else
-#define NUM_ETHERNET_INTERFACES     0x2//AI: Single 40GbE Core 0x5
+#define NUM_ETHERNET_INTERFACES     5u//AI: Single 40GbE Core 0x5
 //#define DO_1GBE_LOOPBACK_TEST
-#endif
 
 //DEFINE INTERFACE NAMES
 
@@ -170,11 +163,18 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define DSP_REGISTER_ADDR       0x00070000
 #else
 /* adjusted wishbone slave address map - provision for "jumbo" ethernet support */
+#if 0
 #define FORTY_GBE_MAC_0_ADDR    0x00054000
 #define FORTY_GBE_MAC_1_ADDR    0x00060000
 #define FORTY_GBE_MAC_2_ADDR    0x0006C000
 #define FORTY_GBE_MAC_3_ADDR    0x00078000
 #define DSP_REGISTER_ADDR       0x00084000
+#endif
+#define FORTY_GBE_MAC_0_ADDR    0x84000
+#define FORTY_GBE_MAC_1_ADDR    0x9A000
+#define FORTY_GBE_MAC_2_ADDR    0xB0000
+#define FORTY_GBE_MAC_3_ADDR    0xC6000
+#define DSP_REGISTER_ADDR       0x84000
 #endif
 
 /*#define DUAL_PORT_RAM_ADDR      0x00000

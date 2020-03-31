@@ -951,6 +951,8 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   sSdramReconfigureRespT *Response = (sSdramReconfigureRespT *) uResponsePacketPtr;
   u32 uReg;
   u8 uIndex;
+  u8 num_links;
+  u8 link;
   u32 uContinuityData;
   u32 uMuxSelect = 0;
 
@@ -1002,16 +1004,9 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-#endif
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group.\r\n", uIndex);
       }
@@ -1041,16 +1036,9 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-#endif
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }

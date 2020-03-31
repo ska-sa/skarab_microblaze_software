@@ -112,7 +112,10 @@ struct sIFObject{
 
 struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
 
+void if_enumerate_interfaces(void);
 u8 get_num_interfaces(void);
+u8 get_interface_id(u8 logical_if_id);
+
 struct sIFObject *lookup_if_handle_by_id(u8 id);
 
 void IFConfig(struct sIFObject *pIFObjectPtr, u32 ip, u32 mask);
