@@ -163,13 +163,6 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define DSP_REGISTER_ADDR       0x00070000
 #else
 /* adjusted wishbone slave address map - provision for "jumbo" ethernet support */
-#if 0
-#define FORTY_GBE_MAC_0_ADDR    0x00054000
-#define FORTY_GBE_MAC_1_ADDR    0x00060000
-#define FORTY_GBE_MAC_2_ADDR    0x0006C000
-#define FORTY_GBE_MAC_3_ADDR    0x00078000
-#define DSP_REGISTER_ADDR       0x00084000
-#endif
 #define FORTY_GBE_MAC_0_ADDR    0x84000
 #define FORTY_GBE_MAC_1_ADDR    0x9A000
 #define FORTY_GBE_MAC_2_ADDR    0xB0000

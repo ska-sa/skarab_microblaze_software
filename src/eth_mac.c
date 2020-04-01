@@ -130,9 +130,13 @@ void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddre
 {
   u32 uAddressOffset = GetAddressOffset(uId);
 
+  /* write out the mac offset here since this is generally the first operation performed on mac */
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] base @ 0x%08x, mac offset @ 0x%08x \r\n", uId, XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR, uAddressOffset);
+
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_UPPER_16), uMACAddressUpper16Bits);
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_LOWER_32), uMACAddressLower32Bits);
 
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] set mac address [ok]\r\n", uId);
 }
 
 //=================================================================================
