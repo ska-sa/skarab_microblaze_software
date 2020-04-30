@@ -43,6 +43,7 @@
 #include "fault_log.h"
 #include "igmp.h"
 #include "time.h"
+#include "error.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -675,6 +676,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   u32 uAddress;
   u32 uWriteData;
   u8 uPaddingIndex;
+  u8 errno = 0;
 
   if (uCommandLength < sizeof(sWriteWishboneReqT))
     return XST_FAILURE;
@@ -685,7 +687,17 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "wb wr data 0x%08x @ 0x%08x\r\n", uWriteData, uAddress);
 
   // Execute the command
-  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);
+  /*Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);*/
+  WriteWishboneRegister(uAddress, uWriteData);
+  /* check if an axi data bus exception was raised */
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    Response->uErrorStatus = 1;
+  } else {
+    Response->uErrorStatus = 0;
+  }
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -694,7 +706,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   Response->uWriteDataHigh = Command->uWriteDataHigh;
   Response->uWriteDataLow = Command->uWriteDataLow;
 
-  for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
+  for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
 
   *uResponseLength = sizeof(sWriteWishboneRespT);
@@ -725,6 +737,7 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   u32 uAddress;
   u32 uReadData;
   u8 uPaddingIndex;
+  u8 errno = 0;
 
   if (uCommandLength < sizeof(sReadWishboneReqT))
     return XST_FAILURE;
@@ -732,7 +745,17 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   uAddress = (Command->uAddressHigh << 16) | (Command->uAddressLow);
 
   // Execute the command
-  uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress);
+  /* uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress); */
+  uReadData = ReadWishboneRegister(uAddress);
+  /* check if an axi data bus exception was raised */
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    Response->uErrorStatus = 1;
+  } else {
+    Response->uErrorStatus = 0;
+  }
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -741,7 +764,7 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   Response->uReadDataHigh = (uReadData >> 16) & 0xFFFF;
   Response->uReadDataLow = uReadData & 0xFFFF;
 
-  for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
+  for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
 
   *uResponseLength = sizeof(sReadWishboneRespT);

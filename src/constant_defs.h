@@ -610,7 +610,12 @@ typedef struct sWriteWishboneResp {
     u16       uAddressLow;
     u16       uWriteDataHigh;
     u16       uWriteDataLow;
-    u16       uPadding[5];
+    u16       uErrorStatus;     /* '0' = success, '1' = error i.e. out-of-range wishbone addr. This convention used
+                                   since we have repurposed one of the padding bytes to serve as an error signal. A zero
+                                   is returned as a 'success' in order to maintain backward compatibility, thus if a
+                                   newer version of casperfpga interacts with an older microblaze, a zero would be
+                                   returned and not block successful transactions. */
+    u16       uPadding[4];
 } sWriteWishboneRespT;
 
 typedef struct sReadWishboneReq {
@@ -625,7 +630,12 @@ typedef struct sReadWishboneResp {
     u16       uAddressLow;
     u16       uReadDataHigh;
     u16       uReadDataLow;
-    u16       uPadding[5];
+    u16       uErrorStatus;     /* '0' = success, '1' = error i.e. out-of-range wishbone addr. This convention used
+                                   since we have repurposed one of the padding bytes to serve as an error signal. A zero
+                                   is returned as a 'success' in order to maintain backward compatibility, thus if a
+                                   newer version of casperfpga interacts with an older microblaze, a zero would be
+                                   returned and not block successful transactions. */
+    u16       uPadding[4];
 } sReadWishboneRespT;
 
 #define MAX_I2C_WRITE_BYTES 33

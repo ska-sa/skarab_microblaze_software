@@ -241,7 +241,12 @@ typedef struct sBigWriteWishboneResp {
     u16       uStartAddressHigh;
     u16       uStartAddressLow;
     u16       uNumberOfWritesDone;
-    u16       uPadding[6];
+    u16       uErrorStatus;     /* '0' = success, '1' = error i.e. out-of-range wishbone addr. This convention used
+                                   since we have repurposed one of the padding bytes to serve as an error signal. A zero
+                                   is returned as a 'success' in order to maintain backward compatibility, thus if a
+                                   newer version of casperfpga interacts with an older microblaze, a zero would be
+                                   returned and not block successful transactions. */
+    u16       uPadding[5];
 } sBigWriteWishboneRespT;
 
 typedef struct sBigReadWishboneReq {
@@ -251,11 +256,12 @@ typedef struct sBigReadWishboneReq {
     u16       uNumberOfReads;
 } sBigReadWishboneReqT;
 
+#define BIG_WB_ERROR_MAGIC  0xABCDu      /* must be larger than 994 */
 typedef struct sBigReadWishboneResp {
   sCommandHeaderT Header;
     u16       uStartAddressHigh;
     u16       uStartAddressLow;
-    u16       uNumberOfReads;
+    u16       uNumberOfReads;     /* upon a wishbone bus error, set to magic number 0xABCD */
     u16       uReadData[994];
 } sBigReadWishboneRespT;
 
