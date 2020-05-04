@@ -211,6 +211,7 @@ int fanctrlr_set_lut_points(u16 *setpoints){
   /* pwm values at indices 0,2,4,6... => check pwm0 < pwm1 < pwm2 < ... < pwm7 */
   for (i = 2; i < 16; i+=2){
     if (setpoints[i] < setpoints[i-2]){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] pwm setpoint %d fails monotonicity\r\n", i);
       return XST_FAILURE;
     }
   }
@@ -218,6 +219,7 @@ int fanctrlr_set_lut_points(u16 *setpoints){
   /* temperature values at indices 1,3,5,7... => check temp0 < temp1 < temp2 < ... < temp7 */
   for (i = 3; i < 16; i+=2){
     if (setpoints[i] < setpoints[i-2]){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] temperature setpoint %d fails monotonicity\r\n", i);
       return XST_FAILURE;
     }
   }
