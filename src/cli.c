@@ -14,6 +14,14 @@
 
 #define LINE_BYTES_MAX 20
 
+extern int _stack;
+extern int _stack_end;
+extern int _STACK_SIZE;
+
+extern int _heap;
+extern int _heap_end;
+extern int _HEAP_SIZE;
+
 /* internal state */
 struct cli{
   char buffer[LINE_BYTES_MAX + 1];    /* extra one for '\0' */
@@ -38,6 +46,7 @@ typedef enum {
   CMD_INDEX_WHOAMI,
   CMD_INDEX_UNAME,
   CMD_INDEX_UPTIME,
+  CMD_INDEX_DUMP,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -54,7 +63,8 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_STATS]       = "stats",
   [CMD_INDEX_WHOAMI]      = "whoami",
   [CMD_INDEX_UNAME]       = "uname",
-  [CMD_INDEX_UPTIME]       ="uptime",
+  [CMD_INDEX_UPTIME]      = "uptime",
+  [CMD_INDEX_DUMP]        = "dump",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -70,6 +80,7 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
+ [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -84,6 +95,7 @@ static int cli_stats_exe(struct cli *_cli);
 static int cli_whoami_exe(struct cli *_cli);
 static int cli_uname_exe(struct cli *_cli);
 static int cli_uptime_exe(struct cli *_cli);
+static int cli_dump_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -97,6 +109,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_WHOAMI]       = cli_whoami_exe,
  [CMD_INDEX_UNAME]        = cli_uname_exe,
  [CMD_INDEX_UPTIME]       = cli_uptime_exe,
+ [CMD_INDEX_DUMP]         = cli_dump_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -755,7 +768,15 @@ static int cli_whoami_exe(struct cli *_cli){
 static int cli_uname_exe(struct cli *_cli){
   char *v = (char *) GetVersionInfo();
 
-  xil_printf("%s\r\n", v);
+  xil_printf("%s ", v);
+
+  if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+    xil_printf("toolflow");
+  } else {
+    xil_printf("bsp");
+  }
+
+  xil_printf("\r\n");
 
   return 0;
 }
@@ -772,6 +793,85 @@ static int cli_uptime_exe(struct cli *_cli){
 
 static int cli_help_exe(struct cli *_cli){
   cli_print_help();
+  return 0;
+}
+
+#define STACK 0
+#define HEAP  1
+#define TEXT  2
+
+static void aux_cli_print_mem_region_bytes(const u8 * const start_addr, const unsigned int size){
+  u8 *ptr = NULL;
+  int i=0;
+
+  for (ptr = (u8 *) start_addr; ptr < ((u8 *) start_addr + size ); ptr++){
+
+#if 0
+    eol = ((i % 4) == 0) ? "\r\n" : " ";
+    xil_printf("%p %02x%s", ptr, *ptr, eol);
+#else
+    if ((i == 0) || ((i % 4) == 0)){
+      xil_printf("\r\n0x%p ", ptr);
+    } else {
+      xil_printf(" ");
+    }
+    xil_printf("%02x", *ptr);
+#endif
+
+#if 0
+    if ((i % 4) == 0) {
+      xil_printf("\r\n");
+    }
+#endif
+    i++;
+  }
+
+  xil_printf("\r\n");
+}
+
+
+static int cli_dump_exe(struct cli *_cli){
+
+  /* WARNING: this function dumps a block of memory to the serial console,
+   * which is a relatively slow operation. The block size needs to be kept
+   * relatively compact since this loop will not kick the wdt. (TODO FIXME)
+   */
+
+  /* the stack grows upward so the end of the stack is at a lower mem
+   * address and the start of the stack is at a higher mem location
+   */
+
+  int *mem_start;
+  //int *mem_end;
+  unsigned int size;
+  //char *eol;
+
+  switch(_cli->opt_id){
+    case STACK:
+      mem_start = (int *) &_stack_end;
+      //mem_end = (int *) &_stack;
+      size = (unsigned int) &_STACK_SIZE;
+
+      //xil_printf("@%p @%p %ub\r\n", mem_start, mem_end, size);
+
+      aux_cli_print_mem_region_bytes((u8 *) mem_start, size);
+
+      break;
+
+    case HEAP:
+      aux_cli_print_mem_region_bytes((u8 *) &_heap, (unsigned int) &_HEAP_SIZE);
+      break;
+
+#if 0
+    case TEXT:
+      /* TODO */
+      break;
+#endif
+
+    default:
+      break;
+  }
+
   return 0;
 }
 

@@ -107,3 +107,41 @@ u32 ReadDSPRegister(u32 uReadAddress)
   return (Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + DSP_REGISTER_ADDR + uReadAddress));
 
 }
+
+//=================================================================================
+//  ReadWishboneRegister
+//--------------------------------------------------------------------------------
+//  This method reads a Wishbone register.
+//
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uReadAddress  IN  Register to read from
+//
+//  Return
+//  ------
+//  32-bit Data read
+//=================================================================================
+u32 ReadWishboneRegister(u32 uReadAddress)
+{
+  return ( Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uReadAddress) );
+}
+
+
+//=================================================================================
+//  WriteWishboneRegister
+//--------------------------------------------------------------------------------
+//  This method writes a Wishbone register.
+//
+//  Parameter Dir   Description
+//  --------- ---   -----------
+//  uWriteAddress IN  Register to write to
+//  uWriteData    IN  Data to write
+//
+//  Return
+//  ------
+//  None
+//=================================================================================
+void WriteWishboneRegister(u32 uWriteAddress, u32 uWriteData)
+{
+  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uWriteAddress,uWriteData);
+}

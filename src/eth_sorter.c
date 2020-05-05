@@ -43,6 +43,8 @@
 #include "fault_log.h"
 #include "igmp.h"
 #include "time.h"
+#include "fanctrl.h"
+#include "error.h"
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -301,6 +303,8 @@ static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int FPGAFanControllerUpdateHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int GetFPGAFanControllerLUTHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
 //=================================================================================
 //  CommandSorter
@@ -408,6 +412,10 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
       return(GetDHCPMonitorTimeout(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_MICROBLAZE_UPTIME)
       return(GetMicroblazeUptime(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == FPGA_FANCONTROLLER_UPDATE)
+      return(FPGAFanControllerUpdateHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+    else if (Command->uCommandType == GET_FPGA_FANCONTROLLER_LUT)
+      return(GetFPGAFanControllerLUTHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else{
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Invalid Opcode Detected!\r\n");
       return(InvalidOpcodeHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
@@ -675,6 +683,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   u32 uAddress;
   u32 uWriteData;
   u8 uPaddingIndex;
+  u8 errno = 0;
 
   if (uCommandLength < sizeof(sWriteWishboneReqT))
     return XST_FAILURE;
@@ -685,7 +694,17 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "wb wr data 0x%08x @ 0x%08x\r\n", uWriteData, uAddress);
 
   // Execute the command
-  Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);
+  /*Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress,uWriteData);*/
+  WriteWishboneRegister(uAddress, uWriteData);
+  /* check if an axi data bus exception was raised */
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    Response->uErrorStatus = 1;
+  } else {
+    Response->uErrorStatus = 0;
+  }
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -694,7 +713,7 @@ int WriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespons
   Response->uWriteDataHigh = Command->uWriteDataHigh;
   Response->uWriteDataLow = Command->uWriteDataLow;
 
-  for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
+  for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
 
   *uResponseLength = sizeof(sWriteWishboneRespT);
@@ -725,6 +744,7 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   u32 uAddress;
   u32 uReadData;
   u8 uPaddingIndex;
+  u8 errno = 0;
 
   if (uCommandLength < sizeof(sReadWishboneReqT))
     return XST_FAILURE;
@@ -732,7 +752,17 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   uAddress = (Command->uAddressHigh << 16) | (Command->uAddressLow);
 
   // Execute the command
-  uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress);
+  /* uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress); */
+  uReadData = ReadWishboneRegister(uAddress);
+  /* check if an axi data bus exception was raised */
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    Response->uErrorStatus = 1;
+  } else {
+    Response->uErrorStatus = 0;
+  }
 
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
@@ -741,7 +771,7 @@ int ReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   Response->uReadDataHigh = (uReadData >> 16) & 0xFFFF;
   Response->uReadDataLow = uReadData & 0xFFFF;
 
-  for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
+  for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
 
   *uResponseLength = sizeof(sReadWishboneRespT);
@@ -3232,5 +3262,165 @@ static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponse
   Response->uMicroblazeUptimeHigh = (uptime >> 16) & 0xffff;
   Response->uMicroblazeUptimeLow = (uptime & 0xffff);
 
+  return XST_SUCCESS;
+}
+
+
+/*
+  En    Upd   Wr
+  0      0    0     No fan control operation but does restore the default values
+  1      0    0     Invalid choice - cannot enable fan control without setting setpoints. This is to ensure valid
+                    control setpoints
+  1      1    0     Set the setpoints and enable fan control
+  0      1    0     Only set the setpoints, leave other setting unchanged
+  x      x    1     Write the current settings to FLASH
+
+*/
+
+static int FPGAFanControllerUpdateHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  int status;
+  u8 uPaddingIndex;
+
+  sFPGAFanControllerUpdateReqT *Command = (sFPGAFanControllerUpdateReqT *) pCommand;
+  sFPGAFanControllerUpdateRespT *Response = (sFPGAFanControllerUpdateRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sFPGAFanControllerUpdateReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sFPGAFanControllerUpdateRespT);
+
+  for (uPaddingIndex = 0; uPaddingIndex < 8; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  /* interlock - ensure that the setpoints are being set when we're enabling fan control */
+  /* NOTE: this does not safeguard us against invalid setpoints - this is a TODO in
+           the fanctrlr_set_lut_points() function - but it at least makes the user
+           aware of the dependency if the flag has not been set */
+  /* ie you can set setpoints without enabling, but not other way round */
+  if ((1 == Command->uEnableFanControl) && (Command->uUpdateSetpoints != 1 )){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] cannot enable fan control without setting setpoints\r\n");
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field will flag the error */
+  }
+
+  status = fanctrlr_configure_mux_switch();
+  if (XST_FAILURE == status){
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field will flag the error */
+  }
+
+  status = fanctrlr_restore_defaults();
+  if (XST_FAILURE == status){
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field will flag the error */
+  }
+
+
+  if (1 == Command->uUpdateSetpoints){
+    status = fanctrlr_set_lut_points(Command->uSetpoints);
+    if (XST_FAILURE == status){
+      goto failure;
+    }
+  }
+
+
+  if (1 == Command->uEnableFanControl){
+    status = fanctrlr_setup_registers();
+    if (XST_FAILURE == status){
+      goto failure;
+    }
+
+
+    status = fanctrlr_enable_auto_fan_control();
+    if (XST_FAILURE == status){
+      goto failure;
+    }
+  }
+
+
+  if (1 == Command->uWriteToFlash){
+    status = fanctrlr_store_defaults_to_flash();
+    if (XST_FAILURE == status){
+      goto failure;
+    }
+  }
+
+  /* status: send 0 for success, >=1 for error */
+  Response->uError = 0;
+  return XST_SUCCESS;
+
+failure:
+  /* try to restore defaults */
+  fanctrlr_restore_defaults();
+  Response->uError = 1;
+  return XST_SUCCESS;   /* return success in order for calling function
+                           to send reply - uError field (>=1) will flag
+                           the error */
+}
+
+
+
+
+static int GetFPGAFanControllerLUTHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u8 uPaddingIndex;
+  u16 *lut_ptr = NULL;
+  int i;
+  int status;
+
+  sGetFPGAFanControllerLUTReqT *Command = (sGetFPGAFanControllerLUTReqT *) pCommand;
+  sGetFPGAFanControllerLUTRespT *Response = (sGetFPGAFanControllerLUTRespT *) uResponsePacketPtr;
+
+  if (uCommandLength < sizeof(sGetFPGAFanControllerLUTReqT)){
+    return XST_FAILURE;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  *uResponseLength = sizeof(sGetFPGAFanControllerLUTRespT);
+
+  for (uPaddingIndex = 0; uPaddingIndex < 4; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+
+  status = fanctrlr_configure_mux_switch();
+  if (XST_FAILURE == status){
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field will flag the error */
+  }
+
+
+  status = fanctrlr_restore_defaults();
+  if (XST_FAILURE == status){
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field will flag the error */
+  }
+
+
+  lut_ptr = fanctrlr_get_lut_points();
+  if (NULL == lut_ptr){
+    Response->uError = 1;
+    return XST_SUCCESS;   /* return success in order for calling function
+                             to send reply - uError field (>=1) will flag
+                             the error */
+  }
+
+  /* copy into response payload */
+  for (i=0; i<16; i++){
+    Response->uSetpointData[i] = lut_ptr[i];
+  }
+
+  Response->uError = 0;
   return XST_SUCCESS;
 }

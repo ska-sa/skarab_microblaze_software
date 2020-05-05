@@ -34,6 +34,8 @@ u32 ReadBoardRegister(u32 uReadAddress);
 void WriteDSPRegister(u32 uWriteAddress, u32 uWriteData);
 u32 ReadDSPRegister(u32 uReadAddress);
 
+u32 ReadWishboneRegister(u32 uReadAddress);
+void WriteWishboneRegister(u32 uWriteAddress, u32 uWriteData);
 #ifdef __cplusplus
 }
 #endif
