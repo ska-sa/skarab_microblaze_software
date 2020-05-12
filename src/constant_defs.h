@@ -152,7 +152,7 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define I2C_2_ADDR          0x00030000
 #define I2C_3_ADDR          0x00038000
 #define I2C_4_ADDR          0x00040000
-#define ONE_GBE_MAC_ADDR      0x00048000
+/* #define ONE_GBE_MAC_ADDR      0x00048000 */
 
 #ifdef WISHBONE_LEGACY_MAP
 /* original/legacy wishbone slave map */
@@ -163,10 +163,15 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define DSP_REGISTER_ADDR       0x00070000
 #else
 /* adjusted wishbone slave address map - provision for "jumbo" ethernet support */
-#define FORTY_GBE_MAC_0_ADDR    0x84000
-#define FORTY_GBE_MAC_1_ADDR    0x9A000
-#define FORTY_GBE_MAC_2_ADDR    0xB0000
-#define FORTY_GBE_MAC_3_ADDR    0xC6000
+/* These offsets are calculated as follows in firmware (each core aloocated 0x16000 of address space):
+ * core index x 0x16000 + dsp-offset of 0x84000
+ * Note : 1gbe = core number 5 with index 4
+ */
+#define FORTY_GBE_MAC_0_ADDR    0x84000     /* 0x84000 + (0 x 0x16000) */
+#define FORTY_GBE_MAC_1_ADDR    0x9A000     /* 0x84000 + (1 x 0x16000) */
+#define FORTY_GBE_MAC_2_ADDR    0xB0000     /* 0x84000 + (2 x 0x16000) */
+#define FORTY_GBE_MAC_3_ADDR    0xC6000     /* 0x84000 + (3 x 0x16000) */
+#define ONE_GBE_MAC_ADDR        0xDC000     /* 0x84000 + (4 x 0x16000) */
 #define DSP_REGISTER_ADDR       0x84000
 #endif
 

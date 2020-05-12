@@ -1862,6 +1862,8 @@ int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRe
   if (uCommandLength < sizeof(sConfigureMulticastReqT))
     return XST_FAILURE;
 
+  /* FIXME - sanity check user supplied interface id - check out of range? */
+
   uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
 
   uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
