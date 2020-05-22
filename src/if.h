@@ -35,6 +35,8 @@ struct sIFObject{
 
   u8 arrIFAddrMac[6];
 
+  u8 stringHostname[16];
+
   u8 arrIFAddrIP[4];
   u8 stringIFAddrIP[16];
   u32 uIFAddrIP;
@@ -115,6 +117,9 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
 void if_enumerate_interfaces(void);
 u8 get_num_interfaces(void);
 u8 get_interface_id(u8 logical_if_id);
+
+u8 *if_generate_hostname_string(u8 phy_interface_id);     /* arg is the physical interface id/position */
+u8 *if_generate_mac_addr_array(u8 phy_interface_id);
 
 struct sIFObject *lookup_if_handle_by_id(u8 id);
 

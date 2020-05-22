@@ -91,6 +91,8 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   for (uLoopIndex = 0; uLoopIndex < 16; uLoopIndex++){
     pIFObjectPtr->stringIFAddrIP[uLoopIndex] = '\0';
     pIFObjectPtr->stringIFAddrNetmask[uLoopIndex] = '\0';
+    pIFObjectPtr->stringHostname[uLoopIndex] ='\0';
+
   }
 
   for (uLoopIndex = 0; uLoopIndex < 4; uLoopIndex++){
@@ -634,41 +636,44 @@ void if_enumerate_interfaces(void){
    * octet/hostname of the interface will not be the same
    */
 
+#if 1
   reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
-  //reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
+#else
+  reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
+#endif
 
   /* check which cores are present... */
 
   if (reg & 0x20){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0\r\n", n);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0\r\n", 0);
     //SetAddressOffset(n, ONE_GBE_MAC_ADDR);
     logical_interface_set[n] = 0;
     n++;
   }
 
   if (reg & 0x40){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1\r\n", n);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1\r\n", 1);
     //SetAddressOffset(n, FORTY_GBE_MAC_0_ADDR);
     logical_interface_set[n] = 1;
     n++;
   }
 
   if (reg & 0x80){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2\r\n", n);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2\r\n", 2);
     //SetAddressOffset(n, FORTY_GBE_MAC_1_ADDR);
     logical_interface_set[n] = 2;
     n++;
   }
 
   if (reg & 0x100){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3\r\n", n);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3\r\n", 3);
     //SetAddressOffset(n, FORTY_GBE_MAC_2_ADDR);
     logical_interface_set[n] = 3;
     n++;
   }
 
   if (reg & 0x200){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4\r\n", n);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4\r\n", 4);
     //SetAddressOffset(n, FORTY_GBE_MAC_3_ADDR);
     logical_interface_set[n] = 4;
     n++;

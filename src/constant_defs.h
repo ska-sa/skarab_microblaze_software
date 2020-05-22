@@ -156,6 +156,7 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 
 #ifdef WISHBONE_LEGACY_MAP
 /* original/legacy wishbone slave map */
+#define ONE_GBE_MAC_ADDR        0x00048000
 #define FORTY_GBE_MAC_0_ADDR    0x00050000
 #define FORTY_GBE_MAC_1_ADDR    0x00058000
 #define FORTY_GBE_MAC_2_ADDR    0x00060000

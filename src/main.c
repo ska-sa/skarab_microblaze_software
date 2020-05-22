@@ -1213,40 +1213,6 @@ int main()
 
   ReadAndPrintFPGADNA();
 
-  /* DHCP State initializations for each interface */
-  /* TODO: perhaps create an inline function for the following to neaten up code */
-  /* the first 5 octets of the mac address /should/ never change across interfaces */
-  uTempMac[0] = (uEthernetFabricMacHigh[0] >> 8) & 0xff;
-  uTempMac[1] = (uEthernetFabricMacHigh[0]     ) & 0xff;
-  uTempMac[2] = (uEthernetFabricMacMid[0]  >> 8) & 0xff;
-  uTempMac[3] = (uEthernetFabricMacMid[0]      ) & 0xff;
-  uTempMac[4] = (uEthernetFabricMacLow[0]  >> 8) & 0xff;
-
-  u8 uTempHostNameString[16] = "skarab";   /* 15 chars plus '/0'. To be appended just now with partial mac & i/f. */
-  u8 uTempDigit;
-
-  /* stringify mac and append to hostname ("skarab" - see initialization above ) */
-
-  uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-mid */
-  uTempHostNameString[6] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-mid */
-  uTempHostNameString[7] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) / 0x10;  /* upper digit of lower octet of mac-mid */
-  uTempHostNameString[8] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) % 0x10;  /* lower digit of lower octet of mac-mid */
-  uTempHostNameString[9] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-low */
-  uTempHostNameString[10] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
-  uTempHostNameString[11] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempHostNameString[12] = '-';
-
   /*
    * read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
    * -> Init wait time at addr 0x1E0(LSB) and 0x1E1(MSB)
@@ -1261,32 +1227,30 @@ int main()
     }
   } /* else run with the default values automatically set when interface initialized */
 
+
   //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
   for (link = 0; link < num_links; link++){
     uEthernetId = get_interface_id(link);
 
-    /* 6th octet of mac should equal id anyway */
-    uTempMac[5] = uEthernetFabricMacLow[uEthernetId] & 0xff;
+    u8 *mac_addr = if_generate_mac_addr_array(uEthernetId);
 
     pIFObjectPtr[uEthernetId] = InterfaceInit(uEthernetId,
         (u8 *) &(uReceiveBuffer[uEthernetId][0]),
         (RX_BUFFER_MAX * 4),
         (u8 *) uTransmitBuffer,
         (TX_BUFFER_MAX * 4),
-        uTempMac);
+        mac_addr);
 
     if (NULL == pIFObjectPtr[uEthernetId]){
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_FATAL, "IF   [%02x] Init error!\r\n", uEthernetId);
     } else {
 
-      /* fill in interface number in host name and terminate string */
-      uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
-      uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
-      uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
+      u8 *hostname = if_generate_hostname_string(uEthernetId);
 
       eventDHCPOnMsgBuilt(pIFObjectPtr[uEthernetId], &vSendDHCPMsg, NULL);
       eventDHCPOnLeaseAcqd(pIFObjectPtr[uEthernetId], &vSetInterfaceConfig, NULL);
-      vDHCPSetHostName(pIFObjectPtr[uEthernetId], (char *) &uTempHostNameString);
+
+      vDHCPSetHostName(pIFObjectPtr[uEthernetId], (char *) hostname);
 
       /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
          We thus want to delay the start of dhcp till these transitions have settled.
