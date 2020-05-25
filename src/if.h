@@ -117,6 +117,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
 void if_enumerate_interfaces(void);
 u8 get_num_interfaces(void);
 u8 get_interface_id(u8 logical_if_id);
+u8 check_interface_valid(u8 physical_interface_id);
 
 u8 *if_generate_hostname_string(u8 phy_interface_id);     /* arg is the physical interface id/position */
 u8 *if_generate_mac_addr_array(u8 phy_interface_id);

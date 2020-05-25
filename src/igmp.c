@@ -136,6 +136,8 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 
     pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
     /*pIGMPObjectPtr->tIGMPCurrentState = IGMP_IDLE_STATE;*/
+  } else {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] Already subscribed with base %08x and mask %08x\r\n", uId, uMulticastBaseAddr,uMulticastAddrMask);
   }
 
   return XST_SUCCESS;
@@ -145,6 +147,8 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 
 u8 uIGMPLeaveGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
+
+  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [..] Leaving groups on i/f %02d\r\n", uId);
 
   if (uId >= NUM_ETHERNET_INTERFACES){
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);

@@ -152,7 +152,6 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define I2C_2_ADDR          0x00030000
 #define I2C_3_ADDR          0x00038000
 #define I2C_4_ADDR          0x00040000
-/* #define ONE_GBE_MAC_ADDR      0x00048000 */
 
 #ifdef WISHBONE_LEGACY_MAP
 /* original/legacy wishbone slave map */
@@ -543,6 +542,10 @@ typedef struct sDHCPHeader {
   u16 uMagicCookieLow;
 } sDHCPHeaderT;
 #endif
+
+/* return this for any uStatus fields in the command response fields */
+#define CMD_STATUS_SUCCESS 0
+#define CMD_STATUS_ERROR   1
 
 typedef struct sCommandHeader {
     u16  uCommandType;
@@ -943,7 +946,10 @@ typedef struct sPMBusReadI2CBytesResp {
 
 typedef struct sConfigureMulticastReq {
   sCommandHeaderT Header;
-  u16       uId;
+  u16       uId;                                /* set to interface identifier to be configured, or
+                                                 * set to 0xff to configure on the interface the
+                                                 * command is received on.
+                                                 */
   u16       uFabricMultiCastIPAddressHigh;
   u16       uFabricMultiCastIPAddressLow;
   u16       uFabricMultiCastIPAddressMaskHigh;
@@ -957,7 +963,8 @@ typedef struct sConfigureMulticastResp {
   u16       uFabricMultiCastIPAddressLow;
   u16       uFabricMultiCastIPAddressMaskHigh;
   u16       uFabricMultiCastIPAddressMaskLow;
-  u16       uPadding[4];
+  u16       uStatus;          /* set according to CMD_STATUS_* macros  */
+  u16       uPadding[3];
 } sConfigureMulticastRespT;
 
 typedef struct sDebugLoopbackTestReq {

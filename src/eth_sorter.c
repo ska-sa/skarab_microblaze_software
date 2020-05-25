@@ -369,7 +369,7 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == PMBUS_READ_I2C)
       return(PMBusReadI2CBytesCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == CONFIGURE_MULTICAST)
-      return(ConfigureMulticastCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(ConfigureMulticastCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == DEBUG_LOOPBACK_TEST)
       return(DebugLoopbackTestCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == QSFP_RESET_AND_PROG)
@@ -1852,52 +1852,70 @@ int PMBusReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
 //  ------
 //  XST_SUCCESS if successful
 //=================================================================================
-int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
   sConfigureMulticastReqT *Command = (sConfigureMulticastReqT *) pCommand;
   sConfigureMulticastRespT *Response = (sConfigureMulticastRespT *) uResponsePacketPtr;
   u32 uFabricMultiCastIPAddress;
   u32 uFabricMultiCastIPAddressMask;
+  u8 if_to_configure;
+  u8 uPaddingIndex;
 
   if (uCommandLength < sizeof(sConfigureMulticastReqT))
     return XST_FAILURE;
 
-  /* FIXME - sanity check user supplied interface id - check out of range? */
-
-  uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
-
-  uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
-
-  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-
-  // Execute the command
-  SetMultiCastIPAddress(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-
-  if (XST_FAILURE == uIGMPJoinGroup(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to join multicast group with addr %08x and mask %08x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-  }
-
-#if 0
-  uEthernetFabricMultiCastIPAddress[Command->uId] = uFabricMultiCastIPAddress;
-  uEthernetFabricMultiCastIPAddressMask[Command->uId] = uFabricMultiCastIPAddressMask;
-
-  // Enable sending of Multicast packets on this interface
-  uIGMPState[Command->uId] = IGMP_STATE_JOINED_GROUP;
-  uIGMPSendMessage[Command->uId] = IGMP_SEND_MESSAGE;
-  uCurrentIGMPMessage[Command->uId] = 0x0;
-#endif
-
+  /* pre-fill the response fields before logic below */
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
-  Response->uId = Command->uId;
   Response->uFabricMultiCastIPAddressHigh = Command->uFabricMultiCastIPAddressHigh;
   Response->uFabricMultiCastIPAddressLow = Command->uFabricMultiCastIPAddressLow;
   Response->uFabricMultiCastIPAddressMaskHigh = Command->uFabricMultiCastIPAddressMaskHigh;
   Response->uFabricMultiCastIPAddressMaskLow = Command->uFabricMultiCastIPAddressMaskLow;
 
+  for (uPaddingIndex = 0; uPaddingIndex < 3; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  /* check that the interface supplied by user is valid
+   * note this is physical interface position as opposed to logical (enumerated) id
+   */
+  if ((Command->uId != 0xff) && (XST_FAILURE == check_interface_valid(Command->uId))){
+    /* 0xff is a special case used in this command */
+    Response->uId = Command->uId;
+    Response->uStatus = CMD_STATUS_ERROR;
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] interface id %2d - error\r\n", uId, Command->uId);
+  } else {
+    if (Command->uId == 0xff){
+      /* special case i.e. we want to subscribe on *this* interface */
+      if_to_configure = uId;    /* this is the uId passed in from the calling function on which the command was received */
+    } else {
+      if_to_configure = Command->uId;   /*i.e. the user requested uId in the packet fields */
+    }
+
+    uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
+    uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
+
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] ID: %d MC IP: %08x MC MASK: %08x\r\n",
+        uId, if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+
+    // Execute the command
+    SetMultiCastIPAddress(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+
+    if (XST_FAILURE == uIGMPJoinGroup(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] failed to join multicast group - base %08x, mask %08x, id %2d\r\n",
+          uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask, if_to_configure);
+    }
+
+    Response->uId = if_to_configure;
+    Response->uStatus = CMD_STATUS_SUCCESS;
+  }
+
   *uResponseLength = sizeof(sConfigureMulticastRespT);
 
-  return XST_SUCCESS;
+  return XST_SUCCESS;   /* NOTE: 'success' is returned even if the operation fails - the calling function relies on this
+                           'success' to send the packet back to the host. The error is signalled via a field in the packet
+                           structure. This is an artefact of the way the original protocol works and the many subsequent
+                           software/packet-field changes.*/
 }
 
 /* TODO: verify that it's safe to remove this function */

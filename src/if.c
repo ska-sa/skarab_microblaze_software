@@ -606,14 +606,40 @@ u8 get_num_interfaces(void){
 }
 
 
-/* we need an array of interfaces that staores the physical id in a logically indexed array */
+/* we need an array of interfaces that stores the physical id in a logically indexed array */
 
-static u8 logical_interface_set[NUM_ETHERNET_INTERFACES];
+static u8 logical_interface_set[NUM_ETHERNET_INTERFACES] = {0xff};
 
 u8 get_interface_id(u8 logical_if_id){
   /* TODO: assert sane logical_if_id */
   return logical_interface_set[logical_if_id];
 }
+
+
+/*
+ * This function checks if the given id is present in the list of logical interfaces.
+ * It is mainly used to verify an argument passed in from the user
+ */
+u8 check_interface_valid(u8 physical_interface_id){
+  int i;
+
+  /* check that id doesn't exceed the bounds */
+  if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
+    return XST_FAILURE;
+  }
+
+  /* check that the interface is part of the logical list enumerated at startup */
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    if (physical_interface_id == logical_interface_set[i]){
+      return XST_SUCCESS;   /* found - therefore interface is present */
+    }
+  }
+
+  /* interface id not found */
+  return XST_FAILURE;
+}
+
+
 
 
 void if_enumerate_interfaces(void){
@@ -645,44 +671,36 @@ void if_enumerate_interfaces(void){
   /* check which cores are present... */
 
   if (reg & 0x20){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0\r\n", 0);
-    //SetAddressOffset(n, ONE_GBE_MAC_ADDR);
     logical_interface_set[n] = 0;
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0 with logical enumeration %d\r\n", 0, n);
     n++;
   }
 
   if (reg & 0x40){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1\r\n", 1);
-    //SetAddressOffset(n, FORTY_GBE_MAC_0_ADDR);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1 with logical enumeration %d\r\n", 1, n);
     logical_interface_set[n] = 1;
     n++;
   }
 
   if (reg & 0x80){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2\r\n", 2);
-    //SetAddressOffset(n, FORTY_GBE_MAC_1_ADDR);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2 with logical enumeration %d\r\n", 2, n);
     logical_interface_set[n] = 2;
     n++;
   }
 
   if (reg & 0x100){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3\r\n", 3);
-    //SetAddressOffset(n, FORTY_GBE_MAC_2_ADDR);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3 with logical enumeration %d\r\n", 3, n);
     logical_interface_set[n] = 3;
     n++;
   }
 
   if (reg & 0x200){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4\r\n", 4);
-    //SetAddressOffset(n, FORTY_GBE_MAC_3_ADDR);
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4 with logical enumeration %d\r\n", 4, n);
     logical_interface_set[n] = 4;
     n++;
   }
 
   /* probably more elegant to shift bits out and test ... TODO */
-
-
-  /* TODO: assert(n < NUM_ETHERNET_INTERFACE) */
 
   runtime_num_interfaces = n;
 }
