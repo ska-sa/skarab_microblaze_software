@@ -57,7 +57,6 @@ static void __sanity_check_igmp(struct sIGMPObject *pIGMPObjectPtr){
   Xil_AssertVoid(IGMP_MAGIC_CANARY == pIGMPObjectPtr->uIGMPMagic);    /* API usage error */
 }
 
-/* TODO: if NUM_ETHERNET_INTERFACES > 17 -> throw compile-time/preprocessor error */
 /* TODO: use get_num_interfaces() */
 static void __sanity_check_igmp_interface_id(u8 if_id){
   Xil_AssertVoid((if_id >= 0) && (if_id < NUM_ETHERNET_INTERFACES));    /* API usage error */
@@ -110,8 +109,8 @@ static struct sIGMPObject *pIGMPGetContext(u8 uId){
 u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  if (XST_FAILURE == check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast join failed\r\n");
     return XST_FAILURE;
   }
 
@@ -150,8 +149,8 @@ u8 uIGMPLeaveGroup(u8 uId){
 
   log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [..] Leaving groups on i/f %02d\r\n", uId);
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  if (XST_FAILURE == check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast leave failed\r\n");
     return XST_FAILURE;
   }
 
@@ -176,8 +175,8 @@ u8 uIGMPLeaveGroup(u8 uId){
 u8 uIGMPRejoinPrevGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  if (XST_FAILURE == check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast rejoin failed\r\n");
     return XST_FAILURE;
   }
 

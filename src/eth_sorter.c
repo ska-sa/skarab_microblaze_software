@@ -1883,7 +1883,7 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
     /* 0xff is a special case used in this command */
     Response->uId = Command->uId;
     Response->uStatus = CMD_STATUS_ERROR;
-    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] interface id %2d - error\r\n", uId, Command->uId);
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Configure multicast failed\r\n", uId, Command->uId);
   } else {
     if (Command->uId == 0xff){
       /* special case i.e. we want to subscribe on *this* interface */
@@ -1902,8 +1902,7 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
     SetMultiCastIPAddress(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 
     if (XST_FAILURE == uIGMPJoinGroup(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
-      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] failed to join multicast group - base %08x, mask %08x, id %2d\r\n",
-          uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask, if_to_configure);
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to join multicast group\r\n", uId);
     }
 
     Response->uId = if_to_configure;

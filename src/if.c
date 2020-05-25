@@ -625,6 +625,7 @@ u8 check_interface_valid(u8 physical_interface_id){
 
   /* check that id doesn't exceed the bounds */
   if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f ID %d out of range\r\n", physical_interface_id);
     return XST_FAILURE;
   }
 
@@ -636,6 +637,7 @@ u8 check_interface_valid(u8 physical_interface_id){
   }
 
   /* interface id not found */
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f %d not present\r\n", physical_interface_id);
   return XST_FAILURE;
 }
 
