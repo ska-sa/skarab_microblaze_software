@@ -14,6 +14,8 @@
 #include "constant_defs.h"
 #include "logging.h"
 #include "diagnostics.h"
+#include "id.h"
+#include "register.h"
 
 /*-------- Network diagnostics --------*/
 
@@ -120,4 +122,51 @@ void PrintVersionInfo(){
 
 const char *GetVersionInfo(){
   return version;
+}
+
+
+void ReadAndPrintPeralexSerial(){
+  u8 status;
+  u8 uPxSerial[ID_PX_SERIAL_LEN];
+
+  status = get_peralex_serial(uPxSerial, ID_PX_SERIAL_LEN);
+  if (status == XST_FAILURE){
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Failed to read Peralex serial number.\r\n");
+  }
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Motherboard Px Serial Number: x%02x%02x%02x d%02d%02d%02d\r\n",
+      uPxSerial[0], uPxSerial[1], uPxSerial[2],uPxSerial[0], uPxSerial[1], uPxSerial[2]);
+}
+
+
+/*  This method reads and prints out the FPGA DNA value */
+void ReadAndPrintFPGADNA()
+{
+  u32 uDNALow = ReadBoardRegister(C_RD_FPGA_DNA_LOW_ADDR);
+  u32 uDNAHigh = ReadBoardRegister(C_RD_FPGA_DNA_HIGH_ADDR);
+  u8 uBitShift = 28;
+  u8 uNibbleCount;
+  u32 uNibble;
+
+  // Print out each nibble in hex format
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "FPGA [..] DNA: 0x");
+
+  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
+  {
+    uNibble = (uDNAHigh >> uBitShift) & 0xF;
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
+    if (uBitShift > 0)
+      uBitShift = uBitShift - 4;
+  }
+
+  uBitShift = 28;
+
+  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
+  {
+    uNibble = (uDNALow >> uBitShift) & 0xF;
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
+    if (uBitShift > 0)
+      uBitShift = uBitShift - 4;
+  }
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
 }

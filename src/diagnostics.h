@@ -26,6 +26,8 @@ void PrintInterfaceCounters(struct sIFObject *pIFObj);
 /* General */
 void PrintVersionInfo();
 const char *GetVersionInfo();
+void ReadAndPrintPeralexSerial();
+void ReadAndPrintFPGADNA();
 
 #ifdef __cplusplus
 }

@@ -366,7 +366,6 @@ void InitialiseEthernetInterfaceParameters()
   u8 link;
   u8 uId;
   u8 uSerial[ID_SK_SERIAL_LEN];
-  u8 uPxSerial[ID_PX_SERIAL_LEN];
 
   u16 uFabricMacHigh;
   u16 uFabricMacMid;
@@ -383,10 +382,6 @@ void InitialiseEthernetInterfaceParameters()
     /* from here on in the mac address will be incorrect (ff:ff:ff...) */
   }
 
-  status = get_peralex_serial(uPxSerial, ID_PX_SERIAL_LEN);
-  if (status == XST_FAILURE){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Failed to read Peralex serial number.\r\n");
-  }
 
   // TO DO: NOT SURE WHAT TO DO HERE FOR MULTICAST
   uFabricMacHigh = 0x0600 | uSerial[0];
@@ -425,9 +420,6 @@ void InitialiseEthernetInterfaceParameters()
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Soft reset successful.\r\n", uId);
     }
   }
-
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Motherboard Px Serial Number: %02x%02x%02x\r\n",
-      uPxSerial[0], uPxSerial[1], uPxSerial[2]);
 
 }
 
@@ -625,50 +617,6 @@ void InitialiseInterruptControllerAndTimer(XTmrCtr * pTimer, XIntc * pInterruptC
 #endif
 }
 
-//=================================================================================
-//  ReadAndPrintFPGADNA
-//--------------------------------------------------------------------------------
-//  This method reads and prints out the FPGA DNA value.
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void ReadAndPrintFPGADNA()
-{
-  u32 uDNALow = ReadBoardRegister(C_RD_FPGA_DNA_LOW_ADDR);
-  u32 uDNAHigh = ReadBoardRegister(C_RD_FPGA_DNA_HIGH_ADDR);
-  u8 uBitShift = 28;
-  u8 uNibbleCount;
-  u32 uNibble;
-
-  // Print out each nibble in hex format
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "FPGA [..] DNA: 0x");
-
-  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
-  {
-    uNibble = (uDNAHigh >> uBitShift) & 0xF;
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
-    if (uBitShift > 0)
-      uBitShift = uBitShift - 4;
-  }
-
-  uBitShift = 28;
-
-  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
-  {
-    uNibble = (uDNALow >> uBitShift) & 0xF;
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
-    if (uBitShift > 0)
-      uBitShift = uBitShift - 4;
-  }
-
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-}
 
 int main()
 {
@@ -719,7 +667,6 @@ int main()
 #endif
 
   //struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
-  u8 uTempMac[6];
 
   /* Temp / Reused variables */
   u32 uSize = 0;       /* used to pass around / hold a packet size */
@@ -1212,6 +1159,7 @@ int main()
   iStatus = XST_SUCCESS;
 
   ReadAndPrintFPGADNA();
+  ReadAndPrintPeralexSerial();
 
   /*
    * read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
