@@ -997,6 +997,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
 
+#if 0
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "About to send IGMP leave messages.\r\n");
 
     /* The clear sdram command is usually called before programming. Thus, in anticipation of a new sdram image being sent */
@@ -1011,6 +1012,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group.\r\n", uIndex);
       }
     }
+#endif
 
     /* Disable SDRAM programming over Wishbone and clear registers */
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_WB_PROGRAM_EN_REG_ADDRESS, 0x0);
@@ -2588,6 +2590,8 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   u32 uTemp = 0;
   u8 uRetVal;
   u8 uIndex;
+  u8 num_links;
+  u8 link;
 
   /* State variables */
   /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
@@ -2616,56 +2620,30 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     return XST_FAILURE;
   }
 
-  for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
-    Response->uPadding[uPaddingIndex] = 0;
-  }
-
-  Response->Header.uCommandType = Command->Header.uCommandType + 1;
-  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
-
-  Response->uChunkNum = Command->uChunkNum; 
-  Response->uStatus = 0x0;  /* ACK */
-
-  *uResponseLength = sizeof(sSDRAMProgramOverWishboneRespT);
-
   /* Chunk number 0 is special case, resets everything */
   if(Command->uChunkNum == 0x0){
-    uChunkSizeBytesCached = uCommandLength - 8;
-
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "IGMP [%02d] About to send IGMP leave messages.\r\n", uId);
-
-#if 0
-    // Check which Ethernet interfaces are part of IGMP groups
-    // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
-      }
-#endif
-      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
-        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
-      }
-    }
-#endif
-
-    /* TODO - should we unsubscribe on all interfaces?? See code commented out above */
-    if (XST_FAILURE == uIGMPLeaveGroup(uId)){
-      log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uId);
-    }
-
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
-
     /* during programming, we need the serial console to be relatively quiet
      * since this is a data-intensive task, cache the log-level...restore later */
     cache_log_level();
     /* only print warnings during programming */
     set_log_level(LOG_LEVEL_WARN);
+
+    uChunkSizeBytesCached = uCommandLength - 8;
+
+    /***************************************************************************
+     *  console output needs to be minimal and short - function speed is NB here
+     **************************************************************************/
+
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0 - chunk size: %d bytes.\r\n" , uId, uChunkSizeBytesCached);
+
+    /* unsubscribe from all igmp groups when programming starts */
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_interface_id(link);
+      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
+        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] Failed to leave multicast group\r\n", uIndex);
+      }
+    }
 
     uChunkIdCached = 0;
     ClearSdram();
@@ -2719,6 +2697,19 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   } else {
     uRetVal = XST_FAILURE;
   }
+
+  for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  Response->uChunkNum = Command->uChunkNum;
+  Response->uStatus = 0x0;  /* ACK */
+
+  *uResponseLength = sizeof(sSDRAMProgramOverWishboneRespT);
+
 
   return uRetVal;
 }
