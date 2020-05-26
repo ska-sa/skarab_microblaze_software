@@ -114,7 +114,7 @@ struct sIFObject{
 
 struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
 
-void if_enumerate_interfaces(void);
+u8 if_enumerate_interfaces(void);   /* returns number of interfaces */
 u8 get_num_interfaces(void);
 u8 get_interface_id(u8 logical_if_id);
 u8 check_interface_valid(u8 physical_interface_id);

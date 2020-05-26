@@ -608,7 +608,7 @@ u8 get_num_interfaces(void){
 
 /* we need an array of interfaces that stores the physical id in a logically indexed array */
 
-static u8 logical_interface_set[NUM_ETHERNET_INTERFACES] = {0xff};
+static u8 logical_interface_set[NUM_ETHERNET_INTERFACES];
 
 u8 get_interface_id(u8 logical_if_id){
   /* TODO: assert sane logical_if_id */
@@ -622,6 +622,10 @@ u8 get_interface_id(u8 logical_if_id){
  */
 u8 check_interface_valid(u8 physical_interface_id){
   int i;
+
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [..] logical %d -> physical %d\r\n", i, logical_interface_set[i]);
+  }
 
   /* check that id doesn't exceed the bounds */
   if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
@@ -643,9 +647,14 @@ u8 check_interface_valid(u8 physical_interface_id){
 
 
 
-
-void if_enumerate_interfaces(void){
+/* This function detects the interfaces present in the
+ * firmware build and maps the logical interface id to
+ * the physical interface position.
+ * The number of interfaces present is returned.
+ */
+u8 if_enumerate_interfaces(void){
   u32 reg;
+  u8 i = 0;
   u8 n = 0;   /*
                * this n is essentially a count of the number of
                * interfaces present at runtime. It is also used
@@ -669,6 +678,12 @@ void if_enumerate_interfaces(void){
 #else
   reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
 #endif
+
+  /* init the array to out of range id value of 0xff */
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    logical_interface_set[i] = 0xff;
+  }
+
 
   /* check which cores are present... */
 
@@ -705,6 +720,8 @@ void if_enumerate_interfaces(void){
   /* probably more elegant to shift bits out and test ... TODO */
 
   runtime_num_interfaces = n;
+
+  return n;
 }
 
 
