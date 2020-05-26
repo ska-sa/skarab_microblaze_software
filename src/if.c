@@ -616,35 +616,76 @@ u8 get_interface_id(u8 logical_if_id){
 }
 
 
+#define ID_PRESENT        0
+#define ID_INVALID_RANGE  1
+#define ID_NOT_PRESENT    2
+static u8 _check_interface_valid(u8 physical_interface_id){
+  int i;
+
+  /* check that id doesn't exceed the bounds */
+  if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
+    return ID_INVALID_RANGE;
+  }
+
+  /* check that the interface is part of the logical list enumerated at startup */
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    if (physical_interface_id == logical_interface_set[i]){
+      return ID_PRESENT;   /* found - therefore interface is present */
+    }
+  }
+
+  /* interface id not found */
+  return ID_NOT_PRESENT;
+}
+
+
 /*
  * This function checks if the given id is present in the list of logical interfaces.
  * It is mainly used to verify an argument passed in from the user
  */
 u8 check_interface_valid(u8 physical_interface_id){
+  u8 status;
   int i;
 
   for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
     log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [..] logical %d -> physical %d\r\n", i, logical_interface_set[i]);
   }
 
-  /* check that id doesn't exceed the bounds */
-  if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f ID %d out of range\r\n", physical_interface_id);
-    return XST_FAILURE;
-  }
+  status = _check_interface_valid(physical_interface_id);
 
-  /* check that the interface is part of the logical list enumerated at startup */
-  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-    if (physical_interface_id == logical_interface_set[i]){
-      return XST_SUCCESS;   /* found - therefore interface is present */
-    }
-  }
+  /* print logging output */
+  switch (status){
+    case ID_PRESENT:
+      return XST_SUCCESS;
 
-  /* interface id not found */
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f %d not present\r\n", physical_interface_id);
-  return XST_FAILURE;
+    case ID_INVALID_RANGE:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f ID %d out of range\r\n", physical_interface_id);
+      return XST_FAILURE;
+
+    case ID_NOT_PRESENT:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f %d not present\r\n", physical_interface_id);
+      return XST_FAILURE;
+
+    default:
+      /* will never reach here - included to quiet compiler warning */
+      return XST_FAILURE;
+      break;
+  }
 }
 
+
+/* this check also occurs in high rate tasks -> need to quiet log output */
+u8 check_interface_valid_quietly(u8 physical_interface_id){
+  u8 status;
+
+  status = _check_interface_valid(physical_interface_id);
+
+  if (ID_PRESENT == status){
+    return XST_SUCCESS;
+  } else {
+    return XST_FAILURE;
+  }
+}
 
 
 /* This function detects the interfaces present in the

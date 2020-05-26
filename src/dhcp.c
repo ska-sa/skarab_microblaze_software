@@ -611,6 +611,42 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
   return DHCP_RETURN_OK;
 }
 
+
+//=================================================================================
+//  uDHCPGetBoundStatus
+//---------------------------------------------------------------------------------
+//  This function returns the status of the DHCP lease-binding process.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  DHCP_RETURN_TRUE or DHCP_RETURN_FALSE
+//=================================================================================
+u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr){
+
+  typeDHCPState state = pIFObjectPtr->DHCPContextState.tDHCPCurrentState;
+
+  switch (state){
+    /* the dhcp lease has been acquired */
+    case BOUND:
+    case RENEW:
+    case REBIND:
+      return DHCP_RETURN_TRUE;
+
+    case INIT:
+    case RANDOMIZE:
+    case SELECT:
+    case WAIT:
+    case REQUEST:
+    default:
+      return DHCP_RETURN_FALSE;
+  }
+}
+
+
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus

@@ -51,6 +51,9 @@ extern "C" {
 #define DHCP_RETURN_INVALID (3)
 #endif
 
+#define DHCP_RETURN_FALSE 0
+#define DHCP_RETURN_TRUE  1
+
 /* dhcp packet offsets */
 
 #define BOOTP_FRAME_BASE            (UDP_FRAME_BASE + UDP_HEADER_TOTAL_LEN) //42
@@ -329,6 +332,9 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr);
 
 /* set the host name to be used in message when requesting dhcp lease from server */
 u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName);
+
+/* get the dhcp lease-binding status */
+u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr);
 
 /* event-driven callbacks */
 

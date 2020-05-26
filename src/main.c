@@ -1832,30 +1832,32 @@ int main()
       }
     }
 
-#if 0
-#if NUM_ETHERNET_INTERFACES > 1   /* if we have at least one 40gbe compiled in */
+
+    /* set the 40gbe interface link and dhcp status in firmware LED-manager register */
+    u8 interface_id;
+
     if(uFlagRunTask_WriteLEDStatus){
       uFlagRunTask_WriteLEDStatus = 0;
       uFrontPanelLedsValue = 0;
-      /* historically, one qsfp module was implemented with four links and thus
-       * this implementation only services 40gbe link 1 up to max 4 */
-      n_links = (NUM_ETHERNET_INTERFACES < 5 ? NUM_ETHERNET_INTERFACES : 5);
-      for (uEthernetId = 1; uEthernetId < n_links; uEthernetId++){
-        if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
-          uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 1);
-          if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState >= BOUND){
-            uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 2);
+
+      for (interface_id = 1; interface_id <= 4;  interface_id++){
+        /* check if the core is compiled into the firmware */
+        if (XST_SUCCESS == check_interface_valid_quietly(interface_id)){
+          /* check the link status */
+          if (pIFObjectPtr[interface_id]->uIFLinkStatus == LINK_UP){
+            uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 1);
+            /* check the dhcp status */
+            if (DHCP_RETURN_TRUE == uDHCPGetBoundStatus(pIFObjectPtr[interface_id])){
+              uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 2);
+            }
           }
         }
       }
-      /*
-       * NOTE: the C_WR_FRONT_PANEL_STAT_LED_ADDR register now monitors dhcp on
-       * interfaces
+      /* C_WR_FRONT_PANEL_STAT_LED_ADDR register
+       * now monitors dhcp on interfaces
        */
       WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
     }
-#endif
-#endif
 
     /* General 100ms task */
     if (uTick_100ms){
