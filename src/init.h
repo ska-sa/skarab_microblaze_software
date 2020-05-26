@@ -7,6 +7,8 @@ extern "C"{
 
 u8 init_persistent_memory_setup(void);
 
+void UpdateGBEPHYConfiguration();
+
 #ifdef __cplusplus
 }
 #endif
