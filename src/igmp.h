@@ -39,6 +39,7 @@ struct sIGMPObject *pIGMPInit(u8 uId);
 
 u8 uIGMPJoinGroup(u8 uId, u32 uMulticaseBaseAddr, u32 uMulticastAddrMask);
 u8 uIGMPLeaveGroup(u8 uId);
+u8 uIGMPLeaveGroupFlush(u8 uId);    /* blocks till all leave requests have been sent */
 u8 uIGMPRejoinPrevGroup(u8 uId);
 
 u8 uIGMPStateMachine(u8 uId);

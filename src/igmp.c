@@ -171,6 +171,32 @@ u8 uIGMPLeaveGroup(u8 uId){
   return XST_SUCCESS;
 }
 
+
+u8 uIGMPLeaveGroupFlush(u8 uId){
+  struct sIGMPObject *pIGMPObjectPtr;
+  int ret;
+
+  ret = uIGMPLeaveGroup(uId);
+  if (XST_FAILURE == ret){
+    return XST_FAILURE;
+  }
+
+  /*
+   * now run the igmp state machine until all the leave messages have been flushed
+   * This function should block till all the leave messages have been sent.
+   * i.e. until the state machine has returned to the idle state from leave state
+   */
+  pIGMPObjectPtr = pIGMPGetContext(uId);
+
+  while (pIGMPObjectPtr->tIGMPCurrentState != IGMP_IDLE_STATE){
+    uIGMPStateMachine(uId);
+  }
+
+  return XST_SUCCESS;
+}
+
+
+
 /* This function was introduced to deal with link-flap scenarios and rejoin the mc group */
 u8 uIGMPRejoinPrevGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
