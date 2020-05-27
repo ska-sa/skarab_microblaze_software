@@ -239,7 +239,7 @@ void vIGMPPrintInfo(void){
     cached_id = pIGMPObjectPtr->uIGMPIfId;   /* included as cross-check to verify that the id mapping is correct */
     current_state = pIGMPObjectPtr->tIGMPCurrentState;
 
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] id: %02d base: %08x mask: %08x state: %s\r\n", phy_id,
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] id: %02d base: %08x mask: %08x state: %s\r\n", phy_id,
         cached_id, base_addr, mask_addr, igmp_state_name_lookup[current_state]);
   }
 }
