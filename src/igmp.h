@@ -44,6 +44,7 @@ u8 uIGMPRejoinPrevGroup(u8 uId);
 
 u8 uIGMPStateMachine(u8 uId);
 
+void vIGMPPrintInfo(void);
 #ifdef __cplusplus
 }
 #endif

@@ -638,6 +638,26 @@ static u8 _check_interface_valid(u8 physical_interface_id){
   return ID_NOT_PRESENT;
 }
 
+void print_interface_map(void){
+  u8 log_id;  /* logical id */
+  u8 n;
+  u8 phy_id;  /* physical id */
+
+  n = get_num_interfaces();
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] %d interface%s present\r\n", n, n == 1 ? "" : "s");
+
+  /* logical to physical mapping */
+  for (log_id = 0; log_id < NUM_ETHERNET_INTERFACES; log_id++){
+    phy_id = logical_interface_set[log_id];
+    if (0xff == phy_id){
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> none\r\n", log_id);
+    } else {
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> physical interface id %d (%s)\r\n",
+          log_id, phy_id, phy_id == 0 ? "1gbe" : "40gbe");
+    }
+  }
+}
+
 
 /*
  * This function checks if the given id is present in the list of logical interfaces.
@@ -645,11 +665,6 @@ static u8 _check_interface_valid(u8 physical_interface_id){
  */
 u8 check_interface_valid(u8 physical_interface_id){
   u8 status;
-  int i;
-
-  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "I/F  [..] logical %d -> physical %d\r\n", i, logical_interface_set[i]);
-  }
 
   status = _check_interface_valid(physical_interface_id);
 

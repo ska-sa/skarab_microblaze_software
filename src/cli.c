@@ -12,6 +12,9 @@
 #include "id.h"
 #include "time.h"
 #include "flash_sdram_controller.h"
+#include "init.h"
+#include "if.h"
+#include "igmp.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -49,6 +52,8 @@ typedef enum {
   CMD_INDEX_UNAME,
   CMD_INDEX_UPTIME,
   CMD_INDEX_DUMP,
+  CMD_INDEX_IF_MAP,
+  CMD_INDEX_IGMP,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -68,6 +73,8 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_UNAME]       = "uname",
   [CMD_INDEX_UPTIME]      = "uptime",
   [CMD_INDEX_DUMP]        = "dump",
+  [CMD_INDEX_IF_MAP]      = "if-map",
+  [CMD_INDEX_IGMP]        = "igmp",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -85,6 +92,8 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
  [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
+ [CMD_INDEX_IF_MAP]       = { NULL },
+ [CMD_INDEX_IGMP]         = { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -101,6 +110,8 @@ static int cli_whoami_exe(struct cli *_cli);
 static int cli_uname_exe(struct cli *_cli);
 static int cli_uptime_exe(struct cli *_cli);
 static int cli_dump_exe(struct cli *_cli);
+static int cli_if_map_exe(struct cli *_cli);
+static int cli_igmp_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -116,6 +127,8 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_UNAME]        = cli_uname_exe,
  [CMD_INDEX_UPTIME]       = cli_uptime_exe,
  [CMD_INDEX_DUMP]         = cli_dump_exe,
+ [CMD_INDEX_IF_MAP]       = cli_if_map_exe,
+ [CMD_INDEX_IGMP]         = cli_igmp_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -575,12 +588,9 @@ static int cli_log_level_exe(struct cli *_cli){
 
 static int cli_bounce_link_exe(struct cli *_cli){
   u32 l;
-  int r;
-  u16 config;
-  u16 wr[4], rd[4];
 
   /* check if the link is present - the option parsing state will catch the other end of the error modes */
-  if (_cli->opt_id >= NUM_ETHERNET_INTERFACES){
+  if (XST_FAILURE == check_interface_valid(_cli->opt_id)){
     xil_printf("link %d not present\r\n", _cli->opt_id);
     return -1;
   }
@@ -589,62 +599,7 @@ static int cli_bounce_link_exe(struct cli *_cli){
 
   if (_cli->opt_id == 0){
     /* 1gbe - always link 0 */
-    /* FIXME: create a function for this since this was copy-pated from main.c -  UpdateGBEPHYConfiguration() */
-
-    /****************create function from here...**************************/
-    // Set the switch to the GBE PHY
-    wr[0] = ONE_GBE_SWITCH_SELECT;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to open I2C switch.\r\n");
-      return -1;
-    }
-
-    // Read register 0 to get current configuration
-    wr[0] = 0; // Address of register to read
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 1);
-
-    if (r == XST_FAILURE){
-      /* TODO: do we want to unwind the "open switch" command upon a failure here (and subsequent failures too)? */
-      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update current read register.\r\n");
-      return -1;
-    }
-
-    r = ReadI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, rd, 2);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
-      return -1;
-    }
-
-    config = ((rd[0] << 8) | rd[1]);
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", config);
-
-    // Trigger a soft reset of 1GBE PHY to update configuration
-    // Do a soft reset
-    config = config | 0x8000;
-
-    wr[0] = 0; // Address of register to write
-    wr[1] = ((config >> 8) & 0xFF);
-    wr[2] = (config & 0xFF);
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 3);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to write CONTROL REG.\r\n");
-      return -1;
-    }
-
-    // Close I2C switch
-    wr[0] = 0x0;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to close I2C switch.\r\n");
-      return -1;
-    }
-    /****************...create function till here**************************/
-
+    UpdateGBEPHYConfiguration();
   } else {
     /* 40gbe link */
     l = 0x1 << _cli->opt_id;
@@ -743,13 +698,14 @@ static int cli_reset_fw_exe(struct cli *_cli){
 
 
 static int cli_stats_exe(struct cli *_cli){
-  u8 n, i;
+  u8 n, i, phy_id;
   struct sIFObject *iface;
 
   n = get_num_interfaces();
 
   for (i = 0; i < n; i++){
-    iface = lookup_if_handle_by_id(i);
+    phy_id = get_interface_id(i);
+    iface = lookup_if_handle_by_id(phy_id);
     PrintInterfaceCounters(iface);
   }
 
@@ -910,6 +866,18 @@ static int cli_reboot_fpga_exe(struct cli *_cli){
       break;
   }
 
+  return 0;
+}
+
+
+static int cli_if_map_exe(struct cli *_cli){
+  print_interface_map();
+  return 0;
+}
+
+
+static int cli_igmp_exe(struct cli *_cli){
+  vIGMPPrintInfo();
   return 0;
 }
 
