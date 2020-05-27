@@ -1467,7 +1467,9 @@ int main()
       //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
       for (link = 0; link < num_links; link++){
         uEthernetId = get_interface_id(link);
-        uIGMPStateMachine(uEthernetId);
+        if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
+          uIGMPStateMachine(uEthernetId);
+        }
       }
     }
 
