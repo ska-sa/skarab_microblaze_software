@@ -1658,24 +1658,27 @@ int main()
       //for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
       for (link = 0; link < num_links; link++){
         uEthernetId = get_interface_id(link);
-        iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-        if(iStatus == XST_SUCCESS){
-          uSize = uResponsePacketLength >> 1; /* 16 bit words */
-          pBuffer = (u16 *) uTransmitBuffer;
+        /* only send lldp packets if the link is up */
+        if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
+          iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
+          if(iStatus == XST_SUCCESS){
+            uSize = uResponsePacketLength >> 1; /* 16 bit words */
+            pBuffer = (u16 *) uTransmitBuffer;
 
-          for(uIndex = 0; uIndex < uSize; uIndex++){
-            pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
-          }
-          uSize = uSize >> 1; /* 32 bit words*/
-          iStatus = TransmitHostPacket(uEthernetId, (u32*) &pBuffer[0], uSize);
-          if (iStatus != XST_SUCCESS){
-            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_ERR);
-          } else {
-            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_OK);
+            for(uIndex = 0; uIndex < uSize; uIndex++){
+              pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+            }
+            uSize = uSize >> 1; /* 32 bit words*/
+            iStatus = TransmitHostPacket(uEthernetId, (u32*) &pBuffer[0], uSize);
+            if (iStatus != XST_SUCCESS){
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_ERR);
+            } else {
+              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_OK);
+            }
           }
         }
       }
-      uFlagRunTask_LLDP = 0;  
+      uFlagRunTask_LLDP = 0;
     }
 
 

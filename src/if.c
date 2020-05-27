@@ -597,8 +597,6 @@ void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c){
   }
 }
 
-#define MOCK_C_RD_ETH_IF_LINK_UP_ADDR 0x60
-
 static u8 runtime_num_interfaces = 0;
 
 u8 get_num_interfaces(void){
@@ -702,6 +700,8 @@ u8 check_interface_valid_quietly(u8 physical_interface_id){
   }
 }
 
+
+#define MOCK_C_RD_ETH_IF_LINK_UP_ADDR 0x60
 
 /* This function detects the interfaces present in the
  * firmware build and maps the logical interface id to
