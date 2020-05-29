@@ -1862,6 +1862,7 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
   u32 uFabricMultiCastIPAddressMask;
   u8 if_to_configure;
   u8 uPaddingIndex;
+  u8 status;
 
   if (uCommandLength < sizeof(sConfigureMulticastReqT))
     return XST_FAILURE;
@@ -1881,10 +1882,20 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
   /* check that the interface supplied by user is valid
    * note this is physical interface position as opposed to logical (enumerated) id
    */
-  if ((Command->uId != 0xff) && (XST_FAILURE == check_interface_valid(Command->uId))){
+  if (Command->uId != 0xff){
+    status = check_interface_valid(Command->uId);
+  }
+
+  if ((Command->uId != 0xff) && (IF_ID_PRESENT != status)){
     /* 0xff is a special case used in this command */
     Response->uId = Command->uId;
-    Response->uStatus = CMD_STATUS_ERROR;
+    if (IF_ID_INVALID_RANGE == status){
+      Response->uStatus = CMD_STATUS_ERROR_IF_OUT_OF_RANGE;
+    } else if (IF_ID_NOT_PRESENT == status){
+      Response->uStatus = CMD_STATUS_ERROR_IF_NOT_PRESENT;
+    } else {
+      Response->uStatus = CMD_STATUS_ERROR_GENERAL;
+    }
     log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Configure multicast failed\r\n", uId, Command->uId);
   } else {
     if (Command->uId == 0xff){
@@ -1905,10 +1916,12 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
 
     if (XST_FAILURE == uIGMPJoinGroup(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
       log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to join multicast group\r\n", uId);
+      Response->uStatus = CMD_STATUS_ERROR_GENERAL;
+    } else {
+      Response->uStatus = CMD_STATUS_SUCCESS;
     }
 
     Response->uId = if_to_configure;
-    Response->uStatus = CMD_STATUS_SUCCESS;
   }
 
   *uResponseLength = sizeof(sConfigureMulticastRespT);
@@ -3178,6 +3191,7 @@ static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponse
 
   Response->uLinkId = Command->uLinkId;
 
+  /* note - the uIGMPLeaveGroup() function does check the interface id */
   status = uIGMPLeaveGroup(Command->uLinkId);
 
   if (XST_SUCCESS == status){

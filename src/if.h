@@ -120,6 +120,9 @@ u8 get_interface_id(u8 logical_if_id);
 
 void print_interface_map(void);
 
+#define IF_ID_PRESENT        0
+#define IF_ID_INVALID_RANGE  1
+#define IF_ID_NOT_PRESENT    2
 u8 check_interface_valid(u8 physical_interface_id);
 u8 check_interface_valid_quietly(u8 physical_interface_id);
 

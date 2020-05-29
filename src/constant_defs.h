@@ -544,8 +544,10 @@ typedef struct sDHCPHeader {
 #endif
 
 /* return this for any uStatus fields in the command response fields */
-#define CMD_STATUS_SUCCESS 0
-#define CMD_STATUS_ERROR   1
+#define CMD_STATUS_SUCCESS                 0
+#define CMD_STATUS_ERROR_GENERAL           1
+#define CMD_STATUS_ERROR_IF_OUT_OF_RANGE   2
+#define CMD_STATUS_ERROR_IF_NOT_PRESENT    3
 
 typedef struct sCommandHeader {
     u16  uCommandType;

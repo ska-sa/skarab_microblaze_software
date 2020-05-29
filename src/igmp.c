@@ -109,7 +109,7 @@ static struct sIGMPObject *pIGMPGetContext(u8 uId){
 u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (XST_FAILURE == check_interface_valid(uId)) {
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast join failed\r\n");
     return XST_FAILURE;
   }
@@ -136,7 +136,7 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
     pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
     /*pIGMPObjectPtr->tIGMPCurrentState = IGMP_IDLE_STATE;*/
   } else {
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] Already subscribed with base %08x and mask %08x\r\n", uId, uMulticastBaseAddr,uMulticastAddrMask);
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] Already subscribed with base %08x and mask %08x\r\n", uId, uMulticastBaseAddr,uMulticastAddrMask);
   }
 
   return XST_SUCCESS;
@@ -149,7 +149,7 @@ u8 uIGMPLeaveGroup(u8 uId){
 
   log_printf(LOG_SELECT_IGMP, LOG_LEVEL_DEBUG, "IGMP [..] Leaving groups on i/f %02d\r\n", uId);
 
-  if (XST_FAILURE == check_interface_valid(uId)) {
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast leave failed\r\n");
     return XST_FAILURE;
   }
@@ -201,7 +201,7 @@ u8 uIGMPLeaveGroupFlush(u8 uId){
 u8 uIGMPRejoinPrevGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (XST_FAILURE == check_interface_valid(uId)) {
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast rejoin failed\r\n");
     return XST_FAILURE;
   }

@@ -742,7 +742,7 @@ int main()
   num_links = if_enumerate_interfaces();
 
   /* check if the one-gbe interface (physical id 0) is present */
-  if (XST_SUCCESS == check_interface_valid(0)){
+  if (IF_ID_PRESENT == check_interface_valid(0)){
     // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
     UpdateGBEPHYConfiguration();
 
@@ -1846,8 +1846,8 @@ int main()
       uFrontPanelLedsValue = 0;
 
       for (interface_id = 1; interface_id <= 4;  interface_id++){
-        /* check if the core is compiled into the firmware */
-        if (XST_SUCCESS == check_interface_valid_quietly(interface_id)){
+        /* check if the 40gbe core [1 to 4] is compiled into the firmware */
+        if (IF_ID_PRESENT == check_interface_valid_quietly(interface_id)){
           /* check the link status */
           if (pIFObjectPtr[interface_id]->uIFLinkStatus == LINK_UP){
             uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 1);

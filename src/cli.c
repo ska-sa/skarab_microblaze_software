@@ -590,7 +590,7 @@ static int cli_bounce_link_exe(struct cli *_cli){
   u32 l;
 
   /* check if the link is present - the option parsing state will catch the other end of the error modes */
-  if (XST_FAILURE == check_interface_valid(_cli->opt_id)){
+  if (IF_ID_PRESENT != check_interface_valid(_cli->opt_id)){
     xil_printf("link %d not present\r\n", _cli->opt_id);
     return -1;
   }
