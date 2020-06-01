@@ -147,7 +147,7 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 u8 uIGMPLeaveGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [..] Leaving groups on i/f %02d\r\n", uId);
+  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [..] Leaving groups on if-%d\r\n", uId);
 
   if (IF_ID_PRESENT != check_interface_valid(uId)) {
     log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast leave failed\r\n");

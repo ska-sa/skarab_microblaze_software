@@ -1908,7 +1908,7 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
     uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
     uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
 
-    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] ID: %d MC IP: %08x MC MASK: %08x\r\n",
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] setting fabric multicast registers - ID: %d MC IP: %08x MC MASK: %08x\r\n",
         uId, if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
 
     // Execute the command
@@ -3211,6 +3211,9 @@ static int MulticastLeaveGroup(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * u
     } else {
       if_to_leave = Command->uLinkId;   /*i.e. the user requested uId in the packet fields */
     }
+
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] clearing fabric multicast registers for if-%d\r\n", uId, if_to_leave);
+    SetMultiCastIPAddress(if_to_leave, 0xffffffff, 0xffffffff);   /* clear the fabric multicast registers */
 
     if (XST_FAILURE == uIGMPLeaveGroup(if_to_leave)){
       log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to leave multicast group on if-%d\r\n", uId, if_to_leave);
