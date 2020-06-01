@@ -298,7 +298,7 @@ static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 *uResponseLength);
 static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
-static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int MulticastLeaveGroup(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 
@@ -403,7 +403,7 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == DHCP_RESET_STATE_MACHINE)
       return(ResetDHCPStateMachine(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == MULTICAST_LEAVE_GROUP)
-      return(MulticastLeaveGroup(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(MulticastLeaveGroup(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_DHCP_MONITOR_TIMEOUT)
       return(GetDHCPMonitorTimeout(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_MICROBLAZE_UPTIME)
@@ -1883,11 +1883,11 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
    * note this is physical interface position as opposed to logical (enumerated) id
    */
   if (Command->uId != 0xff){
+    /* 0xff is a special case used in this command */
     status = check_interface_valid(Command->uId);
   }
 
   if ((Command->uId != 0xff) && (IF_ID_PRESENT != status)){
-    /* 0xff is a special case used in this command */
     Response->uId = Command->uId;
     if (IF_ID_INVALID_RANGE == status){
       Response->uStatus = CMD_STATUS_ERROR_IF_OUT_OF_RANGE;
@@ -1900,7 +1900,7 @@ int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, 
   } else {
     if (Command->uId == 0xff){
       /* special case i.e. we want to subscribe on *this* interface */
-      if_to_configure = uId;    /* this is the uId passed in from the calling function on which the command was received */
+      if_to_configure = uId;    /* this is the uId, passed in from the calling function, on which the command was received */
     } else {
       if_to_configure = Command->uId;   /*i.e. the user requested uId in the packet fields */
     }
@@ -3174,8 +3174,9 @@ static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 }
 
 
-static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
-  u8 status;
+static int MulticastLeaveGroup(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u8 if_to_leave;
+  u8 if_status;
 
   sMulticastLeaveGroupReqT *Command = (sMulticastLeaveGroupReqT *) pCommand;
   sMulticastLeaveGroupRespT *Response = (sMulticastLeaveGroupRespT *) uResponsePacketPtr;
@@ -3189,19 +3190,38 @@ static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponse
 
   *uResponseLength = sizeof(sMulticastLeaveGroupRespT);
 
-  Response->uLinkId = Command->uLinkId;
+  log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] mc leave - link ID: %d\r\n", uId, Command->uLinkId);
 
-  /* note - the uIGMPLeaveGroup() function does check the interface id */
-  status = uIGMPLeaveGroup(Command->uLinkId);
+  /* check that the interface supplied by user is valid
+   * note this is physical interface position as opposed to logical (enumerated) id
+   */
+  if (Command->uLinkId != 0xff){
+    /* 0xff is a special case used in this command - interface check would fail if 0xff passed in */
+    if_status = check_interface_valid(Command->uLinkId);
+  }
 
-  if (XST_SUCCESS == status){
-    Response->uSuccess = 1;
+  if ((Command->uLinkId != 0xff) && (IF_ID_PRESENT != if_status)){
+    Response->uLinkId = Command->uLinkId;
+    Response->uSuccess = 0;   /* error */
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to leave multicast group on if-%d\r\n", uId, Command->uLinkId);
   } else {
-    Response->uSuccess = 0;
+    if (Command->uLinkId == 0xff){
+      /* special case i.e. we want to unsubscribe on *this* interface */
+      if_to_leave = uId;    /* this is the uId, passed in from the calling function, on which the command was received */
+    } else {
+      if_to_leave = Command->uLinkId;   /*i.e. the user requested uId in the packet fields */
+    }
+
+    if (XST_FAILURE == uIGMPLeaveGroup(if_to_leave)){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to leave multicast group on if-%d\r\n", uId, if_to_leave);
+      Response->uSuccess = 0;   /* error */
+    } else {
+      Response->uSuccess = 1;   /* successful */
+    }
+    Response->uLinkId = if_to_leave;
   }
 
   return XST_SUCCESS;
-
 }
 
 
