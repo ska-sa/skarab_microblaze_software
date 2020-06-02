@@ -80,7 +80,7 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
- [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
+ [CMD_INDEX_DUMP]         = {"stack",   "heap", /*, "text"*/ NULL},
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
