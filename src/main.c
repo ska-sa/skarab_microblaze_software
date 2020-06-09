@@ -1278,26 +1278,32 @@ int main()
             pIFObjectPtr[uEthernetId]->uNumWordsRead = uNumWords;
             uSize = uNumWords << 1;
 
-            /* correct the endianess */
-            for (uIndex = 0; uIndex < uSize; uIndex++){
-              //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+            /* deep packet inspection */
+            if (pBuffer[18] != UDP_CONTROL_PORT){
+              /* correct the endianess */
+              for (uIndex = 0; uIndex < uSize; uIndex++){
+                //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
 #if 0
-              pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
+                pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
 #else
-              buf = (unsigned char *) (pBuffer + uIndex);
-              temp = buf[0];
-              buf[0] = buf[1];
-              buf[1] = temp;
-              //pBuffer++;
-              /* TODO: check this logic again!! */
+                buf = (unsigned char *) (pBuffer + uIndex);
+                temp = buf[0];
+                buf[0] = buf[1];
+                buf[1] = temp;
+                //pBuffer++;
+                /* TODO: check this logic again!! */
 #endif
+              }
+
+              /* reset pBuffer to point to start of buffer since we altered it */
+              //pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
+
+              uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
+            } else {
+              uPacketType = PACKET_FILTER_CONTROL;
             }
 
-            /* reset pBuffer to point to start of buffer since we altered it */
-            //pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
-
-            uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
-            log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "PCKT [%02x] Received packet type %d\r\n", uEthernetId, uPacketType);
+            log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] Received packet type %d\r\n", uEthernetId, uPacketType);
 
             /* do relevant checksum validation */
             switch(uPacketType){
@@ -1507,7 +1513,7 @@ int main()
            host has timeout in it's state machine (casperfpga),
            therefore reduce over head (printf's, etc.) */
 
-
+#if 0
         /* correct the endianess */
         for (uIndex = 0; uIndex < uSize; uIndex++){
           //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
@@ -1521,6 +1527,7 @@ int main()
           pBuffer++;
 #endif
         }
+#endif
 
         iStatus = EthernetRecvHandler(uEthernetId, pIFObjectPtr[uEthernetId]->uNumWordsRead, &uResponsePacketLength);
 

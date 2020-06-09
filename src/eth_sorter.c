@@ -2608,7 +2608,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
 
   /* State variables */
   /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
-  static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
+  static u32 uChunkIdCached = 0;        /* the last chunk that has been successfully programmed */
   static u32 uChunkSizeBytesCached = 0;      /* cache the chunk length which is obtained from chunk 0 */
 
   sSDRAMProgramOverWishboneReqT *Command = (sSDRAMProgramOverWishboneReqT *) pCommand;
