@@ -245,12 +245,12 @@ void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
   if (pIFObjectPtr->uIFEnableArpRequests == ARP_REQUESTS_ENABLE){
     RequestIP = pIFObjectPtr->uIFEthernetSubnet | pIFObjectPtr->uIFCurrentArpRequest;
     /* build the arp request */
-    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "build : 0x%08x ", RequestIP);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_DEBUG, "build : 0x%08x ", RequestIP);
     uARPBuildMessage(pIFObjectPtr, ARP_OPCODE_REQUEST, RequestIP);
 
     size = (u32) (pIFObjectPtr->uMsgSize >> 1);    /* bytes to 16-bit words */
 
-    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "swap: %d ", size);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_DEBUG, "swap: %d ", size);
     for (i = 0; i < size; i++){
       pBuffer[i] = Xil_EndianSwap16(pBuffer[i]);
     }
@@ -258,7 +258,7 @@ void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
     id = pIFObjectPtr->uIFEthernetId;
 
     size = size >> 1;   /*  32-bit words */
-    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "send: %d %d ", size, id);
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_DEBUG, "send: %d iface: %d ", size, id);
     iStatus = TransmitHostPacket(id, (u32 *) pBuffer, size);
     if (iStatus == XST_SUCCESS){
       pIFObjectPtr->uTxEthArpRequestOk++;
@@ -267,7 +267,7 @@ void ArpRequestHandler(struct sIFObject *pIFObjectPtr)
       pIFObjectPtr->uTxEthArpErr++;
     }
 
-    log_printf(LOG_SELECT_ARP, LOG_LEVEL_TRACE, "done\r\n");
+    log_printf(LOG_SELECT_ARP, LOG_LEVEL_DEBUG, "done\r\n");
     /* cycle through IP's from .1 to .254 */
     if (pIFObjectPtr->uIFCurrentArpRequest == 254){
       pIFObjectPtr->uIFCurrentArpRequest = 1;
