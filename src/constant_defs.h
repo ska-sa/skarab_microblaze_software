@@ -71,7 +71,8 @@ volatile u32 uTransmitBuffer[TX_BUFFER_MAX];
                                we require 9000 plus extra 14 bytes for eth header
                                (preamble and FCS handled in FW).
                                2254 x 32bit words = 9016 bytes */
-volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
+//volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
+volatile u32 uReceiveBuffer[RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
 
 // Transmit and receive buffers for loopback testing of second interface
 volatile u32 uLoopbackTransmitBuffer[256];

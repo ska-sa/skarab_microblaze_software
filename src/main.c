@@ -87,9 +87,9 @@ void IllegalOpcodeException(void *Data);
 /* void UnalignedAccessException(void *Data); */
 
 /* temp global definition */
-static volatile u8 uFlagRunTask_DHCP = 0;
-static volatile u8 uFlagRunTask_IGMP = 0;
-static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
+static volatile u8 uFlagRunTask_DHCP[NUM_ETHERNET_INTERFACES] = {0};
+static volatile u8 uFlagRunTask_IGMP[NUM_ETHERNET_INTERFACES] = {0};
+static volatile u8 uFlagRunTask_LLDP[NUM_ETHERNET_INTERFACES] = {0};
 #ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
 #endif
@@ -98,7 +98,7 @@ static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
-static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
+static volatile u8 uFlagRunTask_ARP_Requests[NUM_ETHERNET_INTERFACES] = {ARP_REQUEST_DONT_UPDATE};
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 #ifdef LINK_MON_RX_40GBE
 static volatile u8 uFlagRunTask_LinkWatchdog = 0;
@@ -142,15 +142,13 @@ static struct sMezzObject *MezzHandle[4];   /* holds the handle to the state of 
 void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 {
   //u8 uIndex;
+  int i;
 
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
   }
 
   uTick_100ms = 1;
-
-  // Every 100 ms, send another ARP request
-  uUpdateArpRequests = ARP_REQUEST_UPDATE;
 
   /* every 5 mins */
   if (uPrintStatsCounter >= 3000){
@@ -161,22 +159,25 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   }
 
   // LLDP every 15 seconds (timer every 100 ms)
-  if(uLLDPTimerCounter == 150)
-  {
+  if(uLLDPTimerCounter >= 150){
     uLLDPTimerCounter = 0x0;
-    uFlagRunTask_LLDP = 1;
-
-  }
-  else{
+    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+      uFlagRunTask_LLDP[i] = 1;
+    }
+  } else{
     uLLDPTimerCounter++;
   }
 
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+    uFlagRunTask_DHCP[i] = 1;
 
-  /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
-  uFlagRunTask_DHCP = 1;
+    /* set the igmp task flag every 100ms which in turn runs igmp state machine */
+    uFlagRunTask_IGMP[i] = 1;
 
-  /* set the igmp task flag every 100ms which in turn runs igmp state machine */
-  uFlagRunTask_IGMP = 1;
+    // Every 100 ms, send another ARP request
+    uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
+  }
 
 #ifdef RECONFIG_UPON_NO_DHCP
   uFlagRunTask_CheckDHCPBound = 1;
@@ -184,33 +185,6 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #ifdef LINK_MON_RX_40GBE
   uFlagRunTask_LinkWatchdog = 1;
-#endif
-
-#if 0
-  // DHCP every 10 seconds (timer every 100 ms)
-  if (uDHCPTimerCounter == 0x64)
-  {
-    uDHCPTimerCounter = 0x0;
-
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-      // Send out ARP requests every 60 seconds
-      if (uIGMPTimerCounter == 0x5)
-      {
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-    }
-
-    // Only send IGMP message reports every 60 seconds
-    if (uIGMPTimerCounter == 0x5)
-      uIGMPTimerCounter = 0;
-    else
-      uIGMPTimerCounter++;
-
-  }
-  else
-    uDHCPTimerCounter++;
 #endif
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
@@ -276,7 +250,8 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
   if (uL2PktLen < sizeof(struct sEthernetHeader))
     return XST_FAILURE;
 
-  pL2Ptr = (u8 *) &(uReceiveBuffer[uId][0]);
+  //pL2Ptr = (u8 *) &(uReceiveBuffer[uId][0]);
+  pL2Ptr = (u8 *) uReceiveBuffer;
   EthHdr = (struct sEthernetHeader *) pL2Ptr;
 
   // Cache MAC source address for response
@@ -1082,7 +1057,7 @@ int main()
     u8 *mac_addr = if_generate_mac_addr_array(uEthernetId);
 
     pIFObjectPtr[uEthernetId] = InterfaceInit(uEthernetId,
-        (u8 *) &(uReceiveBuffer[uEthernetId][0]),
+        (u8 *) uReceiveBuffer,
         (RX_BUFFER_MAX * 4),
         (u8 *) uTransmitBuffer,
         (TX_BUFFER_MAX * 4),
@@ -1239,8 +1214,6 @@ int main()
       }
     }
 
-    //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-
     for (link = 0; link < num_links; link++){
       uEthernetId = get_interface_id(link);
 
@@ -1252,7 +1225,7 @@ int main()
         if (uNumWords != 0)
         {
           /* zero the receive buffer */
-          memset((u8 *) &(uReceiveBuffer[uEthernetId][0]), 0, RX_BUFFER_MAX * 4);
+          memset((u8 *) uReceiveBuffer, 0, RX_BUFFER_MAX * 4);
 
           /* General packet reception handling:
              FILTER ( by layer and packet type)
@@ -1264,7 +1237,7 @@ int main()
              PROCESS  (Do the work) */
 
           // Read packet into receive buffer
-          iStatus  = ReadHostPacket(uEthernetId, &(uReceiveBuffer[uEthernetId][0]), uNumWords);
+          iStatus  = ReadHostPacket(uEthernetId, uReceiveBuffer, uNumWords);
           if (iStatus != XST_SUCCESS){
             log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Read Host Packet Error!\r\n");
           } else {
@@ -1272,7 +1245,7 @@ int main()
             time1 = XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET);
 #endif
             log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Read %d words in host packet!\r\n", uNumWords);
-            pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
+            pBuffer = (u16*) uReceiveBuffer;
 
             /* convert the number of 32bit words to a number of 16bit half-words */
             pIFObjectPtr[uEthernetId]->uNumWordsRead = uNumWords;
@@ -1414,7 +1387,7 @@ int main()
                     vDHCPStateMachineReset(pIFObjectPtr[uEthernetId]);
                     uDHCPSetStateMachineEnable(pIFObjectPtr[uEthernetId], SM_TRUE);
                     //uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
-                    uFlagRunTask_DHCP = 1;
+                    uFlagRunTask_DHCP[uEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_INVALID){
                     log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ARP  [%02x] malformed packet!\r\n", uEthernetId);
                     IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_INVALID);
@@ -1446,46 +1419,33 @@ int main()
           }
         }
       }
-    }
 
-    /* simple interrupt driven multi-tasking scheduler */
-    /*TODO: FIXME: wrap link up status check around all these tasks - especially the transmit tasks! */
+      /* simple interrupt driven multi-tasking scheduler */
 
-    //----------------------------------------------------------------------------//
-    //  DHCP TASK                                                                 //
-    //  Triggered on timer interrupt and DHCP message receipt                     //
-    //----------------------------------------------------------------------------//
-    if (uFlagRunTask_DHCP){
-      uFlagRunTask_DHCP = 0;     /* reset task flag */
-      //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      for (link = 0; link < num_links; link++){
-        uEthernetId = get_interface_id(link);
+      //----------------------------------------------------------------------------//
+      //  DHCP TASK                                                                 //
+      //  Triggered on timer interrupt and DHCP message receipt                     //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_DHCP[uEthernetId]){
+        uFlagRunTask_DHCP[uEthernetId] = 0;     /* reset task flag */
         uDHCPStateMachine(pIFObjectPtr[uEthernetId]);
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  IGMP TASK                                                                 //
-    //  Triggered on timer interrupt and IGMP control command                     //
-    //----------------------------------------------------------------------------//
-    if (uFlagRunTask_IGMP){
-      uFlagRunTask_IGMP = 0;     /* reset task flag */
-      //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      for (link = 0; link < num_links; link++){
-        uEthernetId = get_interface_id(link);
+      //----------------------------------------------------------------------------//
+      //  IGMP TASK                                                                 //
+      //  Triggered on timer interrupt and IGMP control command                     //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_IGMP[uEthernetId]){
+        uFlagRunTask_IGMP[uEthernetId] = 0;     /* reset task flag */
         if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
           uIGMPStateMachine(uEthernetId);
         }
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  CONTROL TASK                                                              //
-    //  Triggered on CONTROL message receipt                                      //
-    //----------------------------------------------------------------------------//
-    //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-    for (link = 0; link < num_links; link++){
-      uEthernetId = get_interface_id(link);
+      //----------------------------------------------------------------------------//
+      //  CONTROL TASK                                                              //
+      //  Triggered on CONTROL message receipt                                      //
+      //----------------------------------------------------------------------------//
       if (uFlagRunTask_CTRL[uEthernetId]){
         log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "CTRL [%02x] Running control task...\r\n", uEthernetId);
         /* TODO: for now, run Peralex Control Protocol handler, slightly hackish */
@@ -1495,39 +1455,6 @@ int main()
 
         /* convert the number of 32bit words to a number of 16bit half-words */
         uSize = pIFObjectPtr[uEthernetId]->uNumWordsRead << 1;
-
-#if 0
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "uNumWordsRead = %d\r\n", IFContext[uEthernetId].uNumWordsRead);
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "uSize = %d\r\n", uSize);
-        /* debug packet dump */
-        for (u32 i=0; i<(512 * 2); i++){
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%02x ", IFContext[uEthernetId].pUserRxBufferPtr[i] );
-          if ((i != 0) && (i % 15) == 0){
-            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-          }
-        }
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-#endif
-
-        /* NOTE: the control response needs to be sent quickly since 
-           host has timeout in it's state machine (casperfpga),
-           therefore reduce over head (printf's, etc.) */
-
-#if 0
-        /* correct the endianess */
-        for (uIndex = 0; uIndex < uSize; uIndex++){
-          //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
-#if 0
-          pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
-#else
-          buf = (unsigned char *) pBuffer;
-          temp = buf[0];
-          buf[0] = buf[1];
-          buf[1] = temp;
-          pBuffer++;
-#endif
-        }
-#endif
 
         iStatus = EthernetRecvHandler(uEthernetId, pIFObjectPtr[uEthernetId]->uNumWordsRead, &uResponsePacketLength);
 
@@ -1550,15 +1477,12 @@ int main()
 
         uFlagRunTask_CTRL[uEthernetId] = 0;
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ICMP TASK                                                                 //
-    //  Triggered on ICMP message receipt                                         //
-    //----------------------------------------------------------------------------//
-    //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-    for (link = 0; link < num_links; link++){
-      uEthernetId = get_interface_id(link);
+
+      //----------------------------------------------------------------------------//
+      //  ICMP TASK                                                                 //
+      //  Triggered on ICMP message receipt                                         //
+      //----------------------------------------------------------------------------//
       if (uFlagRunTask_ICMP_Reply[uEthernetId]){
         iStatus = uICMPBuildReplyMessage(pIFObjectPtr[uEthernetId]);
         if (iStatus != ICMP_RETURN_OK){
@@ -1584,15 +1508,12 @@ int main()
         uFlagRunTask_ICMP_Reply[uEthernetId] = 0;
         uFlagRunTask_Diagnostics = 1;   /* dump interface counters to console upon ping */
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ARP PROCESSING TASK                                                       //
-    //  Triggered on ARP reply message reception                                  //
-    //----------------------------------------------------------------------------//
-    //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-    for (link = 0; link < num_links; link++){
-      uEthernetId = get_interface_id(link);
+
+      //----------------------------------------------------------------------------//
+      //  ARP PROCESSING TASK                                                       //
+      //  Triggered on ARP reply message reception                                  //
+      //----------------------------------------------------------------------------//
       if (uFlagRunTask_ARP_Process[uEthernetId]){
 
         /* TODO FIXME refactor following lines: remove inline declarations, etc. */
@@ -1612,15 +1533,11 @@ int main()
 
         uFlagRunTask_ARP_Process[uEthernetId] = 0;
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ARP RESPOND TASK                                                          //
-    //  Triggered on ARP request message reception                                //
-    //----------------------------------------------------------------------------//
-    //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-    for (link = 0; link < num_links; link++){
-      uEthernetId = get_interface_id(link);
+      //----------------------------------------------------------------------------//
+      //  ARP RESPOND TASK                                                          //
+      //  Triggered on ARP request message reception                                //
+      //----------------------------------------------------------------------------//
       if (uFlagRunTask_ARP_Respond[uEthernetId]){
         iStatus = uARPBuildMessage(pIFObjectPtr[uEthernetId], ARP_OPCODE_REPLY, 0);
         if (iStatus != ARP_RETURN_OK){
@@ -1645,28 +1562,20 @@ int main()
         }
         uFlagRunTask_ARP_Respond[uEthernetId] = 0;
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ARP REQUEST TASK                                                          //
-    //----------------------------------------------------------------------------//
-      if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
-        uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
-        //for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        for (link = 0; link < num_links; link++){
-          uEthernetId = get_interface_id(link);
-          ArpRequestHandler(pIFObjectPtr[uEthernetId]);
-        }
+      //----------------------------------------------------------------------------//
+      //  ARP REQUEST TASK                                                          //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_ARP_Requests[uEthernetId] == ARP_REQUEST_UPDATE){
+        uFlagRunTask_ARP_Requests[uEthernetId] = ARP_REQUEST_DONT_UPDATE;
+        ArpRequestHandler(pIFObjectPtr[uEthernetId]);
       }
 
-    //----------------------------------------------------------------------------//
-    //  LLDP TASK                                                                 //
-    //  Triggered on timer interrupt                                              //
-    //----------------------------------------------------------------------------//
-    if(uFlagRunTask_LLDP){
-      //for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      for (link = 0; link < num_links; link++){
-        uEthernetId = get_interface_id(link);
+      //----------------------------------------------------------------------------//
+      //  LLDP TASK                                                                 //
+      //  Triggered on timer interrupt                                              //
+      //----------------------------------------------------------------------------//
+      if(uFlagRunTask_LLDP[uEthernetId]){
         /* only send lldp packets if the link is up */
         if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
           iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
@@ -1686,10 +1595,10 @@ int main()
             }
           }
         }
+        uFlagRunTask_LLDP[uEthernetId] = 0;
       }
-      uFlagRunTask_LLDP = 0;
-    }
 
+    }   /* end network for-loop */
 
     //----------------------------------------------------------------------------//
     //  40GBE RX LINK MONITOR TASK                                                //
@@ -2084,7 +1993,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
   uDHCPState[id] = DHCP_STATE_COMPLETE;
 
   EnableFabricInterface(id, 1);
-  uFlagRunTask_LLDP = 1;
+  uFlagRunTask_LLDP[id] = 1;
 
   /* cache the ip in persistent memory for DHCP request on next reconfigure cycle */
   /* TODO: should we check the state of persistent memory again (?) - perhaps a
