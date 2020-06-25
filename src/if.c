@@ -608,9 +608,13 @@ u8 get_num_interfaces(void){
 
 static u8 logical_interface_set[NUM_ETHERNET_INTERFACES];
 
-u8 get_interface_id(u8 logical_if_id){
+
+/* @param logical_link_id
+ * return physical interface id
+ */
+u8 get_physical_interface_id(u8 logical_link_id){
   /* TODO: assert sane logical_if_id */
-  return logical_interface_set[logical_if_id];
+  return logical_interface_set[logical_link_id];
 }
 
 

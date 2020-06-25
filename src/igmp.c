@@ -221,8 +221,8 @@ u8 uIGMPRejoinPrevGroup(u8 uId){
 
 void vIGMPPrintInfo(void){
   u8 num_links;
-  u8 log_id;  /* logical id */
-  u8 phy_id;  /* physical id*/
+  u8 logical_link;
+  u8 physical_id;
   u32 base_addr;
   u32 mask_addr;
   typeIGMPState current_state;
@@ -230,16 +230,16 @@ void vIGMPPrintInfo(void){
   struct sIGMPObject *pIGMPObjectPtr;
 
   num_links = get_num_interfaces();
-  for (log_id = 0; log_id < num_links; log_id++){
-    phy_id = get_interface_id(log_id);
-    pIGMPObjectPtr = pIGMPGetContext(phy_id);
+  for (logical_link = 0; logical_link < num_links; logical_link++){
+    physical_id = get_physical_interface_id(logical_link);
+    pIGMPObjectPtr = pIGMPGetContext(physical_id);
 
     base_addr = pIGMPObjectPtr->uIGMPJoinMulticastAddress;
     mask_addr = pIGMPObjectPtr->uIGMPJoinMulticastAddressMask;
     cached_id = pIGMPObjectPtr->uIGMPIfId;   /* included as cross-check to verify that the id mapping is correct */
     current_state = pIGMPObjectPtr->tIGMPCurrentState;
 
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] id: %02d base: %08x mask: %08x state: %s\r\n", phy_id,
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] id: %02d base: %08x mask: %08x state: %s\r\n", physical_id,
         cached_id, base_addr, mask_addr, igmp_state_name_lookup[current_state]);
   }
 }

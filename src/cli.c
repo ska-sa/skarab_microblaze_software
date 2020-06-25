@@ -698,13 +698,13 @@ static int cli_reset_fw_exe(struct cli *_cli){
 
 
 static int cli_stats_exe(struct cli *_cli){
-  u8 n, i, phy_id;
+  u8 n, link, phy_id;
   struct sIFObject *iface;
 
   n = get_num_interfaces();
 
-  for (i = 0; i < n; i++){
-    phy_id = get_interface_id(i);
+  for (link = 0; link < n; link++){
+    phy_id = get_physical_interface_id(link);
     iface = lookup_if_handle_by_id(phy_id);
     PrintInterfaceCounters(iface);
   }

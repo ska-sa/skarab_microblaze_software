@@ -116,7 +116,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
 
 u8 if_enumerate_interfaces(void);   /* returns number of interfaces */
 u8 get_num_interfaces(void);
-u8 get_interface_id(u8 logical_if_id);
+u8 get_physical_interface_id(u8 logical_link_id);
 
 void print_interface_map(void);
 

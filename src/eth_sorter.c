@@ -1007,7 +1007,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     // and send leave messages immediately
     num_links = get_num_interfaces();
     for (link = 0; link < num_links; link++){
-      uIndex = get_interface_id(link);
+      uIndex = get_physical_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group.\r\n", uIndex);
       }
@@ -1040,7 +1040,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
     // and send leave messages immediately
     num_links = get_num_interfaces();
     for (link = 0; link < num_links; link++){
-      uIndex = get_interface_id(link);
+      uIndex = get_physical_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }
@@ -2652,7 +2652,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     /* unsubscribe from all igmp groups when programming starts */
     num_links = get_num_interfaces();
     for (link = 0; link < num_links; link++){
-      uIndex = get_interface_id(link);
+      uIndex = get_physical_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] Failed to leave multicast group\r\n", uIndex);
       }
