@@ -266,8 +266,10 @@ struct sDHCPObject{
   u32 uDHCPLeaseTime;
 
   /* byte arrays */
-  u8  arrDHCPNextHopMacCached[6];       /* holds the mac address of the next hop on link */
-  u8  arrDHCPAddrServerCached[4];       /* holds the lease issuing dhcp server's ip address */
+#define DHCP_MAC_ARR_LEN  6
+  u8  arrDHCPNextHopMacCached[DHCP_MAC_ARR_LEN];       /* holds the mac address of the next hop on link */
+#define DHCP_IPADDR_ARR_LEN  4
+  u8  arrDHCPAddrServerCached[DHCP_IPADDR_ARR_LEN];       /* holds the lease issuing dhcp server's ip address */
 
   u32 uDHCPXidCached;
 

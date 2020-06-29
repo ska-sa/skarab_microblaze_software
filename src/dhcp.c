@@ -1319,6 +1319,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   int RetVal = (-1);
   u16 uCheckTemp = 0;
   u16 uUDPLength = 0;
+  int i;
 
   struct sDHCPObject *pDHCPObjectPtr;
 
@@ -1341,7 +1342,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     memcpy(pBuffer + ETH_DST_OFFSET, pDHCPObjectPtr->arrDHCPNextHopMacCached, 6);
   } else {
     memset(pBuffer + ETH_DST_OFFSET, 0xff, 6);   /* broadcast */
-  } 
+  }
 
   /* fill in our hardware mac address */
   memcpy(pBuffer + ETH_SRC_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
@@ -1513,7 +1514,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP: UDP pseudo header: \r\n");
-  for (int i = 0; i < 12; i++){
+  for (i = 0; i < 12; i++){
     log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", uPseudoHdr[i]);
   }
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
@@ -1544,6 +1545,11 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   pIFObjectPtr->uMsgSize = uLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
   /* TODO: set a message ready flag */
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP tx pkt:");
+  for (i = 0; i < uLength; i++){
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", pBuffer[i]);
+  }
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
 
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,

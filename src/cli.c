@@ -54,6 +54,9 @@ typedef enum {
   CMD_INDEX_DUMP,
   CMD_INDEX_IF_MAP,
   CMD_INDEX_IGMP,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  CMD_INDEX_PEEK,
+#endif
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -75,6 +78,9 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_DUMP]        = "dump",
   [CMD_INDEX_IF_MAP]      = "if-map",
   [CMD_INDEX_IGMP]        = "igmp",
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  [CMD_INDEX_PEEK]        = "peek",
+#endif
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -94,6 +100,9 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
  [CMD_INDEX_IF_MAP]       = { NULL },
  [CMD_INDEX_IGMP]         = { NULL },
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = {"iface",   "dhcp"},
+#endif
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -112,6 +121,9 @@ static int cli_uptime_exe(struct cli *_cli);
 static int cli_dump_exe(struct cli *_cli);
 static int cli_if_map_exe(struct cli *_cli);
 static int cli_igmp_exe(struct cli *_cli);
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+static int cli_peek_exe(struct cli *_cli);
+#endif
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -129,6 +141,9 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_DUMP]         = cli_dump_exe,
  [CMD_INDEX_IF_MAP]       = cli_if_map_exe,
  [CMD_INDEX_IGMP]         = cli_igmp_exe,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = cli_peek_exe,
+#endif
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -880,6 +895,42 @@ static int cli_igmp_exe(struct cli *_cli){
   vIGMPPrintInfo();
   return 0;
 }
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+#define CLI_PEEK_IFACE  0
+#define CLI_PEEK_DHCP   1
+
+static int cli_peek_exe(struct cli *_cli){
+  u8 logical_link;
+  u8 physical_interface_id;
+  u8 n;
+
+  n = get_num_interfaces();
+
+  /* TODO: could optimise this code a bit more */
+  switch(_cli->opt_id){
+    case CLI_PEEK_IFACE:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_interface_internals(physical_interface_id);
+      }
+      break;
+
+    case CLI_PEEK_DHCP:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_dhcp_internals(physical_interface_id);
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+#endif
+
 
 #if 0
 static const char * const cmd_map[][12] = {

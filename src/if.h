@@ -33,16 +33,22 @@ struct sIFObject{
   u8 uIFLinkStatus;
   u8 uIFLinkRxActive;
 
-  u8 arrIFAddrMac[6];
+#define IF_MAC_ARR_LEN  6
+  u8 arrIFAddrMac[IF_MAC_ARR_LEN];
 
-  u8 stringHostname[16];
+#define IF_HOSTNAME_STR_LEN 16
+  u8 stringHostname[IF_HOSTNAME_STR_LEN];
 
-  u8 arrIFAddrIP[4];
-  u8 stringIFAddrIP[16];
+#define IF_IPADDR_ARR_LEN 4
+  u8 arrIFAddrIP[IF_IPADDR_ARR_LEN];
+#define IF_IPADDR_STR_LEN 16
+  u8 stringIFAddrIP[IF_IPADDR_STR_LEN];
   u32 uIFAddrIP;
 
-  u8 arrIFAddrNetmask[4];
-  u8 stringIFAddrNetmask[16];
+#define IF_NETMASK_ARR_LEN 4
+  u8 arrIFAddrNetmask[IF_NETMASK_ARR_LEN];
+#define IF_NETMASK_STR_LEN 16
+  u8 stringIFAddrNetmask[IF_NETMASK_STR_LEN];
   u32 uIFAddrMask;
 
   u8 uIFEthernetId;

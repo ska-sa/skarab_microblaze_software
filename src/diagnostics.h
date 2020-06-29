@@ -23,6 +23,11 @@ extern "C" {
 /* Network */
 void PrintInterfaceCounters(struct sIFObject *pIFObj);
 
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+void print_interface_internals(u8 physical_interface_id);
+void print_dhcp_internals(u8 physical_interface_id);
+#endif
+
 /* General */
 void PrintVersionInfo();
 const char *GetVersionInfo();

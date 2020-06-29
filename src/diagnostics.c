@@ -170,3 +170,132 @@ void ReadAndPrintFPGADNA()
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
 }
+
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+/*
+ * print the interface object data structure
+ */
+void print_interface_internals(u8 physical_interface_id){
+  int i;
+  struct sIFObject *ifptr;
+
+  ifptr = lookup_if_handle_by_id(physical_interface_id);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFMagic x%08x\r\n", ifptr->uIFMagic);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "pUserTxBufferPtr x%p\r\n", ifptr->pUserTxBufferPtr);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uUserTxBufferSize u%u\r\n", ifptr->uUserTxBufferSize);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uMsgSize u%u\r\n", ifptr->uMsgSize );
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "pUserRxBufferPtr x%p\r\n", ifptr->pUserRxBufferPtr);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uUserRxBufferSize u%u\r\n", ifptr->uUserRxBufferSize);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uNumWordsRead u%u\r\n", ifptr->uNumWordsRead);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFLinkStatus u%u\r\n", ifptr->uIFLinkStatus);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFLinkRxActive u%u\r\n", ifptr->uIFLinkRxActive);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrIFAddrMac[%d]", IF_MAC_ARR_LEN);
+  for (i = 0; i < IF_MAC_ARR_LEN; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", ifptr->arrIFAddrMac[i])
+  }
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+  /* currently not being setso don't display - hostname is set in the dhcp API functions from main() */
+  //log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "stringHostname[%d] %s\r\n", IF_HOSTNAME_STR_LEN, ifptr->stringHostname);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrIFAddrIP[%d]", IF_IPADDR_ARR_LEN);
+  for (i = 0; i < IF_IPADDR_ARR_LEN; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", ifptr->arrIFAddrIP[i])
+  }
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "stringIFAddrIP[%d] %s\r\n", IF_IPADDR_STR_LEN, ifptr->stringIFAddrIP);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFAddrIP x%08x\r\n", ifptr->uIFAddrIP);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrIFAddrNetmask[%d]", IF_NETMASK_ARR_LEN);
+  for (i = 0; i < IF_NETMASK_ARR_LEN; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", ifptr->arrIFAddrNetmask[i])
+  }
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "stringIFAddrNetmask[%d] %s\r\n", IF_NETMASK_STR_LEN, ifptr->stringIFAddrNetmask);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFAddrMask x%08x\r\n", ifptr->uIFAddrMask);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFEthernetId u%u\r\n", ifptr->uIFEthernetId);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFEthernetSubnet x%08x\r\n", ifptr->uIFEthernetSubnet);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFEnableArpRequests u%u\r\n", ifptr->uIFEnableArpRequests);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFCurrentArpRequest u%u\r\n", ifptr->uIFCurrentArpRequest);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n", ifptr->uIFCurrentArpRequest);
+}
+
+
+
+/*
+ * print the dhcp object data structure
+ */
+void print_dhcp_internals(u8 physical_interface_id){
+  int i;
+  struct sDHCPObject *dhcpptr;
+  struct sIFObject *ifptr;
+
+  static const char *dhcp_state_string_lookup[] = {
+    [INIT] = "INIT",
+    [RANDOMIZE] = "RANDOMIZE",
+    [SELECT] = "SELECT",
+    [WAIT] = "WAIT",
+    [REQUEST] = "REQUEST",
+    [BOUND] = "BOUND",
+    [RENEW] = "RENEW",
+    [REBIND] = "REBIND"
+  };
+
+  ifptr = lookup_if_handle_by_id(physical_interface_id);
+  dhcpptr = &(ifptr->DHCPContextState);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMagic x%08x\r\n", dhcpptr->uDHCPMagic);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMessageReady u%u\r\n", dhcpptr->uDHCPMessageReady);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTx u%u\r\n", dhcpptr->uDHCPTx);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRx u%u\r\n", dhcpptr->uDHCPRx);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPErrors u%u\r\n", dhcpptr->uDHCPErrors);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPInvalid u%u\r\n", dhcpptr->uDHCPInvalid);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRetries u%u\r\n", dhcpptr->uDHCPRetries);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTimeoutStatus u%u\r\n", dhcpptr->uDHCPTimeoutStatus);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRebootReqs u%u\r\n", dhcpptr->uDHCPRebootReqs);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTimeout u%u\r\n", dhcpptr->uDHCPTimeout);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "tDHCPCurrentState %s\r\n", dhcp_state_string_lookup[dhcpptr->tDHCPCurrentState] );
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPInternalTimer u%u\r\n", dhcpptr->uDHCPInternalTimer);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPCurrentClkTick u%u\r\n", dhcpptr->uDHCPCurrentClkTick);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPCachedClkTick u%u\r\n", dhcpptr->uDHCPCachedClkTick);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPExternalTimerTick u%u\r\n", dhcpptr->uDHCPExternalTimerTick);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRandomWait u%u\r\n", dhcpptr->uDHCPRandomWait);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRandomWaitCached u%u\r\n", dhcpptr->uDHCPRandomWaitCached);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPSMRetryInterval u%u\r\n", dhcpptr->uDHCPSMRetryInterval);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPSMInitWait u%u\r\n", dhcpptr->uDHCPSMInitWait);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPT1 u%u\r\n", dhcpptr->uDHCPT1);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPT2 u%u\r\n", dhcpptr->uDHCPT2);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPLeaseTime u%u\r\n", dhcpptr->uDHCPLeaseTime);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPNextHopMacCached[%d]", DHCP_MAC_ARR_LEN);
+  for (i = 0; i < DHCP_MAC_ARR_LEN; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPNextHopMacCached[i])
+  }
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPAddrServerCached[%d]", DHCP_IPADDR_ARR_LEN);
+  for (i = 0; i < DHCP_IPADDR_ARR_LEN; i++){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPAddrServerCached[i])
+  }
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPXidCached x%08x\r\n", dhcpptr->uDHCPXidCached);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPHostName %s\r\n", dhcpptr->arrDHCPHostName);
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRegisterFlags x%02x\r\n", dhcpptr->uDHCPRegisterFlags);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+
+}
+
+#endif
