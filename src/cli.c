@@ -1,5 +1,6 @@
 #include <xil_printf.h>
 #include <xstatus.h>
+#include <stdlib.h>
 
 #include "cli.h"
 #include "logging.h"
@@ -15,6 +16,7 @@
 #include "init.h"
 #include "if.h"
 #include "igmp.h"
+#include "error.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -34,6 +36,7 @@ struct cli{
   unsigned int cmd_id;
   unsigned int curr_index;
   unsigned int opt_id;
+  unsigned int opt_value_u32;
   CLI_STATE state;
   unsigned int run_again;    /* used to run the state machine again interneally before
                               * passing control back to calling function */
@@ -57,6 +60,7 @@ typedef enum {
 #ifndef PRUNE_CODEBASE_DIAGNOSTICS
   CMD_INDEX_PEEK,
 #endif
+  CMD_INDEX_WB_READ,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -81,10 +85,12 @@ static const char * const cli_cmd_map[] = {
 #ifndef PRUNE_CODEBASE_DIAGNOSTICS
   [CMD_INDEX_PEEK]        = "peek",
 #endif
+  [CMD_INDEX_WB_READ]     = "wb-read",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
 
+#define CLI_KEYWORD_HEX "HEX"
 static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_LOG_LEVEL]    = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
  [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "igmp",  "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
@@ -97,12 +103,13 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
- [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
+ [CMD_INDEX_DUMP]         = {"stack",   "heap", /*, "text"*/ NULL},
  [CMD_INDEX_IF_MAP]       = { NULL },
  [CMD_INDEX_IGMP]         = { NULL },
 #ifndef PRUNE_CODEBASE_DIAGNOSTICS
  [CMD_INDEX_PEEK]         = {"iface",   "dhcp"},
 #endif
+ [CMD_INDEX_WB_READ]      = {CLI_KEYWORD_HEX, NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -124,6 +131,7 @@ static int cli_igmp_exe(struct cli *_cli);
 #ifndef PRUNE_CODEBASE_DIAGNOSTICS
 static int cli_peek_exe(struct cli *_cli);
 #endif
+static int cli_wb_read_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -144,6 +152,7 @@ static const cmd_callback cli_cmd_callback[] = {
 #ifndef PRUNE_CODEBASE_DIAGNOSTICS
  [CMD_INDEX_PEEK]         = cli_peek_exe,
 #endif
+ [CMD_INDEX_WB_READ]      = cli_wb_read_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -156,6 +165,7 @@ static void cli_print_help(void);
 static void cli_sm_run_again(struct cli *_cli);
 static int cli_isspace(char c);
 static int cli_strncmp(const char *first, const char *second, unsigned int n);
+static int cli_valid_hex(char *string, unsigned int size);
 
 typedef CLI_STATE (* const cli_state_func_ptr)(struct cli *);
 
@@ -390,6 +400,28 @@ static CLI_STATE cli_parse_opt_state(struct cli *_cli){
   }
   tmp_buffer[j] = '\0';
 
+  /* first check for cli keywords... */
+  if (cli_strncmp(CLI_KEYWORD_HEX, cli_cmd_options[_cli->cmd_id][m], 4)){
+    /* check that the argument is a valid *hex* format */
+    /* and only provide support for 32-bit hex values: 0xffffffff */
+    if (cli_valid_hex(tmp_buffer, j+1) && ((j+1) <= 11)){
+      /* convert hex string to a value */
+      _cli->opt_value_u32 = (unsigned int) strtoul(tmp_buffer, NULL, 16);    /* the string has already been
+                                                                             * validated, therefore pass in NULL as
+                                                                             * 2nd arg */
+      _cli->opt_id = m;
+      _cli->curr_index = i;
+      return CLI_EXE;
+    } else {
+      xil_printf("%s %s%s\r\n",cli_cmd_map[_cli->cmd_id], tmp_buffer,\
+          /* space formatting -> */ tmp_buffer[0] != '\0' ? " {invalid hex value, expected 32-bit format 0x1234abcd}" : "{hex value required}");
+
+      cli_reset_internals(_cli);
+      return CLI_IDLE;
+    }
+  }
+
+  /* if not a keyword then parse the arguments... */
   while(cli_cmd_options[_cli->cmd_id][m] != NULL){
     if (cli_strncmp(tmp_buffer, cli_cmd_options[_cli->cmd_id][m], j+1)){
       _cli->opt_id = m;
@@ -418,6 +450,7 @@ static CLI_STATE cli_parse_opt_state(struct cli *_cli){
 static CLI_STATE cli_exe_state(struct cli *_cli){
   int ret = 1;
 
+  /* run the relevant cmd callback according to the index */
   if (cli_cmd_callback[_cli->cmd_id] != NULL){
     ret = cli_cmd_callback[_cli->cmd_id](_cli);
   }
@@ -553,6 +586,41 @@ static int cli_strncmp(const char *first, const char *second, unsigned int n){
 
   return 0;
 }
+
+/* return 1 if hex, return 0 if not */
+/* valid hex format: 0x0000000... */
+static int cli_valid_hex(char *string, unsigned int size){
+  unsigned int i;
+
+  /*
+   * must have at least one digit, therefore
+   * size must be at least 4 => '0x' plus 1 digit plus '\0'
+   */
+  if (size < 4){
+    return 0;
+  }
+
+  /* check '0x' prefix */
+  if ((string[0] != '0') || (string[1] != 'x')){
+    return 0;
+  }
+
+  /* the characters in the cli are always converted to lower case */
+  /* check validity of each digit */
+  for (i = 2; i < (size-1); i++){
+
+    /* number or hex letter? */
+    if (((string[i] >= 0x30) && (string[i] <= 0x39)) || ((string[i] >= 0x61) && (string[i] <= 0x66))) {
+      continue; /* valid => check next char by advancing for-loop*/
+    } else {
+      return 0; /* not a valid char */
+    }
+  }
+
+  /* if we reach here we have a valid hex format */
+  return 1;
+}
+
 
 static void cli_print_help(void){
   int i = 0;
@@ -932,74 +1000,22 @@ static int cli_peek_exe(struct cli *_cli){
 #endif
 
 
-#if 0
-static const char * const cmd_map[][12] = {
-  {"log-level",   "trace",   "debug", "info", "warn", "error", "off",  NULL},
-  {"log-select",  "general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl", "buff", "hardw", "iface", "all", NULL},
-  {NULL}
-};
+static int cli_wb_read_exe(struct cli *_cli){
+  u32 addr;
+  u32 data;
+  u8 errno;
 
-static void cli_print_help(void){
-  int i = 0;
-  int j = 1;
+  addr = _cli->opt_value_u32;
+  data = ReadWishboneRegister(addr);
 
-  xil_printf("usage:\r\n");
-  i = 0;
-  while(cmd_map[i][0] != NULL){
-    xil_printf("%s [", cmd_map[i][0]);
-    j = 1;
-    while(cmd_map[i][j] != NULL){
-      xil_printf("%s", cmd_map[i][j]);
-      cmd_map[i][j+1] == NULL ? xil_printf("]\r\n") : xil_printf("|");
-      j++;
-    }
-    i++;
-  }
-  /*xil_printf("log-level [trace|debug|info|warn|error|off]\r\n");*/
-  /*xil_printf("log-select [general|dhcp|arp|icmp|lldp|ctrl|buff|hardw|iface|all]\r\n");*/
-}
-#endif
+  /* check for wb memory addressing errors (out-of-range address)*/
+  errno = read_and_clear_error_flag();
 
-#if 0
-/* trading bytes for simplicity - each row has n columns with '\0' if unused
-   this tradeoff cheap for small LUT and expensive for large LUT */
-
-static const char * lookup(char *){
-  static const char * const cmd_map[][] = {
-    {"log-level",   "trace",   "debug", "info", "warn", "error", "off",  "\0",   "\0",    "\0",    "\0",  "\0"},
-    {"log-select",  "general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl", "buff", "hardw", "iface", "all", "\0"},
-    {"\0"}
+  if (errno == ERROR_AXI_DATA_BUS){
+    xil_printf("bus error\r\n") ;
+    return -1;
+  } else {
+    xil_printf("addr 0x%08x, data 0x%08x\r\n", addr, data) ;
+    return 0;
   }
 }
-#endif
-
-
-#if 0
-/* the command interface only allows a command to have one of its registered
- * options selected */
-/* TODO: this could also be done with variable sized options ... */
-cli_register_cmd(_cli, "log-level", option_required);
-cli_register_option(_cli, "log-level", "trace");
-cli_register_option(_cli, "log-level", "debug");
-cli_register_option(_cli, "log-level", "info");
-cli_register_option(_cli, "log-level", "warn");
-cli_register_option(_cli, "log-level", "error");
-cli_register_option(_cli, "log-level", "off");
-
-struct cli_cmd{
-  const char * const name;
-  const char * const options[];
-
-}
-struct cli_cmd* cmd[CMD_MAP_SIZE];
-
-
-static int cli_register_cmd(struct cli *_cli, const char * const cmd){
-
-
-}
-
-
-cli_build_command_map(_cli)
-
-#endif

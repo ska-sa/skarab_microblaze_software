@@ -62,6 +62,7 @@
 #include "igmp.h"
 #include "time.h"
 #include "init.h"
+#include "error.h"
 
 #define DHCP_MAX_RECONFIG_COUNT 2
 
@@ -2053,6 +2054,9 @@ void IBusException(void *Data){
 
 void DBusException(void *Data){
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Data AXI bus exception\r\n");
+
+  /* this exception was most likely caused by an illegal addressing of the wishbone bus which resulted in a bus timeout */
+  set_error_flag(ERROR_AXI_DATA_BUS);
 }
 
 void StackViolationException(void *Data){

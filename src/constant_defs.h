@@ -293,7 +293,9 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define MULTICAST_LEAVE_GROUP       0x0061
 #define GET_DHCP_MONITOR_TIMEOUT    0x0063
 #define GET_MICROBLAZE_UPTIME       0x0065
-#define HIGHEST_DEFINED_COMMAND     0x0065
+#define FPGA_FANCONTROLLER_UPDATE   0x0067
+#define GET_FPGA_FANCONTROLLER_LUT  0x0069
+#define HIGHEST_DEFINED_COMMAND     0x0069
 
 
 // ETHERNET TYPE CODES
@@ -615,7 +617,12 @@ typedef struct sWriteWishboneResp {
     u16       uAddressLow;
     u16       uWriteDataHigh;
     u16       uWriteDataLow;
-    u16       uPadding[5];
+    u16       uErrorStatus;     /* '0' = success, '1' = error i.e. out-of-range wishbone addr. This convention used
+                                   since we have repurposed one of the padding bytes to serve as an error signal. A zero
+                                   is returned as a 'success' in order to maintain backward compatibility, thus if a
+                                   newer version of casperfpga interacts with an older microblaze, a zero would be
+                                   returned and not block successful transactions. */
+    u16       uPadding[4];
 } sWriteWishboneRespT;
 
 typedef struct sReadWishboneReq {
@@ -630,7 +637,12 @@ typedef struct sReadWishboneResp {
     u16       uAddressLow;
     u16       uReadDataHigh;
     u16       uReadDataLow;
-    u16       uPadding[5];
+    u16       uErrorStatus;     /* '0' = success, '1' = error i.e. out-of-range wishbone addr. This convention used
+                                   since we have repurposed one of the padding bytes to serve as an error signal. A zero
+                                   is returned as a 'success' in order to maintain backward compatibility, thus if a
+                                   newer version of casperfpga interacts with an older microblaze, a zero would be
+                                   returned and not block successful transactions. */
+    u16       uPadding[4];
 } sReadWishboneRespT;
 
 #define MAX_I2C_WRITE_BYTES 33
@@ -1206,6 +1218,33 @@ typedef struct sGetMicroblazeUptimeResp {
   u16 uMicroblazeUptimeLow;
   u16 uPadding[7];
 } sGetMicroblazeUptimeRespT;
+
+/* update the MAX31785 fan controller parameters */
+typedef struct sFPGAFanControllerUpdateReq {
+  sCommandHeaderT Header;
+  u16 uEnableFanControl;    /* 1=automatic fan control mode */
+  u16 uUpdateSetpoints;
+  u16 uSetpoints[16];     /* 8x (temperature,pwm) each setpoint data is 16-bit wide */
+  u16 uWriteToFlash;        /* default=FALSE; TRUE=>this stores the currently received set of parameters
+                               accompanying this command to flash  */
+} sFPGAFanControllerUpdateReqT;
+
+typedef struct sFPGAFanControllerUpdateResp {
+  sCommandHeaderT Header;
+  u16 uError;  /* status: send 0 for success, >= 1 for error */
+  u16 uPadding[8];
+} sFPGAFanControllerUpdateRespT;
+
+typedef struct sGetFPGAFanControllerLUTReq {
+  sCommandHeaderT Header;
+} sGetFPGAFanControllerLUTReqT;
+
+typedef struct sGetFPGAFanControllerLUTResp {
+  sCommandHeaderT Header;
+  u16 uSetpointData[16];
+  u16 uError;  /* status: send 0 for success, >= 1 for error */
+  u16 uPadding[4];
+} sGetFPGAFanControllerLUTRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0

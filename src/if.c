@@ -722,7 +722,7 @@ u8 if_enumerate_interfaces(void){
    * octet/hostname of the interface will not be the same
    */
 
-#if 1
+#if MULTILINK_ARCH
   reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
 #else
   reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;

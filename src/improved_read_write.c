@@ -5,11 +5,14 @@
  *      Author: tyronevb
  */
 
-#include <xil_io.h> 
-#include <xstatus.h> 
+#include <xil_io.h>
+#include <xstatus.h>
 
 #include "improved_read_write.h"
 #include "custom_constants.h"
+#include "error.h"
+#include "logging.h"
+#include "register.h"
 
 // function definitions
 
@@ -18,7 +21,7 @@
 //--------------------------------------------------------------------------------
 //  This method executes the BIG_READ_REG command. Allows for reading more than 4 bytes
 //  with a single transaction.
-// 
+//
 //
 //  Parameter Dir   Description
 //  --------- ---   -----------
@@ -41,6 +44,7 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
   u16 uDataIndex = 0;
   u16 uNullWords;
   u16 uNullWordsIndex;
+  u8 errno = 0;
 
   if (uCommandLength < sizeof(sBigReadWishboneReqT)){
     return XST_FAILURE;
@@ -61,12 +65,26 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
   for (uReadIndex = 0; uReadIndex < Command->uNumberOfReads; uReadIndex++)
   {
     // read 32-bit data
-    uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress);
+    /*uReadData = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress);*/
+    uReadData = ReadWishboneRegister(uAddress);
     // place data in response packet as it gets read
     Response->uReadData[uDataIndex] = (uReadData >> 16) & 0xFFFF; // upper 16 bits
     Response->uReadData[uDataIndex + 1] = uReadData & 0xFFFF; // lower 16 bits
     uDataIndex = uDataIndex + 2; // increment data index
     uAddress = uAddress + 4; // increment address by 4 to read the next 32-bit register
+  }
+
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    /* overwrite uNumberOfReads field */
+    Response->uNumberOfReads = BIG_WB_ERROR_MAGIC;    /* since the wishbone addr range timeout mechanism was added
+                                                         later, a means to signal an error to casperfpga was required.
+                                                         To maintain backward compatibility between casperfpga and
+                                                         microblazes, a new field was not added and a magic number for
+                                                         this field was decided upon. Also had no padding bytes to
+                                                         repurpose for this use. */
   }
 
   //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Big Read Completed OK!\r\n");
@@ -92,7 +110,7 @@ int BigReadWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespo
 //--------------------------------------------------------------------------------
 //  This method executes the BIG_WRITE_REG command. Allows for writing more than 4 bytes
 //  with a single transaction.
-//  
+//
 //
 //  Parameter Dir   Description
 //  --------- ---   -----------
@@ -115,6 +133,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   u16 uDataIndex = 0;
   u16 uNumberOfWritesDone = 0;
   u8 uPaddingIndex;
+  u8 errno = 0;
 
   //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Inside BigWriteWishboneCommandHandler now . . .\r\n");
 
@@ -122,7 +141,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     return XST_FAILURE;
   }
 
-  // determine the address at which to start 
+  // determine the address at which to start
   uAddress = (Command->uStartAddressHigh << 16) | (Command->uStartAddressLow);
 
   //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Response packet created OK!\r\n");
@@ -135,7 +154,8 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     uWriteData = (Command->uWriteData[uDataIndex] << 16) | (Command->uWriteData[uDataIndex + 1]);
 
     // execute the write wishbone command
-    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress, uWriteData);
+    /* Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddress, uWriteData); */
+    WriteWishboneRegister(uAddress, uWriteData);
 
     // debug msg
     //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Wrote data\r\n");
@@ -143,6 +163,15 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
     uNumberOfWritesDone += 1;
     uDataIndex = uDataIndex + 2; // increment data index to get the next 32-bit word
     uAddress = uAddress + 4; // increment address by 4 to read the next 32-bit register
+  }
+
+  errno = read_and_clear_error_flag();
+  /* TODO: should we error out on all errno's or only on AXI_DATA_BUS errno? */
+  if (errno == ERROR_AXI_DATA_BUS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [..] AXI data bus error - wishbone addr outside range perhaps?\r\n", errno);
+    Response->uErrorStatus = 1;
+  } else {
+    Response->uErrorStatus = 0;
   }
 
   // debug msg
@@ -157,7 +186,7 @@ int BigWriteWishboneCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResp
   Response->uNumberOfWritesDone = uNumberOfWritesDone;
 
   // pad to minimum packet size and 64-bit boundary
-  for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++)
+  for (uPaddingIndex = 0; uPaddingIndex < 5; uPaddingIndex++)
     Response->uPadding[uPaddingIndex] = 0;
 
   *uResponseLength = sizeof(sBigWriteWishboneRespT);
