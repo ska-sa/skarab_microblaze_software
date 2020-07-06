@@ -736,6 +736,13 @@ static int cli_get_config_exe(struct cli *_cli){
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "wishb legacy map: %s\r\n", str_wb);
 
+#ifdef MULTILINK_ARCH
+  const char *str_multi = "yes";
+#else
+  const char *str_multi = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "multi-link arch: %s\r\n", str_multi);
+
 #ifdef LINK_MON_RX_40GBE
   const char *str_lmon = "yes";
 #else
@@ -764,6 +771,14 @@ static int cli_get_config_exe(struct cli *_cli){
   const char *str_pre_ip = "no";
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "pre-config 40gbe link 1: %s\r\n", str_pre_ip);
+
+#ifdef PRUNE_CODEBASE_DIAGNOSTICS
+  const char *str_prune = "yes";
+#else
+  const char *str_prune = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "prune code: %s\r\n", str_prune);
+
   return 0;
 }
 
