@@ -12,6 +12,10 @@
 #include "scratchpad.h"
 #include "id.h"
 #include "time.h"
+#include "flash_sdram_controller.h"
+#include "init.h"
+#include "if.h"
+#include "igmp.h"
 #include "error.h"
 
 #define LINE_BYTES_MAX 20
@@ -45,11 +49,17 @@ typedef enum {
   CMD_INDEX_TEST_TIMER,
   CMD_INDEX_GET_CONFIG,
   CMD_INDEX_RESET_FW,
+  CMD_INDEX_REBOOT_FPGA,
   CMD_INDEX_STATS,
   CMD_INDEX_WHOAMI,
   CMD_INDEX_UNAME,
   CMD_INDEX_UPTIME,
   CMD_INDEX_DUMP,
+  CMD_INDEX_IF_MAP,
+  CMD_INDEX_IGMP,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  CMD_INDEX_PEEK,
+#endif
   CMD_INDEX_WB_READ,
   CMD_INDEX_HELP,
   CMD_INDEX_END
@@ -64,11 +74,17 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_GET_CONFIG]  = "get-config",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
+  [CMD_INDEX_REBOOT_FPGA] = "reboot-fpga",
   [CMD_INDEX_STATS]       = "stats",
   [CMD_INDEX_WHOAMI]      = "whoami",
   [CMD_INDEX_UNAME]       = "uname",
   [CMD_INDEX_UPTIME]      = "uptime",
   [CMD_INDEX_DUMP]        = "dump",
+  [CMD_INDEX_IF_MAP]      = "if-map",
+  [CMD_INDEX_IGMP]        = "igmp",
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  [CMD_INDEX_PEEK]        = "peek",
+#endif
   [CMD_INDEX_WB_READ]     = "wb-read",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
@@ -82,11 +98,17 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
+ [CMD_INDEX_REBOOT_FPGA]  = { "",       "flash",  "sdram"},
  [CMD_INDEX_STATS]        = { NULL },
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
  [CMD_INDEX_DUMP]         = {"stack",   "heap", /*, "text"*/ NULL},
+ [CMD_INDEX_IF_MAP]       = { NULL },
+ [CMD_INDEX_IGMP]         = { NULL },
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = {"iface",   "dhcp"},
+#endif
  [CMD_INDEX_WB_READ]      = {CLI_KEYWORD_HEX, NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
@@ -98,11 +120,17 @@ static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
+static int cli_reboot_fpga_exe(struct cli *_cli);
 static int cli_stats_exe(struct cli *_cli);
 static int cli_whoami_exe(struct cli *_cli);
 static int cli_uname_exe(struct cli *_cli);
 static int cli_uptime_exe(struct cli *_cli);
 static int cli_dump_exe(struct cli *_cli);
+static int cli_if_map_exe(struct cli *_cli);
+static int cli_igmp_exe(struct cli *_cli);
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+static int cli_peek_exe(struct cli *_cli);
+#endif
 static int cli_wb_read_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
@@ -113,11 +141,17 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
+ [CMD_INDEX_REBOOT_FPGA]  = cli_reboot_fpga_exe,
  [CMD_INDEX_STATS]        = cli_stats_exe,
  [CMD_INDEX_WHOAMI]       = cli_whoami_exe,
  [CMD_INDEX_UNAME]        = cli_uname_exe,
  [CMD_INDEX_UPTIME]       = cli_uptime_exe,
  [CMD_INDEX_DUMP]         = cli_dump_exe,
+ [CMD_INDEX_IF_MAP]       = cli_if_map_exe,
+ [CMD_INDEX_IGMP]         = cli_igmp_exe,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = cli_peek_exe,
+#endif
  [CMD_INDEX_WB_READ]      = cli_wb_read_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
@@ -637,12 +671,9 @@ static int cli_log_level_exe(struct cli *_cli){
 
 static int cli_bounce_link_exe(struct cli *_cli){
   u32 l;
-  int r;
-  u16 config;
-  u16 wr[4], rd[4];
 
   /* check if the link is present - the option parsing state will catch the other end of the error modes */
-  if (_cli->opt_id >= NUM_ETHERNET_INTERFACES){
+  if (IF_ID_PRESENT != check_interface_valid(_cli->opt_id)){
     xil_printf("link %d not present\r\n", _cli->opt_id);
     return -1;
   }
@@ -651,62 +682,7 @@ static int cli_bounce_link_exe(struct cli *_cli){
 
   if (_cli->opt_id == 0){
     /* 1gbe - always link 0 */
-    /* FIXME: create a function for this since this was copy-pasted from main.c -  UpdateGBEPHYConfiguration() */
-
-    /****************create function from here...**************************/
-    // Set the switch to the GBE PHY
-    wr[0] = ONE_GBE_SWITCH_SELECT;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to open I2C switch.\r\n");
-      return -1;
-    }
-
-    // Read register 0 to get current configuration
-    wr[0] = 0; // Address of register to read
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 1);
-
-    if (r == XST_FAILURE){
-      /* TODO: do we want to unwind the "open switch" command upon a failure here (and subsequent failures too)? */
-      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update current read register.\r\n");
-      return -1;
-    }
-
-    r = ReadI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, rd, 2);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
-      return -1;
-    }
-
-    config = ((rd[0] << 8) | rd[1]);
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", config);
-
-    // Trigger a soft reset of 1GBE PHY to update configuration
-    // Do a soft reset
-    config = config | 0x8000;
-
-    wr[0] = 0; // Address of register to write
-    wr[1] = ((config >> 8) & 0xFF);
-    wr[2] = (config & 0xFF);
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 3);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to write CONTROL REG.\r\n");
-      return -1;
-    }
-
-    // Close I2C switch
-    wr[0] = 0x0;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to close I2C switch.\r\n");
-      return -1;
-    }
-    /****************...create function till here**************************/
-
+    UpdateGBEPHYConfiguration();
   } else {
     /* 40gbe link */
     l = 0x1 << _cli->opt_id;
@@ -805,13 +781,14 @@ static int cli_reset_fw_exe(struct cli *_cli){
 
 
 static int cli_stats_exe(struct cli *_cli){
-  u8 n, i;
+  u8 n, link, phy_id;
   struct sIFObject *iface;
 
   n = get_num_interfaces();
 
-  for (i = 0; i < n; i++){
-    iface = lookup_if_handle_by_id(i);
+  for (link = 0; link < n; link++){
+    phy_id = get_physical_interface_id(link);
+    iface = lookup_if_handle_by_id(phy_id);
     PrintInterfaceCounters(iface);
   }
 
@@ -942,6 +919,85 @@ static int cli_dump_exe(struct cli *_cli){
 
   return 0;
 }
+
+#define CLI_RBT_NOARG 0
+#define CLI_RBT_FLASH 1
+#define CLI_RBT_SDRAM 2
+
+static int cli_reboot_fpga_exe(struct cli *_cli){
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+
+  switch(_cli->opt_id){
+    case CLI_RBT_NOARG:
+      xil_printf("rebooting from previous location\r\n");
+      sudo_reboot_now_from_last_location();
+      break;
+
+    case CLI_RBT_FLASH:
+      xil_printf("rebooting from flash\r\n");
+      sudo_reboot_now_from_flash_location();
+      break;
+
+    case CLI_RBT_SDRAM:
+      xil_printf("rebooting from sdram\r\n");
+      sudo_reboot_now_from_sdram_location();
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+
+
+static int cli_if_map_exe(struct cli *_cli){
+  print_interface_map();
+  return 0;
+}
+
+
+static int cli_igmp_exe(struct cli *_cli){
+  vIGMPPrintInfo();
+  return 0;
+}
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+#define CLI_PEEK_IFACE  0
+#define CLI_PEEK_DHCP   1
+
+static int cli_peek_exe(struct cli *_cli){
+  u8 logical_link;
+  u8 physical_interface_id;
+  u8 n;
+
+  n = get_num_interfaces();
+
+  /* TODO: could optimise this code a bit more */
+  switch(_cli->opt_id){
+    case CLI_PEEK_IFACE:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_interface_internals(physical_interface_id);
+      }
+      break;
+
+    case CLI_PEEK_DHCP:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_dhcp_internals(physical_interface_id);
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+#endif
 
 
 static int cli_wb_read_exe(struct cli *_cli){

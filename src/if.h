@@ -33,14 +33,22 @@ struct sIFObject{
   u8 uIFLinkStatus;
   u8 uIFLinkRxActive;
 
-  u8 arrIFAddrMac[6];
+#define IF_MAC_ARR_LEN  6
+  u8 arrIFAddrMac[IF_MAC_ARR_LEN];
 
-  u8 arrIFAddrIP[4];
-  u8 stringIFAddrIP[16];
+#define IF_HOSTNAME_STR_LEN 16
+  u8 stringHostname[IF_HOSTNAME_STR_LEN];
+
+#define IF_IPADDR_ARR_LEN 4
+  u8 arrIFAddrIP[IF_IPADDR_ARR_LEN];
+#define IF_IPADDR_STR_LEN 16
+  u8 stringIFAddrIP[IF_IPADDR_STR_LEN];
   u32 uIFAddrIP;
 
-  u8 arrIFAddrNetmask[4];
-  u8 stringIFAddrNetmask[16];
+#define IF_NETMASK_ARR_LEN 4
+  u8 arrIFAddrNetmask[IF_NETMASK_ARR_LEN];
+#define IF_NETMASK_STR_LEN 16
+  u8 stringIFAddrNetmask[IF_NETMASK_STR_LEN];
   u32 uIFAddrMask;
 
   u8 uIFEthernetId;
@@ -112,7 +120,21 @@ struct sIFObject{
 
 struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferSize, u8 *pTxBufferPtr, u16 uTxBufferSize, u8 *arrUserMacAddr);
 
+u8 if_enumerate_interfaces(void);   /* returns number of interfaces */
 u8 get_num_interfaces(void);
+u8 get_physical_interface_id(u8 logical_link_id);
+
+void print_interface_map(void);
+
+#define IF_ID_PRESENT        0
+#define IF_ID_INVALID_RANGE  1
+#define IF_ID_NOT_PRESENT    2
+u8 check_interface_valid(u8 physical_interface_id);
+u8 check_interface_valid_quietly(u8 physical_interface_id);
+
+u8 *if_generate_hostname_string(u8 phy_interface_id);     /* arg is the physical interface id/position */
+u8 *if_generate_mac_addr_array(u8 phy_interface_id);
+
 struct sIFObject *lookup_if_handle_by_id(u8 id);
 
 void IFConfig(struct sIFObject *pIFObjectPtr, u32 ip, u32 mask);

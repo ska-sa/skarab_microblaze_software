@@ -42,7 +42,8 @@ typedef enum {
   HMC_RECONFIG_HMC3_COUNT_INDEX,    /* count the HMC 3 triggered reconfigurations */
   PMEM_BLOCK2_BYTE5_INDEX,          /* unused */
   PMEM_BLOCK2_BYTE6_INDEX,          /* unused */
-  PMEM_BLOCK2_BYTE7_INDEX,          /* unused */
+  AUX_SKARAB_FLAGS_INDEX,           /* bit0 - last reconfig location (0 = flash, 1 = sdram); bit1 - lock bit for bit0;
+                                       the reset are unused for now */
   PMEM_INDEX_MAX = 24
   /* NOTE: 24 byte (3 x 8-byte) storage block implemented */
 } tPMemByteIndex;
