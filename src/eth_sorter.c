@@ -984,7 +984,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   u8 num_links;
   u8 link;
   u32 uContinuityData;
-  u32 uMuxSelect = 0;
+  /* u32 uMuxSelect = 0; */
 
   if (uCommandLength < sizeof(sSdramReconfigureReqT))
     return XST_FAILURE;
@@ -1010,6 +1010,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   if (Command->uClearSdram == 1){
     ClearSdram();
 
+#if 0
     /* Now, set the mux bit (bit #2) in C_WR_BRD_CTL_STAT_1_ADDR (register 0x18) to select */
     /* the appropriate interface to receive the config data on. */
     /* Since this is a later addition to this command, this seems to be the most appropriate place to do it. */
@@ -1026,7 +1027,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
-
+#endif
 #if 0
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "About to send IGMP leave messages.\r\n");
 

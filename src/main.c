@@ -1028,8 +1028,10 @@ int main()
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
 
+#if 0
   /* set bit#1 in C_WR_BRD_CTL_STAT_1_ADDR to 1 to connect 40gbe to user fabric */
   WriteBoardRegister(C_WR_BRD_CTL_STAT_1_ADDR, 0x2);
+#endif
 
   iStatus = XST_SUCCESS;
 
