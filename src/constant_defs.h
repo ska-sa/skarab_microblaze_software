@@ -32,18 +32,6 @@ extern "C" {
 #define NUM_ETHERNET_INTERFACES     5u//AI: Single 40GbE Core 0x5
 //#define DO_1GBE_LOOPBACK_TEST
 
-//DEFINE INTERFACE NAMES
-
-#ifndef ONE_GBE_INTERFACE
-#define ONE_GBE_INTERFACE          "I/F-01GBE-00"
-#endif
-#ifndef FORTY_GBE_INTERFACE
-#define FORTY_GBE_INTERFACE       "I/F-40GBE-01"
-#endif
-
-#ifndef HOSTNAME
-#define HOSTNAME                   "skarab"
-#endif
 
 //uncomment relevant print output level
 //macro logic in print.h

@@ -87,26 +87,50 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   pTransmitBuffer[LLDP_PORT_DESCR_TLV_TYPE_OFFSET] = LLDP_PORT_DESC_TLV;
   pTransmitBuffer[LLDP_PORT_DESCR_TLV_LEN_OFFSET] = LLDP_PORT_DESCR_TLV_LEN;
   switch(uId){
+    /*
+     *  TODO: it would be more efficient to use the uId to generate the following named fields
+     */
     case 0:
       memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-00", 6);
-      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, ONE_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_ONE_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
       break;
 
     case 1:
       memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-01", 6);
-      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, FORTY_GBE_INTERFACE, LLDP_PORT_DESCR_TLV_LEN);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_FORTY_GBE_INTERFACE_0, LLDP_PORT_DESCR_TLV_LEN);
+      break;
+
+    case 2:
+      memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-02", 6);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_FORTY_GBE_INTERFACE_1, LLDP_PORT_DESCR_TLV_LEN);
+      break;
+
+    case 3:
+      memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-03", 6);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_FORTY_GBE_INTERFACE_2, LLDP_PORT_DESCR_TLV_LEN);
+      break;
+
+    case 4:
+      memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-04", 6);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_FORTY_GBE_INTERFACE_3, LLDP_PORT_DESCR_TLV_LEN);
+      break;
+
+    /* max of 5 interfaces allowed in the architecture - 1x 1gbe + 4x 40gbe */
+    default:
+      /* execution path should never reach here but populate fields for debugging in case it does */
+      memcpy(pTransmitBuffer + LLDP_PORT_ID_TLV_OFFSET + 1, "I/F-xx", 6);
+      memcpy(pTransmitBuffer + LLDP_PORT_DESCR_TLV_OFFSET, LLDP_FORTY_GBE_INTERFACE_x, LLDP_PORT_DESCR_TLV_LEN);
       break;
   }
-  /* FIXME: default case */
 
   /* System name  TLV */
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_TYPE_OFFSET] = LLDP_SYSTEM_NAME_TLV;
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_LEN_OFFSET] = LLDP_SYSTEM_NAME_TLV_LEN;
   char hostname[LLDP_SYSTEM_NAME_TLV_LEN + 1];
   hostname[LLDP_SYSTEM_NAME_TLV_LEN] = '\0';
-  memcpy(hostname, HOSTNAME, strlen(HOSTNAME));
+  memcpy(hostname, LLDP_HOSTNAME, strlen(LLDP_HOSTNAME));
   char str[2] = {'\0'};
-  u8 tempOffset = strlen(HOSTNAME);
+  u8 tempOffset = strlen(LLDP_HOSTNAME);
   for(u8 uIndex = 2; uIndex < 5; uIndex++){
     u8ToStr(src_mac_addr[uIndex], str, 2);
     memcpy(hostname + tempOffset,str, strlen(str));
