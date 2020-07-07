@@ -686,10 +686,14 @@ int main()
 
   /* initialise the log level */
   u8 log_level_cached = 0;
+  u8 log_select_cached = 0;
   tLogLevel log_level = LOG_LEVEL_INFO;
+  tLogSelect log_select = LOG_SELECT_ALL;
 
   if (PMemState != PMEM_RETURN_ERROR){
     PersistentMemory_ReadByte(LOG_LEVEL_STARTUP_INDEX, &log_level_cached);
+    PersistentMemory_ReadByte(LOG_SELECT_STARTUP_INDEX, &log_select_cached);
+
     /* if the msb is set, then we know that the log-level command was issued before the reset */
     if (log_level_cached & 0x80){
       /* the cached log-level is stored in the lower 7 bits */
@@ -698,9 +702,19 @@ int main()
       /* otherwise default to *info* */
       log_level = LOG_LEVEL_INFO;
     }
+
+    /* if the msb is set, then we know that the log-select command was issued before the reset */
+    if (log_select_cached & 0x80){
+      /* the cached log-select is stored in the lower 7 bits */
+      log_select = (tLogSelect) (log_select_cached & 0x7f);
+    } else {
+      /* otherwise default to *all* */
+      log_select = LOG_SELECT_ALL;
+    }
   }
 
   set_log_level(log_level);
+  set_log_select(log_select);
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "---Entering main---\r\n");
   PrintVersionInfo();

@@ -40,7 +40,9 @@ typedef enum {
   HMC_RECONFIG_HMC1_COUNT_INDEX,    /* count the HMC 1 triggered reconfigurations */
   HMC_RECONFIG_HMC2_COUNT_INDEX,    /* count the HMC 2 triggered reconfigurations */
   HMC_RECONFIG_HMC3_COUNT_INDEX,    /* count the HMC 3 triggered reconfigurations */
-  PMEM_BLOCK2_BYTE5_INDEX,          /* unused */
+  LOG_SELECT_STARTUP_INDEX,         /* cache log-select between reboots/resets - not power cycles tho. See
+                                       LOG_LEVEL_STARTUP_INDEX above. These two could be combined into one byte which
+                                       would limit the number of log levels and selections */
   PMEM_BLOCK2_BYTE6_INDEX,          /* unused */
   AUX_SKARAB_FLAGS_INDEX,           /* bit0 - last reconfig location (0 = flash, 1 = sdram); bit1 - lock bit for bit0;
                                        the reset are unused for now */

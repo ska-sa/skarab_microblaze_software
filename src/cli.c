@@ -657,8 +657,20 @@ static void cli_print_help(void){
 
 
 static int cli_log_select_exe(struct cli *_cli){
+  u8 cache_log_select = 0;
   /* TODO: some error checking perhaps? */
   xil_printf("running log-select %d\r\n", _cli->opt_id);
+
+
+  /* cache the log select in persistent memory
+   * bit8 => set when this cmd issued to indicate a manual change in log-select upon reset
+   * bit7-0 => cached log select
+   */
+  cache_log_select = (_cli->opt_id) | 0x80;
+
+  xil_printf("caching log-select value 0x%02x to pmem\r\n", cache_log_select);
+  PersistentMemory_WriteByte(LOG_SELECT_STARTUP_INDEX, cache_log_select);
+
   set_log_select(_cli->opt_id);
   return 0;
 }
@@ -674,7 +686,7 @@ static int cli_log_level_exe(struct cli *_cli){
    */
   cache_log_level = (_cli->opt_id) | 0x80;
 
-  xil_printf("caching value 0x%02x to pmem\r\n", cache_log_level);
+  xil_printf("caching log-level value 0x%02x to pmem\r\n", cache_log_level);
   PersistentMemory_WriteByte(LOG_LEVEL_STARTUP_INDEX, cache_log_level);
 
   set_log_level(_cli->opt_id);

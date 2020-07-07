@@ -1545,15 +1545,16 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   pIFObjectPtr->uMsgSize = uLength + ETH_FRAME_TOTAL_LEN + uPaddingLength;
 
   /* TODO: set a message ready flag */
+
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
+      (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
+      dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
+
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP tx pkt:");
   for (i = 0; i < uLength; i++){
     log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", pBuffer[i]);
   }
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
-
-  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
-      (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
-      dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
 
   /* invoke a callback once the message successfully built */
   if (pDHCPObjectPtr->callbackOnMsgBuilt != NULL){
