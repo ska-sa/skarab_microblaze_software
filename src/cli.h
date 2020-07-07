@@ -19,6 +19,10 @@ typedef enum {
   CLI_EXIT
 } CLI_STATE;
 
+/* call to initialise the cli state machine */
+CLI_STATE cli_init(void);
+
+/* run the cli state machine */
 CLI_STATE cli_sm(const char c);
 
 #ifdef __cplusplus

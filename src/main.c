@@ -621,7 +621,7 @@ int main()
     if (iStatus != XST_SUCCESS) {
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UART [..] Seft-test FAILED!\r\n");
     } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "UART [..] Initialized successfully!\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n\r\nUART [..] Initialized successfully!\r\n");
     }
   }
 
@@ -630,8 +630,11 @@ int main()
 
   FinishedBootingFromSdram();
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Waiting 2s...\r\n");
-  Delay(2000000);
+  CLI_STATE cli_status = cli_init();
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "CLI  [..] init status=%d\r\n", cli_status);
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Waiting 0.5s...\r\n");
+  Delay(500000);
 
   ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
   if (ReceivedCount){
@@ -648,7 +651,7 @@ int main()
      but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
      and add another one to prevent off-by-one error*/
   if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n"\
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] from addr @0x%08x to @0x%08x...\r\n"\
                                  "[Memory Test] expected value {@0x%08x}: 0x%08x\r\n"\
                                  "[Memory Test] computed value              : 0x%08x\r\n",\
                                  0x50, &_text_section_end_, &_location_checksum_,\

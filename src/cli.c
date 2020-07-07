@@ -223,6 +223,18 @@ CLI_STATE cli_sm(const char c){
   return _cli.state;
 }
 
+CLI_STATE cli_init(void){
+  /*
+   *  this function merely advances the state machine from the CLI_INIT state to the CLI_IDLE state. This is necessary
+   *  for the cli state machine to immediately start parsing the characters input (instead of the one character delay in
+   *  processing if this is not first called). The choice to wrap the cli_sm function with cli_init is due to the fact
+   *  that the <struct cli> is private to the cli_sm function and would need to be made global (file scope) if a call to
+   *  cli_reset_internals were to be made available via the API. The cli_sm function also needs a valid character to
+   *  advance and hence the function is called with the '?' character.
+   */
+
+  return cli_sm('?');
+}
 
 static CLI_STATE cli_init_state(struct cli *_cli){
 
