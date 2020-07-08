@@ -13,6 +13,7 @@
 #include "constant_defs.h"
 #include "register.h"
 #include "if.h"
+#include "logging.h"
 
 static char lookup[17] = "0123456789ABCDEF";
 
@@ -34,21 +35,19 @@ static char lookup[17] = "0123456789ABCDEF";
 //==================================================================================
 int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   struct sIFObject *pIF;
+  int i;
+  u8  uPaddingLength = 0;
+  u32 uIPAddress;
+  u32 version;
+  u8 dst_mac_addr[ETH_DST_LEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
+  u8 *src_mac_addr;
+  u8 *hostname;
+  u16 first_part;
 
   pIF = lookup_if_handle_by_id(uId);
 
-  /* u32 uIPAddress = uEthernetFabricIPAddress[uId]; */
-  u32 uIPAddress = pIF->uIFAddrIP; 
-  u32 version;
-  u8 dst_mac_addr[ETH_DST_LEN] = {0x01, 0x80, 0xc2, 0x00, 0x00, 0x0e };
-
-  u8 src_mac_addr[ETH_SRC_LEN];
-  src_mac_addr[0] = ((uEthernetFabricMacHigh[uId] >> 8) & 0xFF);
-  src_mac_addr[1] = (uEthernetFabricMacHigh[uId] & 0xFF);
-  src_mac_addr[2] = ((uEthernetFabricMacMid[uId] >> 8) & 0xFF);
-  src_mac_addr[3] = (uEthernetFabricMacMid[uId] & 0xFF);
-  src_mac_addr[4] = ((uEthernetFabricMacLow[uId] >> 8) & 0xFF);
-  src_mac_addr[5] = (uEthernetFabricMacLow[uId] & 0xFF);
+  uIPAddress = pIF->uIFAddrIP;
+  src_mac_addr = pIF->arrIFAddrMac;
 
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
   memset(pTransmitBuffer, 0, LLDP_MAX_BUFFER_SIZE);
@@ -126,23 +125,17 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   /* System name  TLV */
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_TYPE_OFFSET] = LLDP_SYSTEM_NAME_TLV;
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_LEN_OFFSET] = LLDP_SYSTEM_NAME_TLV_LEN;
-  char hostname[LLDP_SYSTEM_NAME_TLV_LEN + 1];
-  hostname[LLDP_SYSTEM_NAME_TLV_LEN] = '\0';
-  memcpy(hostname, LLDP_HOSTNAME, strlen(LLDP_HOSTNAME));
-  char str[2] = {'\0'};
-  u8 tempOffset = strlen(LLDP_HOSTNAME);
-  for(u8 uIndex = 2; uIndex < 5; uIndex++){
-    u8ToStr(src_mac_addr[uIndex], str, 2);
-    memcpy(hostname + tempOffset,str, strlen(str));
-    tempOffset += strlen(str);
-  }
+
+  hostname = if_generate_hostname_string(uId);
+  /* NOTE: the if_generate_hostname_string() returns a string including the interface number appended to it but we ill
+   * only copy the first part e.g. skarab020304 in the next line */
   memcpy(pTransmitBuffer + LLDP_SYSTEM_NAME_TLV_OFFSET, hostname, LLDP_SYSTEM_NAME_TLV_LEN);
 
   /* LLDP_SYSTEM_DESCR_TLV */
   pTransmitBuffer[LLDP_SYSTEM_DESCR_TLV_TYPE_OFFSET] = LLDP_SYSTEM_DESCR_TLV;
   pTransmitBuffer[LLDP_SYSTEM_DESCR_TLV_LEN_OFFSET] = LLDP_SYSTEM_DESCR_TLV_LEN;
   version = ReadBoardRegister(C_RD_VERSION_ADDR);
-  u16 first_part = (version & 0xff000000) >> 24; // for BSP or TLF
+  first_part = (version & 0xff000000) >> 24; // for BSP or TLF
   if(first_part > 0){
     memcpy(pTransmitBuffer + LLDP_SYSTEM_DESCR_TLV_OFFSET, "BSP", LLDP_SYSTEM_DESCR_TLV_LEN);
   }
@@ -167,9 +160,25 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   pTransmitBuffer[LLDP_END_OF_LLDPDU_TLV_LEN_OFFSET] = 0;
 
   *uResponseLength = LLDP_END_OF_LLDPDU_TLV_OFFSET + 1;
-  if(*uResponseLength % 64 != 0){ // make minimum packet length multiple of 64 bits
-    *uResponseLength = *uResponseLength + (64 - (*uResponseLength % 64));
-  } 
+
+  /* pad to nearest 64 bit boundary */
+  /* simply increase total length by following amount - these bytes already zero due to earlier memset */
+  uPaddingLength = 8 - (*uResponseLength % 8);
+
+  /* and with 0b111 since only interested in values of 0 to 7 */
+  uPaddingLength = uPaddingLength & 0x7;
+
+  *uResponseLength = *uResponseLength + uPaddingLength;
+
+  log_printf(LOG_SELECT_LLDP, LOG_LEVEL_INFO, "LLDP [%02x] sending LLDP (len %d)\r\n", (pIF != NULL) ?
+      pIF->uIFEthernetId : 0xFF, *uResponseLength);
+
+  log_printf(LOG_SELECT_LLDP, LOG_LEVEL_TRACE, "LLDP tx pkt:");
+  for (i = 0; i < *uResponseLength; i++){
+    log_printf(LOG_SELECT_LLDP, LOG_LEVEL_TRACE, " %02x", pTransmitBuffer[i]);
+  }
+  log_printf(LOG_SELECT_LLDP, LOG_LEVEL_TRACE, "\r\n");
+
   return LLDP_RETURN_OK;
 
 }
