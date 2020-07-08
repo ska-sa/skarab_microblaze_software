@@ -433,17 +433,18 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
   //u32 uReg;
   u8 uPaddingWords = 0;
   u32 uPaddingIndex = 0;
+  u8 *t;
 
   // Must be a multiple of 64 bits
   if ((uNumWords % 2) != 0x0)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
     return XST_FAILURE;
   }
 
   if (uNumWords < 16){
     uPaddingWords = (16 - uNumWords);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
   }
 
   // Check that the transmit buffer is ready for a packet
@@ -456,11 +457,13 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %d\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "[SEND %02x] Send %d 32-bit words\r\n", uId, uNumWords);
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Send %d 32-bit words\r\n", uId, uNumWords);
+
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d ", uId);
 
   // Program transmit packet words into FIFO
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
@@ -468,7 +471,19 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     //uReg = ((puTransmitPacket[uIndex] >> 16) & 0xFFFF) | ((puTransmitPacket[uIndex] & 0xFFFF) << 16);
     //Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, uReg);
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
+    /* possibly a big performance hit when tracing receive buffer */
+    t = (u8 *) &(puTransmitPacket[uIndex]);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                 word swapped - see
+                                                                                                 indices - for easier
+                                                                                                 reading on console */
+    if (((uIndex != 0) && (uIndex % 8) == 0)){
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+    } else {
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+    }
   }
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
 
   // Write padding words (zero) to FIFO
   if (uPaddingWords != 0){
@@ -491,11 +506,11 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %d\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "[SEND %02x] Done sending data.\r\n", uId);
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Done sending data.\r\n", uId);
 
   return XST_SUCCESS;
 
@@ -522,6 +537,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
   u32 uAddressOffset = GetAddressOffset(uId);
   u16 pktlen = 0, padlen = 0;
   //u32 uReg;
+  u8 *t;
 
   // GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
   //if (uNumWords > GetHostReceiveBufferLevel(uId))
@@ -532,11 +548,13 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   if (uNumWords > RX_BUFFER_MAX)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "RECV [%02x] Packet size exceeds %d words. SIZE: %x\r\n", uId, RX_BUFFER_MAX, uNumWords);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "RX   [%02d] Packet size exceeds %d words. SIZE: %d\r\n", uId, RX_BUFFER_MAX, uNumWords);
     return XST_FAILURE;
   }
 
   //log_printf(LOG_SELECT_BUFF, LOG_LEVEL_DEBUG, "%02x: rd %d words\n", uId, uNumWords);
+
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d ", uId);
 
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
   {
@@ -545,14 +563,18 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 
     /* possibly a big performance hit when tracing receive buffer */
-    u8 *t = (u8 *) &(puReceivePacket[uIndex]);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[0],t[1],t[2],t[3]);
-    if (((uIndex != 0) && (uIndex % 15) == 0)){
+    t = (u8 *) &(puReceivePacket[uIndex]);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                 word swapped - see
+                                                                                                 indices - for easier
+                                                                                                 reading on console */
+    if (((uIndex != 0) && (uIndex % 8) == 0)){
       log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
     } else {
       log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
     }
   }
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
 
   if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
                                                to print it anyway  */
@@ -573,7 +595,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     pktlen = pktlen < 16 ? 16 : pktlen;     /* lowest value is 16 */
 
     if (uNumWords != pktlen){
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RECV [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
 #if 0
       for (uIndex = 0x0; uIndex < uNumWords; uIndex++){
         log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%08x\r\n", puReceivePacket[uIndex]);
@@ -582,7 +604,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     }
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RECV [%02x] Done reading cpu receive buffer\r\n", uId);
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d Done reading cpu receive buffer\r\n", uId);
 
   // Acknowledge reading the packet from the FIFO
   AckHostPacketReceive(uId);
