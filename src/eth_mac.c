@@ -496,8 +496,11 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
       /* possibly a big performance hit when tracing receive buffer */
       if (uIndex == 0){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Send %d 32-bit words\r\n", uId, uNumWords);
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d ", uId);
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d[@x%x] ", uId, uAddressOffset);   /* id and wb-addr-offset -
+                                                                                               useful to trace all the
+                                                                                               id-to-addr mappings in
+                                                                                               the netw stack */
       }
 
       t = (u8 *) &(puTransmitPacket[uIndex]);
@@ -542,7 +545,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Done sending data.\r\n", uId);
+  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d send done\r\n", uId);
 
   return XST_SUCCESS;
 
@@ -596,7 +599,11 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
                                                  to print it anyway  */
       /* possibly a big performance hit when tracing receive buffer */
       if (uIndex == 0){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d ", uId);    /* do once for index 0 */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d[@x%x] ", uId, uAddressOffset);    /* do once for index 0 -
+                                                                                                id and wb-addr-offset -
+                                                                                                useful to trace all the
+                                                                                                id-to-addr mappings in
+                                                                                                the netw stack */
       }
 
       t = (u8 *) &(puReceivePacket[uIndex]);
@@ -641,7 +648,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 #endif
     }
 
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d Done reading cpu receive buffer\r\n", uId);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d read done\r\n", uId);
   }
 
   // Acknowledge reading the packet from the FIFO
