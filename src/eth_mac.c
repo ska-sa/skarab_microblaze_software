@@ -28,6 +28,20 @@
 #include "logging.h"
 #include "constant_defs.h"
 
+
+static u32 eth_mac_wb_offset[] = {
+  [0] = ONE_GBE_MAC_ADDR,
+  [1] = FORTY_GBE_MAC_0_ADDR,
+  [2] = FORTY_GBE_MAC_1_ADDR,
+  [3] = FORTY_GBE_MAC_2_ADDR,
+  [4] = FORTY_GBE_MAC_3_ADDR
+};
+
+/* only has local scope */
+/* c-like prototype:
+ * static u32 priv_GetAddressOffset(uId);
+ */
+#define priv_GetAddressOffset(uId)   eth_mac_wb_offset[uId]
 //=================================================================================
 //  GetAddressOffset
 //--------------------------------------------------------------------------------
@@ -43,6 +57,7 @@
 //=================================================================================
 u32 GetAddressOffset(u8 uId)
 {
+#if 0
   if (uId == 0)
     return ONE_GBE_MAC_ADDR;
   else if (uId == 1)
@@ -53,6 +68,9 @@ u32 GetAddressOffset(u8 uId)
     return FORTY_GBE_MAC_2_ADDR;
   else
     return FORTY_GBE_MAC_3_ADDR;
+#endif
+
+  return priv_GetAddressOffset(uId);
 
 }
 
@@ -74,7 +92,7 @@ int SoftReset(u8 uId)
   unsigned uTimeout = 0x0;
   u32 uStatus = 0x0;
 
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
 
@@ -128,7 +146,7 @@ int SoftReset(u8 uId)
 //=================================================================================
 void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   /* write out the mac offset here since this is generally the first operation performed on mac */
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] base @ 0x%08x, mac offset @ 0x%08x \r\n", uId, XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR, uAddressOffset);
@@ -155,7 +173,7 @@ void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddre
 //=================================================================================
 void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_GATEWAY), uGatewayARPCacheAddress);
 
@@ -177,7 +195,7 @@ void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress)
 //=================================================================================
 void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_IP_ADDRESS), uIPAddress);
 
@@ -199,7 +217,7 @@ void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 //=================================================================================
 void SetFabricNetmask(u8 uId, u32 uNetmask)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_NETMASK), uNetmask);
 }
@@ -221,7 +239,7 @@ void SetFabricNetmask(u8 uId, u32 uNetmask)
 //=================================================================================
 void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddressMask)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP), uMultiCastIPAddress);
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP_MASK), uMultiCastIPAddressMask);
@@ -244,7 +262,7 @@ void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddr
 //=================================================================================
 void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE), uPortAddress);
@@ -270,7 +288,7 @@ void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 //=================================================================================
 void EnableFabricInterface(u8 uId, u8 uEnable)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 2, uEnable);
@@ -298,7 +316,7 @@ void EnableFabricInterface(u8 uId, u8 uEnable)
 //=================================================================================
 void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Program ARP cache...\r\n");
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
@@ -323,7 +341,7 @@ void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper
 u32 GetHostTransmitBufferLevel(u8 uId)
 {
   u32 uReg = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
@@ -350,7 +368,7 @@ u32 GetHostTransmitBufferLevel(u8 uId)
 u32 GetHostReceiveBufferLevel(u8 uId)
 {
   u32 uReg = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
@@ -382,7 +400,7 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel)
 {
   u16 uReg = uBufferLevel / 2;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL) + 2, uReg);
 
@@ -403,7 +421,7 @@ void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel)
 //=================================================================================
 void AckHostPacketReceive(u8 uId)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL), 0x0);
 
@@ -429,7 +447,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
   unsigned int uTimeout = 0x0;
   u32 uHostTransmitBufferLevel = 0x0;
   u32 uIndex = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
   //u32 uReg;
   unsigned int uPaddingWords = 0;
   u32 uPaddingIndex = 0;
@@ -548,7 +566,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
   unsigned int uIndex = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
   u32 pktlen = 0, padlen = 0;
   //u32 uReg;
   u8 *t;
