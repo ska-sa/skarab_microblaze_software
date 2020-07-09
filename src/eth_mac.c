@@ -426,12 +426,12 @@ void AckHostPacketReceive(u8 uId)
 //=================================================================================
 int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 {
-  unsigned uTimeout = 0x0;
+  unsigned int uTimeout = 0x0;
   u32 uHostTransmitBufferLevel = 0x0;
   u32 uIndex = 0x0;
   u32 uAddressOffset = GetAddressOffset(uId);
   //u32 uReg;
-  u8 uPaddingWords = 0;
+  unsigned int uPaddingWords = 0;
   u32 uPaddingIndex = 0;
   u8 *t;
 
@@ -461,29 +461,43 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Send %d 32-bit words\r\n", uId, uNumWords);
-
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d ", uId);
-
   // Program transmit packet words into FIFO
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
   {
     //uReg = ((puTransmitPacket[uIndex] >> 16) & 0xFFFF) | ((puTransmitPacket[uIndex] & 0xFFFF) << 16);
     //Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, uReg);
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
-    /* possibly a big performance hit when tracing receive buffer */
-    t = (u8 *) &(puTransmitPacket[uIndex]);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
-                                                                                                 word swapped - see
-                                                                                                 indices - for easier
-                                                                                                 reading on console */
-    if (((uIndex != 0) && (uIndex % 8) == 0)){
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
-    } else {
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+    if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
+                                                 to print it anyway  */
+      /* the eth drivers need to be fast - especially from a programming point of view. Thus all trace level logging
+       * and related data operations are guarded by the above if-statement. This is to reduce the amount of conditional
+       * checks when trace level logging is not set since each log_printf maps to a conditional check to see if the
+       * trace level is set. Thus, all these conditionals are guarded by one check (i.e the line above). In normal
+       * operation, trace level will not be set and then we need this function to be as efficient as possible.
+       */
+
+      /* possibly a big performance hit when tracing receive buffer */
+      if (uIndex == 0){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d Send %d 32-bit words\r\n", uId, uNumWords);
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d ", uId);
+      }
+
+      t = (u8 *) &(puTransmitPacket[uIndex]);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                   word swapped - see
+                                                                                                   indices - for easier
+                                                                                                   reading on console */
+      if (((uIndex != 0) && (uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+      }
+
+      if (uIndex == (uNumWords - 1)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");  /* only do once at the end */
+      }
     }
   }
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
 
   // Write padding words (zero) to FIFO
   if (uPaddingWords != 0){
@@ -533,9 +547,9 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 //=================================================================================
 int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
-  unsigned uIndex = 0x0;
+  unsigned int uIndex = 0x0;
   u32 uAddressOffset = GetAddressOffset(uId);
-  u16 pktlen = 0, padlen = 0;
+  u32 pktlen = 0, padlen = 0;
   //u32 uReg;
   u8 *t;
 
@@ -554,30 +568,36 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   //log_printf(LOG_SELECT_BUFF, LOG_LEVEL_DEBUG, "%02x: rd %d words\n", uId, uNumWords);
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d ", uId);
-
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
   {
     puReceivePacket[uIndex] = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
     //uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
     //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 
-    /* possibly a big performance hit when tracing receive buffer */
-    t = (u8 *) &(puReceivePacket[uIndex]);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
-                                                                                                 word swapped - see
-                                                                                                 indices - for easier
-                                                                                                 reading on console */
-    if (((uIndex != 0) && (uIndex % 8) == 0)){
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
-    } else {
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+    if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
+                                                 to print it anyway  */
+      /* possibly a big performance hit when tracing receive buffer */
+      if (uIndex == 0){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d ", uId);    /* do once for index 0 */
+      }
+
+      t = (u8 *) &(puReceivePacket[uIndex]);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                   word swapped - see
+                                                                                                   indices - for easier
+                                                                                                   reading on console */
+      if (((uIndex != 0) && (uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+      }
     }
   }
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
 
   if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
                                                to print it anyway  */
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+
     /* added to debug packet length and firmware read buffer length discrepancy */
     if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
       pktlen = ((((puReceivePacket[4] >> 16) & 0xff) + ((puReceivePacket[4] >> 24) & 0xff)) * 2) + 8 + 14;
@@ -602,9 +622,9 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
       }
 #endif
     }
-  }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d Done reading cpu receive buffer\r\n", uId);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d Done reading cpu receive buffer\r\n", uId);
+  }
 
   // Acknowledge reading the packet from the FIFO
   AckHostPacketReceive(uId);

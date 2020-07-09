@@ -1273,7 +1273,10 @@ int main()
             pIFObjectPtr[uPhysicalEthernetId]->uNumWordsRead = uNumWords;
             uSize = uNumWords << 1;
 
-            /* deep packet inspection */
+            /*
+             * deep packet inspection - this was added to specifically improve programming performance by bypassing the
+             * subsequent half-word endian swapping since this is not needed for the control packet parsing code
+             */
             if (pBuffer[18] != UDP_CONTROL_PORT){
               /* correct the endianess */
               for (uIndex = 0; uIndex < uSize; uIndex++){
