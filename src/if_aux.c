@@ -13,12 +13,6 @@ u8 *if_generate_hostname_string(u8 phy_interface_id){     /* arg is the physical
   u8 serial_no[ID_SK_SERIAL_LEN];
   u8 status;
 
-  /* check a few char in hostname array - if filled correctly, this function has probably been called previously
-   * and the hostname cached in the static array declared above... so return early */
-  if ((hostname[0] == 's') && (hostname[1] == 'k') && (hostname[12] == '-')){
-    return hostname;
-  }
-
   status = get_skarab_serial(serial_no, ID_SK_SERIAL_LEN);
   if (status == XST_FAILURE){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Failed to read SKARAB serial number.\r\n");

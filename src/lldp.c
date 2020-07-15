@@ -49,6 +49,8 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   uIPAddress = pIF->uIFAddrIP;
   src_mac_addr = pIF->arrIFAddrMac;
 
+  hostname = pIF->DHCPContextState.arrDHCPHostName;
+
   /* zero the buffer, saves us from having to explicitly set zero valued bytes */
   memset(pTransmitBuffer, 0, LLDP_MAX_BUFFER_SIZE);
 
@@ -126,9 +128,7 @@ int uLLDPBuildPacket(u8 uId, u8 *pTransmitBuffer, u32 *uResponseLength){
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_TYPE_OFFSET] = LLDP_SYSTEM_NAME_TLV;
   pTransmitBuffer[LLDP_SYSTEM_NAME_TLV_LEN_OFFSET] = LLDP_SYSTEM_NAME_TLV_LEN;
 
-  hostname = if_generate_hostname_string(uId);
-  /* NOTE: the if_generate_hostname_string() returns a string including the interface number appended to it but we ill
-   * only copy the first part e.g. skarab020304 in the next line */
+  /* only copy the first part of the hostname e.g. skarab020304 - exclude interface number */
   memcpy(pTransmitBuffer + LLDP_SYSTEM_NAME_TLV_OFFSET, hostname, LLDP_SYSTEM_NAME_TLV_LEN);
 
   /* LLDP_SYSTEM_DESCR_TLV */

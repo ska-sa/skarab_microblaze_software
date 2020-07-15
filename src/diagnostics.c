@@ -253,6 +253,7 @@ void print_dhcp_internals(u8 physical_interface_id){
   ifptr = lookup_if_handle_by_id(physical_interface_id);
   dhcpptr = &(ifptr->DHCPContextState);
 
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "physical interface id u%u\r\n", physical_interface_id);
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMagic x%08x\r\n", dhcpptr->uDHCPMagic);
 
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMessageReady u%u\r\n", dhcpptr->uDHCPMessageReady);
