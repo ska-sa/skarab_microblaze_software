@@ -1398,7 +1398,9 @@ int main()
 
                 case PACKET_FILTER_ARP:
                   iStatus =  uARPMessageValidateReply(pIFObjectPtr[uPhysicalEthernetId]);
-                  if (iStatus == ARP_RETURN_REPLY){
+                  if (iStatus == ARP_RETURN_OFF){
+                    asm("nop");
+                  } else if (iStatus == ARP_RETURN_REPLY){
                     log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] valid reply received!\r\n", uPhysicalEthernetId);
                     IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ARP_REPLY);
                     uFlagRunTask_ARP_Process[uPhysicalEthernetId] = 1;

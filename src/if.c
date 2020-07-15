@@ -109,6 +109,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   }
   pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
   pIFObjectPtr->uIFCurrentArpRequest = 1;
+  pIFObjectPtr->uIFEnableArpProcessing = ARP_PROCESSING_ENABLE;
 
   pIFObjectPtr->uIFEthernetSubnet = 0;
   pIFObjectPtr->uIFEthernetId = uEthernetId;

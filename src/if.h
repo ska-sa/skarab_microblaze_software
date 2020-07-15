@@ -60,6 +60,10 @@ struct sIFObject{
   u8 uIFEnableArpRequests;  /* enable arp requests on this interface */
   u8 uIFCurrentArpRequest;  /* keep a counter to cycle through arp request IP's */
 
+#define ARP_PROCESSING_DISABLE  0
+#define ARP_PROCESSING_ENABLE   1
+  u8 uIFEnableArpProcessing;  /* enable arp processing on this interface */
+
   /* RX Packet Counters */
   u32 uRxTotal; /* total packets received */
     /* Filtered Ethernet Types we handle */

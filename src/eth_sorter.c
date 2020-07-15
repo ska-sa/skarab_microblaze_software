@@ -2636,6 +2636,7 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   u8 uIndex;
   u8 num_links;
   u8 link;
+  static struct sIFObject *iface;
 
   /* State variables */
   /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
@@ -2698,6 +2699,14 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_WB_PROGRAM_CTL_REG_ADDRESS, 0x2);
 
     uRetVal = XST_SUCCESS;
+
+    iface = lookup_if_handle_by_id(uId);
+    /*
+     * ARP processing can be truned off from the CLI. Therefore ensure that arp
+     * processing is enable in order to respond to arp requests from server.
+     * This needed for programming
+     */
+    iface->uIFEnableArpProcessing = ARP_PROCESSING_ENABLE;
 
   } else if (Command->uChunkNum == (uChunkIdCached + 1)){
     /* log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */

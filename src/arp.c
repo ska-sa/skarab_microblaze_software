@@ -67,6 +67,10 @@ u8 uARPMessageValidateReply(struct sIFObject *pIFObjectPtr){
 
   SANE_ARP(pIFObjectPtr);
 
+  if (pIFObjectPtr->uIFEnableArpProcessing == ARP_PROCESSING_DISABLE){
+    return ARP_RETURN_OFF;
+  }
+
   pUserBufferPtr = pIFObjectPtr->pUserRxBufferPtr;
 
   if (memcmp(pUserBufferPtr + ARP_FRAME_BASE + ARP_HW_TYPE_OFFSET, uEthernetHWType, 2) != 0){
