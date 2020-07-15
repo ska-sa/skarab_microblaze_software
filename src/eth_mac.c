@@ -57,21 +57,7 @@ static u32 eth_mac_wb_offset[] = {
 //=================================================================================
 u32 GetAddressOffset(u8 uId)
 {
-#if 0
-  if (uId == 0)
-    return ONE_GBE_MAC_ADDR;
-  else if (uId == 1)
-    return FORTY_GBE_MAC_0_ADDR;
-  else if (uId == 2)
-    return FORTY_GBE_MAC_1_ADDR;
-  else if (uId == 3)
-    return FORTY_GBE_MAC_2_ADDR;
-  else
-    return FORTY_GBE_MAC_3_ADDR;
-#endif
-
   return priv_GetAddressOffset(uId);
-
 }
 
 //=================================================================================
@@ -496,24 +482,25 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
       /* possibly a big performance hit when tracing receive buffer */
       if (uIndex == 0){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d[@x%x] ", uId, uAddressOffset);   /* id and wb-addr-offset -
-                                                                                               useful to trace all the
-                                                                                               id-to-addr mappings in
-                                                                                               the netw stack */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\nTX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d[@x%x]", uId, uAddressOffset);   /* id and wb-addr-offset -
+                                                                                                useful to trace all the
+                                                                                                id-to-addr mappings in
+                                                                                                the netw stack */
+      }
+
+      /* formatting */
+      if ((uIndex == 0) || ((uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, " ");
       }
 
       t = (u8 *) &(puTransmitPacket[uIndex]);
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
                                                                                                    word swapped - see
                                                                                                    indices - for easier
                                                                                                    reading on console */
-      if (((uIndex != 0) && (uIndex % 8) == 0)){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
-      } else {
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
-      }
-
       if (uIndex == (uNumWords - 1)){
         log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");  /* only do once at the end */
       }
@@ -599,11 +586,19 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
                                                  to print it anyway  */
       /* possibly a big performance hit when tracing receive buffer */
       if (uIndex == 0){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d[@x%x] ", uId, uAddressOffset);    /* do once for index 0 -
-                                                                                                id and wb-addr-offset -
-                                                                                                useful to trace all the
-                                                                                                id-to-addr mappings in
-                                                                                                the netw stack */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\nRX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d[@x%x]", uId, uAddressOffset);    /* do once for index 0 -
+                                                                                                 id and wb-addr-offset -
+                                                                                                 useful to trace all the
+                                                                                                 id-to-addr mappings in
+                                                                                                 the netw stack */
+      }
+
+      /* formatting */
+      if ((uIndex == 0) || ((uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
       }
 
       t = (u8 *) &(puReceivePacket[uIndex]);
@@ -611,11 +606,6 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
                                                                                                    word swapped - see
                                                                                                    indices - for easier
                                                                                                    reading on console */
-      if (((uIndex != 0) && (uIndex % 8) == 0)){
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
-      } else {
-        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
-      }
     }
   }
 
