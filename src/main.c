@@ -113,10 +113,12 @@ static volatile u8 uTick_100ms = 0;
 /* place this variable at a specific location in memory (in .rodata section). See linker script */
 //u32 __attribute__ ((section(".rodata.checksum"))) __attribute__ ((aligned (32))) uMemPlace;
 
+#if 0
 /* this variable holds the end address of the .text section. See linker script */
 extern u32 _text_section_end_;
 /* this variable holds the location at which the externally computed checksum was stored by linker. See linker script */
 extern u32 _location_checksum_;
+#endif
 
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
@@ -563,7 +565,6 @@ int main()
   u8 uValidate = 0;
 
   u32 uKeepAliveReg;
-  u32 uMemTest = 0;
 
 #ifdef TIME_PROFILE
   u32 time1 = 0, time2 = 0;
@@ -646,32 +647,9 @@ int main()
     }
   }
 
-
-  /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
-     but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
-     and add another one to prevent off-by-one error*/
-  if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] from addr @0x%08x to @0x%08x...\r\n"\
-                                 "[Memory Test] expected value {@0x%08x}: 0x%08x\r\n"\
-                                 "[Memory Test] computed value              : 0x%08x\r\n",\
-                                 0x50, &_text_section_end_, &_location_checksum_,\
-                                 _location_checksum_, uMemTest);
-    /* do not allow failure to go unnoticed - Assert()! */
-    if (uMemTest != _location_checksum_){
-      while(1){
-        /* enter endless printout loop in order to debug with serial console */
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS,  "[Memory Test] ***FAILED*** expect: 0x%08x compute: 0x%08x\r\n", _location_checksum_, uMemTest);
-        Delay(1000000);
-      }
-    } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] ***PASSED***\r\n");
-    }
-  } else {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] Error - could not execute\r\n");
-  }
+  vRunMemoryTest();
 
   PMemState = init_persistent_memory_setup();
-
 
   //Xil_ICacheEnable();
   //Xil_DCacheEnable();
@@ -1770,7 +1748,6 @@ int main()
       uFlagRunTask_Diagnostics = 0;
 
       /* also print some other useful info for debugging */
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Memory Test - expected 0x%08x, calculated 0x%08x\r\n", _location_checksum_, uMemTest );
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Register C_RD_ETH_IF_LINK_UP_ADDR: 0x%08x\r\n", ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR));
 
       //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){

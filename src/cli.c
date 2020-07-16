@@ -17,6 +17,7 @@
 #include "if.h"
 #include "igmp.h"
 #include "error.h"
+#include "memtest.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -63,6 +64,7 @@ typedef enum {
   CMD_INDEX_WB_READ,
   CMD_INDEX_ARP_REQ,
   CMD_INDEX_ARP_PROC,
+  CMD_INDEX_MEMTEST,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -90,6 +92,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_WB_READ]     = "wb-read",
   [CMD_INDEX_ARP_REQ]     = "arp-req",
   [CMD_INDEX_ARP_PROC]    = "arp-proc",
+  [CMD_INDEX_MEMTEST]     = "memtest",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -116,6 +119,7 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_WB_READ]      = {CLI_KEYWORD_HEX, NULL },
  [CMD_INDEX_ARP_REQ]      = {"off",     "on"},    /* order of "off" (index 0) and "on" (index 1) are important */
  [CMD_INDEX_ARP_PROC]     = {"off",     "on"},    /* order of "off" (index 0) and "on" (index 1) are important */
+ [CMD_INDEX_MEMTEST]      = { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -140,6 +144,7 @@ static int cli_peek_exe(struct cli *_cli);
 static int cli_wb_read_exe(struct cli *_cli);
 static int cli_arp_req_exe(struct cli *_cli);
 static int cli_arp_proc_exe(struct cli *_cli);
+static int cli_memtest_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -163,6 +168,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_WB_READ]      = cli_wb_read_exe,
  [CMD_INDEX_ARP_REQ]      = cli_arp_req_exe,
  [CMD_INDEX_ARP_PROC]     = cli_arp_proc_exe,
+ [CMD_INDEX_MEMTEST]      = cli_memtest_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -1101,6 +1107,14 @@ static int cli_arp_proc_exe(struct cli *_cli){
     iface = lookup_if_handle_by_id(physical_interface_id);
     iface->uIFEnableArpProcessing = _cli->opt_id;   /* ensure the option id maps to arp proc enable/disable */
   }
+
+  return 0;
+}
+
+
+static int cli_memtest_exe(struct cli *_cli){
+
+  vRunMemoryTest();
 
   return 0;
 }
