@@ -85,6 +85,7 @@ extern "C" {
 #define ETH_MAC_RESET_PROMISC_ENABLE        0x0Bu
 #define ETH_MAC_REG_SOURCE_PORT             0x0Cu
 /*      ETH_MAC_REG_RESERVED_FUTURE_USE     0x0Du - 0x1Eu */
+#define ETH_MAC_REG_CNT_RESET               0x1Eu
 
 #define ETH_MAC_REG_LOW_ADDRESS                       0x0000u
 #define ETH_MAC_REG_HIGH_ADDRESS                      0x0FFFu

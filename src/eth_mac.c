@@ -434,7 +434,7 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
   u32 uHostTransmitBufferLevel = 0x0;
   u32 uIndex = 0x0;
   u32 uAddressOffset = priv_GetAddressOffset(uId);
-  //u32 uReg;
+  u32 uReg = 0x0;
   unsigned int uPaddingWords = 0;
   u32 uPaddingIndex = 0;
   u8 *t;
@@ -532,7 +532,16 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d send done\r\n", uId);
+  if (LOG_LEVEL_TRACE == get_log_level()){
+#ifndef WISHBONE_LEGACY_MAP
+    /* this code added to debug interface mapping */
+    uReg = uAddressOffset | uId;
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d wr 0x%x to @x%x\r\n", uId, uReg, (uAddressOffset + (4*ETH_MAC_REG_CNT_RESET)));
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_CNT_RESET), uReg);
+#endif
+
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d send done\r\n", uId);
+  }
 
   return XST_SUCCESS;
 
