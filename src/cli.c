@@ -18,6 +18,7 @@
 #include "igmp.h"
 #include "error.h"
 #include "memtest.h"
+#include "mezz.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -49,6 +50,7 @@ typedef enum {
   CMD_INDEX_BOUNCE_LINK,
   CMD_INDEX_TEST_TIMER,
   CMD_INDEX_GET_CONFIG,
+  CMD_INDEX_GET_MEZZ_INV,
   CMD_INDEX_RESET_FW,
   CMD_INDEX_REBOOT_FPGA,
   CMD_INDEX_STATS,
@@ -77,6 +79,7 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_BOUNCE_LINK] = "bounce-link",
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_GET_CONFIG]  = "get-config",
+  [CMD_INDEX_GET_MEZZ_INV]= "get-mezz-inv",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
   [CMD_INDEX_REBOOT_FPGA] = "reboot-fpga",
   [CMD_INDEX_STATS]       = "stats",
@@ -104,6 +107,7 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },
+ [CMD_INDEX_GET_MEZZ_INV] = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
  [CMD_INDEX_REBOOT_FPGA]  = { "",       "flash",  "sdram"},
  [CMD_INDEX_STATS]        = { NULL },
@@ -129,6 +133,7 @@ static int cli_log_select_exe(struct cli *_cli);
 static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
+static int cli_get_mezz_inv_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
 static int cli_reboot_fpga_exe(struct cli *_cli);
 static int cli_stats_exe(struct cli *_cli);
@@ -153,6 +158,7 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_BOUNCE_LINK]  = cli_bounce_link_exe,
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
+ [CMD_INDEX_GET_MEZZ_INV] = cli_get_mezz_inv_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
  [CMD_INDEX_REBOOT_FPGA]  = cli_reboot_fpga_exe,
  [CMD_INDEX_STATS]        = cli_stats_exe,
@@ -1144,6 +1150,20 @@ static int cli_arp_proc_exe(struct cli *_cli){
 static int cli_memtest_exe(struct cli *_cli){
 
   vRunMemoryTest();
+
+  return 0;
+}
+
+
+
+static int cli_get_mezz_inv_exe(struct cli *_cli){
+  u8 mezz;
+
+  for (mezz = 0; mezz < 4; mezz++){
+    /* these functions print mezz type, for hw and fw, internally */
+    read_mezz_type_id(mezz);
+    get_mezz_firmware_type(mezz);
+  }
 
   return 0;
 }

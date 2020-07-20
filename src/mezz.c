@@ -8,7 +8,7 @@
 #include "constant_defs.h"
 #include "logging.h"
 
-static MezzHWType read_mezz_type_id(u8 mezz_site);
+/* static MezzHWType read_mezz_type_id(u8 mezz_site); */
 /* static MezzFirmwType get_mezz_firmware_type(u8 mezz_site); */
 
 /*********** Sanity Checks ***************/
@@ -106,7 +106,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
 
 
-static MezzHWType read_mezz_type_id(u8 mezz_site){
+/* static */ MezzHWType read_mezz_type_id(u8 mezz_site){
   u32 reg;
   u32 mezz_mask;
   u32 mezz_ctl_shadow_reg;
