@@ -1765,7 +1765,7 @@ int main()
       uFlagRunTask_WriteLEDStatus = 0;
       uFrontPanelLedsValue = 0;
 
-      for (interface_id = 1; interface_id <= 4;  interface_id++){
+      for (interface_id = 1; interface_id <= 4;  interface_id++){     /* loop through physical interface id's */
         /* check if the 40gbe core [1 to 4] is compiled into the firmware */
         if (IF_ID_PRESENT == check_interface_valid_quietly(interface_id)){
           /* check the link status */
@@ -1773,14 +1773,14 @@ int main()
             uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 1);
             /* check the dhcp status */
             if (DHCP_RETURN_TRUE == uDHCPGetBoundStatus(pIFObjectPtr[interface_id])){
-              uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 2);
+              //uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 2);
+              uFrontPanelLedsValue = uFrontPanelLedsValue | 1;    /* C_WR_FRONT_PANEL_STAT_LED_ADDR(0) now monitors dhcp
+                                                                     on all interfaces */
             }
           }
         }
       }
-      /* C_WR_FRONT_PANEL_STAT_LED_ADDR register
-       * now monitors dhcp on interfaces
-       */
+
       WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
     }
 
