@@ -648,15 +648,17 @@ void print_interface_map(void){
   n = get_num_interfaces();
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] %d interface%s present\r\n", n, n == 1 ? "" : "s");
 
-  /* logical to physical mapping */
-  for (log_id = 0; log_id < NUM_ETHERNET_INTERFACES; log_id++){
-    phy_id = logical_interface_set[log_id];
-    if (0xff == phy_id){
-      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> none\r\n", log_id);
-    } else {
-      wb_offset = GetAddressOffset(phy_id);
-      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> physical interface id %d (%s) @ wb 0x%08x\r\n",
-          log_id, phy_id, phy_id == 0 ? "1gbe" : "40gbe", wb_offset);
+  if (n > 0){
+    /* logical to physical mapping */
+    for (log_id = 0; log_id < NUM_ETHERNET_INTERFACES; log_id++){
+      phy_id = logical_interface_set[log_id];
+      if (0xff == phy_id){
+        log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> none\r\n", log_id);
+      } else {
+        wb_offset = GetAddressOffset(phy_id);
+        log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> physical interface id %d (%s) @ wb 0x%08x\r\n",
+            log_id, phy_id, phy_id == 0 ? "1gbe" : "40gbe", wb_offset);
+      }
     }
   }
 }
