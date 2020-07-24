@@ -300,7 +300,7 @@ static int GetVoltageLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 static int GetFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 *uResponseLength);
 static int ClearFanControllerLogsHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
-static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
+static int MulticastLeaveGroup(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetDHCPMonitorTimeout(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int GetMicroblazeUptime(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
 static int FPGAFanControllerUpdateHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength);
@@ -373,7 +373,7 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == PMBUS_READ_I2C)
       return(PMBusReadI2CBytesCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == CONFIGURE_MULTICAST)
-      return(ConfigureMulticastCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(ConfigureMulticastCommandHandler(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == DEBUG_LOOPBACK_TEST)
       return(DebugLoopbackTestCommandHandler(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == QSFP_RESET_AND_PROG)
@@ -407,7 +407,7 @@ int CommandSorter(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacke
     else if (Command->uCommandType == DHCP_RESET_STATE_MACHINE)
       return(ResetDHCPStateMachine(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == MULTICAST_LEAVE_GROUP)
-      return(MulticastLeaveGroup(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
+      return(MulticastLeaveGroup(uId, pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_DHCP_MONITOR_TIMEOUT)
       return(GetDHCPMonitorTimeout(pCommand, uCommandLength, uResponsePacketPtr, uResponseLength));
     else if (Command->uCommandType == GET_MICROBLAZE_UPTIME)
@@ -981,8 +981,10 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   sSdramReconfigureRespT *Response = (sSdramReconfigureRespT *) uResponsePacketPtr;
   u32 uReg;
   u8 uIndex;
+  u8 num_links;
+  u8 link;
   u32 uContinuityData;
-  u32 uMuxSelect = 0;
+  /* u32 uMuxSelect = 0; */
 
   if (uCommandLength < sizeof(sSdramReconfigureReqT))
     return XST_FAILURE;
@@ -1008,6 +1010,7 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
   if (Command->uClearSdram == 1){
     ClearSdram();
 
+#if 0
     /* Now, set the mux bit (bit #2) in C_WR_BRD_CTL_STAT_1_ADDR (register 0x18) to select */
     /* the appropriate interface to receive the config data on. */
     /* Since this is a later addition to this command, this seems to be the most appropriate place to do it. */
@@ -1024,7 +1027,8 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Received SDRAM reconfig command on %s-i/f with id %d\r\n", uId == 0 ? "1gbe" : "40gbe", uId);
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Setting board register 0x%.4x to 0x%.4x\r\n", C_WR_BRD_CTL_STAT_1_ADDR, uMuxSelect);
-
+#endif
+#if 0
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "About to send IGMP leave messages.\r\n");
 
     /* The clear sdram command is usually called before programming. Thus, in anticipation of a new sdram image being sent */
@@ -1032,20 +1036,14 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-#endif
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_physical_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group.\r\n", uIndex);
       }
     }
+#endif
 
     /* Disable SDRAM programming over Wishbone and clear registers */
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_WB_PROGRAM_EN_REG_ADDRESS, 0x0);
@@ -1071,16 +1069,9 @@ int SdramReconfigureCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8
 
     // Check which Ethernet interfaces are part of IGMP groups
     // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-#endif
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_physical_interface_id(link);
       if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
         log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
       }
@@ -1894,50 +1885,82 @@ int PMBusReadI2CBytesCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uRes
 //  ------
 //  XST_SUCCESS if successful
 //=================================================================================
-int ConfigureMulticastCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int ConfigureMulticastCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
   sConfigureMulticastReqT *Command = (sConfigureMulticastReqT *) pCommand;
   sConfigureMulticastRespT *Response = (sConfigureMulticastRespT *) uResponsePacketPtr;
   u32 uFabricMultiCastIPAddress;
   u32 uFabricMultiCastIPAddressMask;
+  u8 if_to_configure;
+  u8 uPaddingIndex;
+  u8 status;
 
   if (uCommandLength < sizeof(sConfigureMulticastReqT))
     return XST_FAILURE;
 
-  uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
-
-  uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
-
-  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "ID: %x MC IP: %x MC MASK: %x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-
-  // Execute the command
-  SetMultiCastIPAddress(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-
-  if (XST_FAILURE == uIGMPJoinGroup(Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to join multicast group with addr %08x and mask %08x \r\n", Command->uId, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
-  }
-
-#if 0
-  uEthernetFabricMultiCastIPAddress[Command->uId] = uFabricMultiCastIPAddress;
-  uEthernetFabricMultiCastIPAddressMask[Command->uId] = uFabricMultiCastIPAddressMask;
-
-  // Enable sending of Multicast packets on this interface
-  uIGMPState[Command->uId] = IGMP_STATE_JOINED_GROUP;
-  uIGMPSendMessage[Command->uId] = IGMP_SEND_MESSAGE;
-  uCurrentIGMPMessage[Command->uId] = 0x0;
-#endif
-
+  /* pre-fill the response fields before logic below */
   Response->Header.uCommandType = Command->Header.uCommandType + 1;
   Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
-  Response->uId = Command->uId;
   Response->uFabricMultiCastIPAddressHigh = Command->uFabricMultiCastIPAddressHigh;
   Response->uFabricMultiCastIPAddressLow = Command->uFabricMultiCastIPAddressLow;
   Response->uFabricMultiCastIPAddressMaskHigh = Command->uFabricMultiCastIPAddressMaskHigh;
   Response->uFabricMultiCastIPAddressMaskLow = Command->uFabricMultiCastIPAddressMaskLow;
 
+  for (uPaddingIndex = 0; uPaddingIndex < 3; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  /* check that the interface supplied by user is valid
+   * note this is physical interface position as opposed to logical (enumerated) id
+   */
+  if (Command->uId != 0xff){
+    /* 0xff is a special case used in this command */
+    status = check_interface_valid(Command->uId);
+  }
+
+  if ((Command->uId != 0xff) && (IF_ID_PRESENT != status)){
+    Response->uId = Command->uId;
+    if (IF_ID_INVALID_RANGE == status){
+      Response->uStatus = CMD_STATUS_ERROR_IF_OUT_OF_RANGE;
+    } else if (IF_ID_NOT_PRESENT == status){
+      Response->uStatus = CMD_STATUS_ERROR_IF_NOT_PRESENT;
+    } else {
+      Response->uStatus = CMD_STATUS_ERROR_GENERAL;
+    }
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Configure multicast failed\r\n", uId, Command->uId);
+  } else {
+    if (Command->uId == 0xff){
+      /* special case i.e. we want to subscribe on *this* interface */
+      if_to_configure = uId;    /* this is the uId, passed in from the calling function, on which the command was received */
+    } else {
+      if_to_configure = Command->uId;   /*i.e. the user requested uId in the packet fields */
+    }
+
+    uFabricMultiCastIPAddress = (Command->uFabricMultiCastIPAddressHigh << 16) | Command->uFabricMultiCastIPAddressLow;
+    uFabricMultiCastIPAddressMask = (Command->uFabricMultiCastIPAddressMaskHigh << 16) | Command->uFabricMultiCastIPAddressMaskLow;
+
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] setting fabric multicast registers - ID: %d MC IP: %08x MC MASK: %08x\r\n",
+        uId, if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+
+    // Execute the command
+    SetMultiCastIPAddress(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask);
+
+    if (XST_FAILURE == uIGMPJoinGroup(if_to_configure, uFabricMultiCastIPAddress, uFabricMultiCastIPAddressMask)){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to join multicast group\r\n", uId);
+      Response->uStatus = CMD_STATUS_ERROR_GENERAL;
+    } else {
+      Response->uStatus = CMD_STATUS_SUCCESS;
+    }
+
+    Response->uId = if_to_configure;
+  }
+
   *uResponseLength = sizeof(sConfigureMulticastRespT);
 
-  return XST_SUCCESS;
+  return XST_SUCCESS;   /* NOTE: 'success' is returned even if the operation fails - the calling function relies on this
+                           'success' to send the packet back to the host. The error is signalled via a field in the packet
+                           structure. This is an artefact of the way the original protocol works and the many subsequent
+                           software/packet-field changes.*/
 }
 
 /* TODO: verify that it's safe to remove this function */
@@ -2611,10 +2634,13 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   u32 uTemp = 0;
   u8 uRetVal;
   u8 uIndex;
+  u8 num_links;
+  u8 link;
+  static struct sIFObject *iface;
 
   /* State variables */
   /* static u8 uCurrentProgrammingId; */      /* the interface Id we are currently receiving sdram data on */
-  static u32 uChunkIdCached = 0;        /* the last chunk that has been succefully programmed */
+  static u32 uChunkIdCached = 0;        /* the last chunk that has been successfully programmed */
   static u32 uChunkSizeBytesCached = 0;      /* cache the chunk length which is obtained from chunk 0 */
 
   sSDRAMProgramOverWishboneReqT *Command = (sSDRAMProgramOverWishboneReqT *) pCommand;
@@ -2639,56 +2665,30 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     return XST_FAILURE;
   }
 
-  for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
-    Response->uPadding[uPaddingIndex] = 0;
-  }
-
-  Response->Header.uCommandType = Command->Header.uCommandType + 1;
-  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
-
-  Response->uChunkNum = Command->uChunkNum; 
-  Response->uStatus = 0x0;  /* ACK */
-
-  *uResponseLength = sizeof(sSDRAMProgramOverWishboneRespT);
-
   /* Chunk number 0 is special case, resets everything */
   if(Command->uChunkNum == 0x0){
-    uChunkSizeBytesCached = uCommandLength - 8;
-
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "IGMP [%02d] About to send IGMP leave messages.\r\n", uId);
-
-#if 0
-    // Check which Ethernet interfaces are part of IGMP groups
-    // and send leave messages immediately
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-#if 0
-      if (uIGMPState[uIndex] == IGMP_STATE_JOINED_GROUP)
-      {
-        uIGMPState[uIndex] = IGMP_STATE_LEAVING;
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IGMP[%02x]: About to send IGMP leave message.\r\n", uIndex);
-      }
-#endif
-      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
-        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uIndex);
-      }
-    }
-#endif
-
-    /* TODO - should we unsubscribe on all interfaces?? See code commented out above */
-    if (XST_FAILURE == uIGMPLeaveGroup(uId)){
-      log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] failed to leave multicast group\r\n", uId);
-    }
-
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0: about to clear sdram. Detected chunk size of %d bytes.\r\n" , uId, uChunkSizeBytesCached);
-
     /* during programming, we need the serial console to be relatively quiet
      * since this is a data-intensive task, cache the log-level...restore later */
     cache_log_level();
     /* only print warnings during programming */
     set_log_level(LOG_LEVEL_WARN);
+
+    uChunkSizeBytesCached = uCommandLength - 8;
+
+    /***************************************************************************
+     *  console output needs to be minimal and short - function speed is NB here
+     **************************************************************************/
+
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "SDRAM PROGRAM[%02x] Chunk 0 - chunk size: %d bytes.\r\n" , uId, uChunkSizeBytesCached);
+
+    /* unsubscribe from all igmp groups when programming starts */
+    num_links = get_num_interfaces();
+    for (link = 0; link < num_links; link++){
+      uIndex = get_physical_interface_id(link);
+      if (XST_FAILURE == uIGMPLeaveGroup(uIndex)){
+        log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [%02d] Failed to leave multicast group\r\n", uIndex);
+      }
+    }
 
     uChunkIdCached = 0;
     ClearSdram();
@@ -2699,6 +2699,14 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_WB_PROGRAM_CTL_REG_ADDRESS, 0x2);
 
     uRetVal = XST_SUCCESS;
+
+    iface = lookup_if_handle_by_id(uId);
+    /*
+     * ARP processing can be truned off from the CLI. Therefore ensure that arp
+     * processing is enable in order to respond to arp requests from server.
+     * This needed for programming
+     */
+    iface->uIFEnableArpProcessing = ARP_PROCESSING_ENABLE;
 
   } else if (Command->uChunkNum == (uChunkIdCached + 1)){
     /* log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "chunk %d: about to write to sdram\r\n", Command->uChunkNum); */  /* this adds lots of overhead */
@@ -2742,6 +2750,19 @@ int SDRAMProgramOverWishboneCommandHandler(u8 uId, u8 * pCommand, u32 uCommandLe
   } else {
     uRetVal = XST_FAILURE;
   }
+
+  for (uPaddingIndex = 0; uPaddingIndex < 7; uPaddingIndex++){
+    Response->uPadding[uPaddingIndex] = 0;
+  }
+
+  Response->Header.uCommandType = Command->Header.uCommandType + 1;
+  Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+
+  Response->uChunkNum = Command->uChunkNum;
+  Response->uStatus = 0x0;  /* ACK */
+
+  *uResponseLength = sizeof(sSDRAMProgramOverWishboneRespT);
+
 
   return uRetVal;
 }
@@ -3193,8 +3214,9 @@ static int ResetDHCPStateMachine(u8 * pCommand, u32 uCommandLength, u8 * uRespon
 }
 
 
-static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
-  u8 status;
+static int MulticastLeaveGroup(u8 uId, u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength){
+  u8 if_to_leave;
+  u8 if_status;
 
   sMulticastLeaveGroupReqT *Command = (sMulticastLeaveGroupReqT *) pCommand;
   sMulticastLeaveGroupRespT *Response = (sMulticastLeaveGroupRespT *) uResponsePacketPtr;
@@ -3208,18 +3230,41 @@ static int MulticastLeaveGroup(u8 * pCommand, u32 uCommandLength, u8 * uResponse
 
   *uResponseLength = sizeof(sMulticastLeaveGroupRespT);
 
-  Response->uLinkId = Command->uLinkId;
+  log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] mc leave - link ID: %d\r\n", uId, Command->uLinkId);
 
-  status = uIGMPLeaveGroup(Command->uLinkId);
+  /* check that the interface supplied by user is valid
+   * note this is physical interface position as opposed to logical (enumerated) id
+   */
+  if (Command->uLinkId != 0xff){
+    /* 0xff is a special case used in this command - interface check would fail if 0xff passed in */
+    if_status = check_interface_valid(Command->uLinkId);
+  }
 
-  if (XST_SUCCESS == status){
-    Response->uSuccess = 1;
+  if ((Command->uLinkId != 0xff) && (IF_ID_PRESENT != if_status)){
+    Response->uLinkId = Command->uLinkId;
+    Response->uSuccess = 0;   /* error */
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to leave multicast group on if-%d\r\n", uId, Command->uLinkId);
   } else {
-    Response->uSuccess = 0;
+    if (Command->uLinkId == 0xff){
+      /* special case i.e. we want to unsubscribe on *this* interface */
+      if_to_leave = uId;    /* this is the uId, passed in from the calling function, on which the command was received */
+    } else {
+      if_to_leave = Command->uLinkId;   /*i.e. the user requested uId in the packet fields */
+    }
+
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "CTRL [%02d] clearing fabric multicast registers for if-%d\r\n", uId, if_to_leave);
+    SetMultiCastIPAddress(if_to_leave, 0xffffffff, 0xffffffff);   /* clear the fabric multicast registers */
+
+    if (XST_FAILURE == uIGMPLeaveGroup(if_to_leave)){
+      log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02d] Failed to leave multicast group on if-%d\r\n", uId, if_to_leave);
+      Response->uSuccess = 0;   /* error */
+    } else {
+      Response->uSuccess = 1;   /* successful */
+    }
+    Response->uLinkId = if_to_leave;
   }
 
   return XST_SUCCESS;
-
 }
 
 

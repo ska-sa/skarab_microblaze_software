@@ -611,6 +611,42 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
   return DHCP_RETURN_OK;
 }
 
+
+//=================================================================================
+//  uDHCPGetBoundStatus
+//---------------------------------------------------------------------------------
+//  This function returns the status of the DHCP lease-binding process.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  DHCP_RETURN_TRUE or DHCP_RETURN_FALSE
+//=================================================================================
+u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr){
+
+  typeDHCPState state = pIFObjectPtr->DHCPContextState.tDHCPCurrentState;
+
+  switch (state){
+    /* the dhcp lease has been acquired */
+    case BOUND:
+    case RENEW:
+    case REBIND:
+      return DHCP_RETURN_TRUE;
+
+    case INIT:
+    case RANDOMIZE:
+    case SELECT:
+    case WAIT:
+    case REQUEST:
+    default:
+      return DHCP_RETURN_FALSE;
+  }
+}
+
+
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus
@@ -1283,6 +1319,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   int RetVal = (-1);
   u16 uCheckTemp = 0;
   u16 uUDPLength = 0;
+  int i;
 
   struct sDHCPObject *pDHCPObjectPtr;
 
@@ -1305,7 +1342,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
     memcpy(pBuffer + ETH_DST_OFFSET, pDHCPObjectPtr->arrDHCPNextHopMacCached, 6);
   } else {
     memset(pBuffer + ETH_DST_OFFSET, 0xff, 6);   /* broadcast */
-  } 
+  }
 
   /* fill in our hardware mac address */
   memcpy(pBuffer + ETH_SRC_OFFSET, pIFObjectPtr->arrIFAddrMac, 6);
@@ -1477,7 +1514,7 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   memcpy(&(uPseudoHdr[10]), pBuffer + UDP_FRAME_BASE + UDP_ULEN_OFFSET, 2);
 
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP: UDP pseudo header: \r\n");
-  for (int i = 0; i < 12; i++){
+  for (i = 0; i < 12; i++){
     log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", uPseudoHdr[i]);
   }
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
@@ -1512,6 +1549,12 @@ static u8 uDHCPBuildMessage(struct sIFObject *pIFObjectPtr, typeDHCPMessage tDHC
   log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [%02x] sending DHCP %s with xid 0x%x\r\n",
       (pIFObjectPtr != NULL) ? pIFObjectPtr->uIFEthernetId : 0xFF,
       dhcp_msg_string_lookup[tDHCPMsgType], pDHCPObjectPtr->uDHCPXidCached);
+
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "DHCP tx pkt:");
+  for (i = 0; i < uLength; i++){
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, " %02x", pBuffer[i]);
+  }
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_TRACE, "\r\n");
 
   /* invoke a callback once the message successfully built */
   if (pDHCPObjectPtr->callbackOnMsgBuilt != NULL){

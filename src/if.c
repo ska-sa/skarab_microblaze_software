@@ -19,6 +19,7 @@
 #include "logging.h"
 #include "constant_defs.h"
 #include "igmp.h"
+#include "eth_mac.h"
 
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
@@ -91,6 +92,8 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   for (uLoopIndex = 0; uLoopIndex < 16; uLoopIndex++){
     pIFObjectPtr->stringIFAddrIP[uLoopIndex] = '\0';
     pIFObjectPtr->stringIFAddrNetmask[uLoopIndex] = '\0';
+    pIFObjectPtr->stringHostname[uLoopIndex] ='\0';
+
   }
 
   for (uLoopIndex = 0; uLoopIndex < 4; uLoopIndex++){
@@ -106,6 +109,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   }
   pIFObjectPtr->uIFEnableArpRequests = ARP_REQUESTS_DISABLE;
   pIFObjectPtr->uIFCurrentArpRequest = 1;
+  pIFObjectPtr->uIFEnableArpProcessing = ARP_PROCESSING_ENABLE;
 
   pIFObjectPtr->uIFEthernetSubnet = 0;
   pIFObjectPtr->uIFEthernetId = uEthernetId;
@@ -595,10 +599,186 @@ void IFCounterIncr(struct sIFObject *pIFObjectPtr, tCounter c){
   }
 }
 
+static u8 runtime_num_interfaces = 0;
+
 u8 get_num_interfaces(void){
-  u8 n = NUM_ETHERNET_INTERFACES;
+  return runtime_num_interfaces;
+}
+
+
+/* we need an array of interfaces that stores the physical id in a logically indexed array */
+
+static u8 logical_interface_set[NUM_ETHERNET_INTERFACES];
+
+
+/* @param logical_link_id
+ * return physical interface id
+ */
+u8 get_physical_interface_id(u8 logical_link_id){
+  /* TODO: assert sane logical_if_id */
+  return logical_interface_set[logical_link_id];
+}
+
+
+static u8 _check_interface_valid(u8 physical_interface_id){
+  int i;
+
+  /* check that id doesn't exceed the bounds */
+  if (physical_interface_id >= NUM_ETHERNET_INTERFACES){
+    return IF_ID_INVALID_RANGE;
+  }
+
+  /* check that the interface is part of the logical list enumerated at startup */
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    if (physical_interface_id == logical_interface_set[i]){
+      return IF_ID_PRESENT;   /* found - therefore interface is present */
+    }
+  }
+
+  /* interface id not found */
+  return IF_ID_NOT_PRESENT;
+}
+
+void print_interface_map(void){
+  u8 log_id;  /* logical id */
+  u8 n;
+  u8 phy_id;  /* physical id */
+  u32 wb_offset = 0x0;
+
+  n = get_num_interfaces();
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] %d interface%s present\r\n", n, n == 1 ? "" : "s");
+
+  if (n > 0){
+    /* logical to physical mapping */
+    for (log_id = 0; log_id < NUM_ETHERNET_INTERFACES; log_id++){
+      phy_id = logical_interface_set[log_id];
+      if (0xff == phy_id){
+        log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> none\r\n", log_id);
+      } else {
+        wb_offset = GetAddressOffset(phy_id);
+        log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [..] logical id %d -> physical interface id %d (%s) @ wb 0x%08x\r\n",
+            log_id, phy_id, phy_id == 0 ? "1gbe" : "40gbe", wb_offset);
+      }
+    }
+  }
+}
+
+
+/*
+ * This function checks if the given id is present in the list of logical interfaces.
+ * It is mainly used to verify an argument passed in from the user
+ */
+u8 check_interface_valid(u8 physical_interface_id){
+  u8 status;
+
+  status = _check_interface_valid(physical_interface_id);
+
+  /* print logging output */
+  switch (status){
+    case IF_ID_PRESENT:
+      return status;
+
+    case IF_ID_INVALID_RANGE:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f ID %d out of range\r\n", physical_interface_id);
+      return status;
+
+    case IF_ID_NOT_PRESENT:
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "I/F  [..] physical i/f %d not present\r\n", physical_interface_id);
+      return status;
+
+    default:
+      /* will never reach here - included to quiet compiler warning */
+      return status;
+      break;
+  }
+}
+
+
+/* this check also occurs in high rate tasks -> need to quiet log output */
+u8 check_interface_valid_quietly(u8 physical_interface_id){
+  return _check_interface_valid(physical_interface_id);
+}
+
+
+#define MOCK_C_RD_ETH_IF_LINK_UP_ADDR 0x60
+
+/* This function detects the interfaces present in the
+ * firmware build and maps the logical interface id to
+ * the physical interface position.
+ * The number of interfaces present is returned.
+ */
+u8 if_enumerate_interfaces(void){
+  u32 reg;
+  u8 i = 0;
+  u8 n = 0;   /*
+               * this n is essentially a count of the number of
+               * interfaces present at runtime. It is also used
+               * to keep track of the index into the array of
+               * memory offsets during enumeration i.e.
+               * the
+               * interface id
+               */
+
+  /*
+   * NOTE: we enumerate the interfaces in such a way that we
+   * have a contiguous list of interfaces(id's) regardless of whether
+   * the hardware/firmware implementation is not contiguous
+   * TODO: should we maintain the current interface mac
+   * assigning wrt the last octet??? - if so the id and last mac
+   * octet/hostname of the interface will not be the same
+   */
+
+#if MULTILINK_ARCH
+  reg = ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR);
+#else
+  reg = MOCK_C_RD_ETH_IF_LINK_UP_ADDR;
+#endif
+
+  /* init the array to out of range id value of 0xff */
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    logical_interface_set[i] = 0xff;
+  }
+
+
+  /* check which cores are present... */
+
+  if (reg & 0x20){
+    logical_interface_set[n] = 0;
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 1gbe core 0 with logical enumeration %d\r\n", 0, n);
+    n++;
+  }
+
+  if (reg & 0x40){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 1 with logical enumeration %d\r\n", 1, n);
+    logical_interface_set[n] = 1;
+    n++;
+  }
+
+  if (reg & 0x80){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 2 with logical enumeration %d\r\n", 2, n);
+    logical_interface_set[n] = 2;
+    n++;
+  }
+
+  if (reg & 0x100){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 3 with logical enumeration %d\r\n", 3, n);
+    logical_interface_set[n] = 3;
+    n++;
+  }
+
+  if (reg & 0x200){
+    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] 40gbe core 4 with logical enumeration %d\r\n", 4, n);
+    logical_interface_set[n] = 4;
+    n++;
+  }
+
+  /* probably more elegant to shift bits out and test ... TODO */
+
+  runtime_num_interfaces = n;
+
   return n;
 }
+
 
 /* hide the interface state handles */
 struct sIFObject *lookup_if_handle_by_id(u8 id){

@@ -61,6 +61,7 @@
 #include "fault_log.h"
 #include "igmp.h"
 #include "time.h"
+#include "init.h"
 #include "error.h"
 
 #define DHCP_MAX_RECONFIG_COUNT 2
@@ -87,9 +88,9 @@ void IllegalOpcodeException(void *Data);
 /* void UnalignedAccessException(void *Data); */
 
 /* temp global definition */
-static volatile u8 uFlagRunTask_DHCP = 0;
-static volatile u8 uFlagRunTask_IGMP = 0;
-static volatile u8 uFlagRunTask_LLDP = 1; /* Set LLDP flag to 1 to send LLDP packet at start up */
+static volatile u8 uFlagRunTask_DHCP[NUM_ETHERNET_INTERFACES] = {0};
+static volatile u8 uFlagRunTask_IGMP[NUM_ETHERNET_INTERFACES] = {0};
+static volatile u8 uFlagRunTask_LLDP[NUM_ETHERNET_INTERFACES] = {0};
 #ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
 #endif
@@ -98,7 +99,7 @@ static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Respond[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
-static volatile u8 uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
+static volatile u8 uFlagRunTask_ARP_Requests[NUM_ETHERNET_INTERFACES] = {ARP_REQUEST_DONT_UPDATE};
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 #ifdef LINK_MON_RX_40GBE
 static volatile u8 uFlagRunTask_LinkWatchdog = 0;
@@ -112,10 +113,12 @@ static volatile u8 uTick_100ms = 0;
 /* place this variable at a specific location in memory (in .rodata section). See linker script */
 //u32 __attribute__ ((section(".rodata.checksum"))) __attribute__ ((aligned (32))) uMemPlace;
 
+#if 0
 /* this variable holds the end address of the .text section. See linker script */
 extern u32 _text_section_end_;
 /* this variable holds the location at which the externally computed checksum was stored by linker. See linker script */
 extern u32 _location_checksum_;
+#endif
 
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
@@ -142,15 +145,13 @@ static struct sMezzObject *MezzHandle[4];   /* holds the handle to the state of 
 void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 {
   //u8 uIndex;
+  int i;
 
   if (uTimeoutCounter != 0){
     uTimeoutCounter--;
   }
 
   uTick_100ms = 1;
-
-  // Every 100 ms, send another ARP request
-  uUpdateArpRequests = ARP_REQUEST_UPDATE;
 
   /* every 5 mins */
   if (uPrintStatsCounter >= 3000){
@@ -161,22 +162,25 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   }
 
   // LLDP every 15 seconds (timer every 100 ms)
-  if(uLLDPTimerCounter == 150)
-  {
+  if(uLLDPTimerCounter >= 150){
     uLLDPTimerCounter = 0x0;
-    uFlagRunTask_LLDP = 1;
-
-  }
-  else{
+    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+      uFlagRunTask_LLDP[i] = 1;
+    }
+  } else{
     uLLDPTimerCounter++;
   }
 
+  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+    /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+    uFlagRunTask_DHCP[i] = 1;
 
-  /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
-  uFlagRunTask_DHCP = 1;
+    /* set the igmp task flag every 100ms which in turn runs igmp state machine */
+    uFlagRunTask_IGMP[i] = 1;
 
-  /* set the igmp task flag every 100ms which in turn runs igmp state machine */
-  uFlagRunTask_IGMP = 1;
+    // Every 100 ms, send another ARP request
+    uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
+  }
 
 #ifdef RECONFIG_UPON_NO_DHCP
   uFlagRunTask_CheckDHCPBound = 1;
@@ -184,33 +188,6 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #ifdef LINK_MON_RX_40GBE
   uFlagRunTask_LinkWatchdog = 1;
-#endif
-
-#if 0
-  // DHCP every 10 seconds (timer every 100 ms)
-  if (uDHCPTimerCounter == 0x64)
-  {
-    uDHCPTimerCounter = 0x0;
-
-    for (uIndex = 0; uIndex < NUM_ETHERNET_INTERFACES; uIndex++)
-    {
-      // Send out ARP requests every 60 seconds
-      if (uIGMPTimerCounter == 0x5)
-      {
-        uIGMPSendMessage[uIndex] = IGMP_SEND_MESSAGE;
-        uCurrentIGMPMessage[uIndex] = 0x0;
-      }
-    }
-
-    // Only send IGMP message reports every 60 seconds
-    if (uIGMPTimerCounter == 0x5)
-      uIGMPTimerCounter = 0;
-    else
-      uIGMPTimerCounter++;
-
-  }
-  else
-    uDHCPTimerCounter++;
 #endif
 
   uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
@@ -276,7 +253,8 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
   if (uL2PktLen < sizeof(struct sEthernetHeader))
     return XST_FAILURE;
 
-  pL2Ptr = (u8 *) &(uReceiveBuffer[uId][0]);
+  //pL2Ptr = (u8 *) &(uReceiveBuffer[uId][0]);
+  pL2Ptr = (u8 *) uReceiveBuffer;
   EthHdr = (struct sEthernetHeader *) pL2Ptr;
 
   // Cache MAC source address for response
@@ -363,14 +341,15 @@ int EthernetRecvHandler(u8 uId, u32 uNumWords, u32 * uResponsePacketLengthBytes)
 //=================================================================================
 void InitialiseEthernetInterfaceParameters()
 {
-  u8 uId;
+  u8 logical_link;
+  u8 uPhysicalEthernetId;
   u8 uSerial[ID_SK_SERIAL_LEN];
-  u8 uPxSerial[ID_PX_SERIAL_LEN];
 
   u16 uFabricMacHigh;
   u16 uFabricMacMid;
   u16 uFabricMacLow;
   u8 status;
+  u8 n;
 
   uPreviousAsyncSdramRead = 0;
   uPreviousSequenceNumber = 0;
@@ -381,155 +360,44 @@ void InitialiseEthernetInterfaceParameters()
     /* from here on in the mac address will be incorrect (ff:ff:ff...) */
   }
 
-  status = get_peralex_serial(uPxSerial, ID_PX_SERIAL_LEN);
-  if (status == XST_FAILURE){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Failed to read Peralex serial number.\r\n");
-  }
 
   // TO DO: NOT SURE WHAT TO DO HERE FOR MULTICAST
   uFabricMacHigh = 0x0600 | uSerial[0];
   uFabricMacMid = (uSerial[1] << 8) | uSerial[2];
 
-  for (uId = 0; uId < NUM_ETHERNET_INTERFACES; uId++){
-    //uEnableArpRequests[uId] = ARP_REQUESTS_DISABLE;
-    //uEthernetLinkUp[uId] = LINK_DOWN;
-    //uEthernetFabricSubnetMask[uId] = ETHERNET_FABRIC_SUBNET_MASK;
-    //uEthernetFabricPortAddress[uId] = ETHERNET_FABRIC_PORT_ADDRESS;
-    //uEthernetSubnet[uId] = ETHERNET_FABRIC_SUBNET;
-    uIPIdentification[uId] = 0x7342;
+  n = get_num_interfaces();
+
+  for (logical_link = 0; logical_link < n; logical_link++){
+
+    uPhysicalEthernetId = get_physical_interface_id(logical_link);
+
+    uIPIdentification[uPhysicalEthernetId] = 0x7342;
 
 #ifdef DO_40GBE_LOOPBACK_TEST
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Setting all 40GBE MAC addresses same so can test in loopback!\r\n");
-    if (uId == 0){
-      uFabricMacLow = (uSerial[3] << 8) | uId;
+    if (uPhysicalEthernetId == 0){
+      uFabricMacLow = (uSerial[3] << 8) | uPhysicalEthernetId;
     } else {
       uFabricMacLow = (uSerial[3] << 8) | 0x1;
     }
 #else
-    uFabricMacLow = (uSerial[3] << 8) | uId;
+    uFabricMacLow = (uSerial[3] << 8) | uPhysicalEthernetId;
 #endif
 
-    uEthernetFabricMacHigh[uId] = uFabricMacHigh;
-    uEthernetFabricMacMid[uId] = uFabricMacMid;
-    uEthernetFabricMacLow[uId] = uFabricMacLow;
+    uEthernetFabricMacHigh[uPhysicalEthernetId] = uFabricMacHigh;
+    uEthernetFabricMacMid[uPhysicalEthernetId] = uFabricMacMid;
+    uEthernetFabricMacLow[uPhysicalEthernetId] = uFabricMacLow;
 
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Setting MAC for IF %d to %04x %04x %04x\r\n", uId, uId, uFabricMacHigh, uFabricMacMid, uFabricMacLow);
-    SetFabricSourceMACAddress(uId, uEthernetFabricMacHigh[uId], ((uEthernetFabricMacMid[uId] << 16) | (uEthernetFabricMacLow[uId])));
-    //SetFabricSourcePortAddress(uId, uEthernetFabricPortAddress[uId]);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Setting MAC for IF %d to %04x %04x %04x\r\n", uPhysicalEthernetId, uPhysicalEthernetId, uFabricMacHigh, uFabricMacMid, uFabricMacLow);
+    SetFabricSourceMACAddress(uPhysicalEthernetId, uEthernetFabricMacHigh[uPhysicalEthernetId], ((uEthernetFabricMacMid[uPhysicalEthernetId] << 16) | (uEthernetFabricMacLow[uPhysicalEthernetId])));
 
-    //uIGMPState[uId] = IGMP_STATE_NOT_JOINED;
-    //uIGMPSendMessage[uId] = IGMP_DONE_SENDING_MESSAGE;
-    //uCurrentIGMPMessage[uId] = 0x0;
-
-    status = SoftReset(uId);
+    status = SoftReset(uPhysicalEthernetId);
     if (status == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "I/F  [%02x] Failed to do soft reset\r\n", uId);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "I/F  [%02x] Failed to do soft reset\r\n", uPhysicalEthernetId);
     } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Soft reset successful.\r\n", uId);
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "I/F  [%02x] Soft reset successful.\r\n", uPhysicalEthernetId);
     }
   }
-
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Motherboard Px Serial Number: %02x%02x%02x\r\n",
-      uPxSerial[0], uPxSerial[1], uPxSerial[2]);
-
-}
-
-//=================================================================================
-//  UpdateGBEPHYConfiguration
-//--------------------------------------------------------------------------------
-//  This method updates the configuration of the 1GBE PHY to improve the link
-//  compatibility with different NICs. The drivers for some NICs do not support sleep 
-//  reliably resulting in occasional packet loss. Also enable flow control through
-//  pause frames to prevent possible packet loss in the Marvell 1GBE PHY. This is equivalent 
-//  to setting DIS_SLEEP = '1' and ENA_PAUSE = '1'
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void UpdateGBEPHYConfiguration()
-{
-  int iSuccess;
-  u16 uWriteBytes[4];
-  u16 uReadBytes[4];
-  u16 uCurrentControlReg;
-
-  // Set the switch to the GBE PHY
-  uWriteBytes[0] = ONE_GBE_SWITCH_SELECT;
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, uWriteBytes, 1);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to open I2C switch.\r\n");
-
-  // Select PAGE 0
-  uWriteBytes[0]  = 22; // Address of register to write
-  uWriteBytes[1]  = 0;
-  uWriteBytes[2]  = 0; // PAGE 0
-
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uWriteBytes, 3);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to select PAGE 0.\r\n");
-
-  // Update PHY SPECIFIC CONTROL REGISTER (16), ENERGY DETECT = "00" (DIS_SLEEP = '1')
-  uWriteBytes[0] = 16; // Address of register to write
-  uWriteBytes[1] = 0xF0;
-  uWriteBytes[2] = 0x78;
-
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uWriteBytes, 3);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update PHY SPECIFIC CONTROL REG.\r\n");
-
-  // Update AUTO NEGOTIATION ADVERTISEMENT REGISTER (4), support PAUSE (ENA_PAUSE = '1')
-  uWriteBytes[0] = 4; // Address of register to write
-  uWriteBytes[1] = 0x0D;
-  uWriteBytes[2] = 0xE1;
-
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uWriteBytes, 3);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update AUTO NEGOTIATION ADVERTISEMENT REG.\r\n");
-
-  // Read register 0 to get current configuration
-  uWriteBytes[0] = 0; // Address of register to read
-
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uWriteBytes, 1);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update current read register.\r\n");
-
-  iSuccess = ReadI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uReadBytes, 2);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
-
-  uCurrentControlReg = ((uReadBytes[0] << 8) | uReadBytes[1]);
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", uCurrentControlReg);
-
-  // Trigger a soft reset of 1GBE PHY to update configuration
-  // Do a soft reset
-  uCurrentControlReg = uCurrentControlReg | 0x8000;
-
-  uWriteBytes[0] = 0; // Address of register to write
-  uWriteBytes[1] = ((uCurrentControlReg >> 8) & 0xFF);
-  uWriteBytes[2] = (uCurrentControlReg & 0xFF);
-
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, uWriteBytes, 3);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to write CONTROL REG.\r\n");
-
-  // Close I2C switch
-  uWriteBytes[0] = 0x0;
-  iSuccess = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, uWriteBytes, 1);
-
-  if (iSuccess == XST_FAILURE)
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to close I2C switch.\r\n");
 
 }
 
@@ -628,52 +496,8 @@ void InitialiseInterruptControllerAndTimer(XTmrCtr * pTimer, XIntc * pInterruptC
 #endif
 }
 
-//=================================================================================
-//  ReadAndPrintFPGADNA
-//--------------------------------------------------------------------------------
-//  This method reads and prints out the FPGA DNA value.
-//
-//  Parameter Dir   Description
-//  --------- ---   -----------
-//  None
-//
-//  Return
-//  ------
-//  None
-//=================================================================================
-void ReadAndPrintFPGADNA()
-{
-  u32 uDNALow = ReadBoardRegister(C_RD_FPGA_DNA_LOW_ADDR);
-  u32 uDNAHigh = ReadBoardRegister(C_RD_FPGA_DNA_HIGH_ADDR);
-  u8 uBitShift = 28;
-  u8 uNibbleCount;
-  u32 uNibble;
 
-  // Print out each nibble in hex format
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "FPGA [..] DNA: 0x");
-
-  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
-  {
-    uNibble = (uDNAHigh >> uBitShift) & 0xF;
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
-    if (uBitShift > 0)
-      uBitShift = uBitShift - 4;
-  }
-
-  uBitShift = 28;
-
-  for (uNibbleCount = 0; uNibbleCount < 8; uNibbleCount++)
-  {
-    uNibble = (uDNALow >> uBitShift) & 0xF;
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%x", uNibble);
-    if (uBitShift > 0)
-      uBitShift = uBitShift - 4;
-  }
-
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-}
-
-int main() 
+int main()
 {
   /* initialise globals TODO: narrow down scope */
   uQSFPMezzanineLocation = 0x0;
@@ -688,7 +512,7 @@ int main()
   struct sIFObject *pIFObjectPtr[NUM_ETHERNET_INTERFACES]; /* store i/f state handles */
   int iStatus;
   u32 uReadReg;
-  u8 uEthernetId;
+  u8 uPhysicalEthernetId;
   u32 uNumWords;
   u32 uResponsePacketLength;
   XTmrCtr Timer;
@@ -722,14 +546,14 @@ int main()
 #endif
 
   //struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO do we have enough stack space???*/
-  u8 uTempMac[6];
 
   /* Temp / Reused variables */
   u32 uSize = 0;       /* used to pass around / hold a packet size */
   u32 uIndex = 0;      /* used to index arrays / buffers */
-  u16 *pBuffer = NULL;  /* pointer to working buffer */ 
+  u16 *pBuffer = NULL;  /* pointer to working buffer */
   u16 uChecksum = 0;
   u32 uHMCBitMask;
+  unsigned int uHMCRunInit = 0;
 
 #define HMC_MAX_RECONFIG_COUNT 3
   u8 uHMC_Total_ReconfigCount = HMC_MAX_RECONFIG_COUNT;
@@ -742,14 +566,15 @@ int main()
   u8 uValidate = 0;
 
   u32 uKeepAliveReg;
-  u32 uMemTest = 0;
 
 #ifdef TIME_PROFILE
   u32 time1 = 0, time2 = 0;
 #endif
 
   u8 uFrontPanelLedsValue = 0;
-  u8 n_links;
+  //u8 n_links;
+  u8 num_links;
+  u8 logical_link;
 
 #ifdef LINK_MON_RX_40GBE
   u32 LinkTimeout = 1;
@@ -780,6 +605,10 @@ int main()
 
   u8 post_scale = 0;
 
+  /* need to cache the current reconfiguration location for later use - e.g. when issuing reboot from last location cmd
+   * this read has to happen early in the boot seq before the value is cleared in firmware */
+  u32 uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + FLASH_SDRAM_SPI_ICAPE_ADDR + FLASH_SDRAM_CONFIG_IO_REG_ADDRESS);
+
   /*
    * Initialize the uart driver
    */
@@ -794,33 +623,34 @@ int main()
     if (iStatus != XST_SUCCESS) {
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UART [..] Seft-test FAILED!\r\n");
     } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "UART [..] Initialized successfully!\r\n");
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n\r\nUART [..] Initialized successfully!\r\n");
     }
   }
 
-  /* NOTE: &_text_section_end_ gives us the address of the last program 32bit word
-     but we're looking for size in bytes - therefore add 3 to include lower 3 bytes as well
-     and add another one to prevent off-by-one error*/
-  if (0 == uDoMemoryTest((u8 *) 0x50, (((u32) &_text_section_end_) + 3 - 0x50 + 1), &uMemTest)){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "\r\n\r\n[Memory Test] from addr @0x%08x to @0x%08x...\r\n"\
-                                 "[Memory Test] expected value {@0x%08x}: 0x%08x\r\n"\
-                                 "[Memory Test] computed value              : 0x%08x\r\n",\
-                                 0x50, &_text_section_end_, &_location_checksum_,\
-                                 _location_checksum_, uMemTest);
-    /* do not allow failure to go unnoticed - Assert()! */
-    if (uMemTest != _location_checksum_){
-      while(1){
-        /* enter endless printout loop in order to debug with serial console */
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS,  "[Memory Test] ***FAILED*** expect: 0x%08x compute: 0x%08x\r\n", _location_checksum_, uMemTest);
-        Delay(1000000);
+  /* print only after the uart initialized */
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] C_CONFIG_IO_REG = 0x%08x\r\n", uReg);
+
+  FinishedBootingFromSdram();
+
+  CLI_STATE cli_status = cli_init();
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "CLI  [..] init status=%d\r\n", cli_status);
+
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Waiting 0.5s...\r\n");
+  Delay(500000);
+
+  ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
+  if (ReceivedCount){
+    while (1){
+      ReceivedCount = XUartLite_Recv(&UartLite, &RecvBuffer, 1);
+      if (ReceivedCount){
+        cli_sm(RecvBuffer);
       }
-    } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] ***PASSED***\r\n");
     }
-  } else {
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, "[Memory Test] Error - could not execute\r\n");
   }
 
+  vRunMemoryTest();
+
+  PMemState = init_persistent_memory_setup();
 
   //Xil_ICacheEnable();
   //Xil_DCacheEnable();
@@ -835,19 +665,35 @@ int main()
 
   /* initialise the log level */
   u8 log_level_cached = 0;
+  u8 log_select_cached = 0;
   tLogLevel log_level = LOG_LEVEL_INFO;
+  tLogSelect log_select = LOG_SELECT_ALL;
 
-  PersistentMemory_ReadByte(LOG_LEVEL_STARTUP_INDEX, &log_level_cached);
-  /* if the msb is set, then we know that the log-level command was issued before the reset */
-  if (log_level_cached & 0x80){
-    /* the cached log-level is stored in the lower 7 bits */
-    log_level = (tLogLevel) (log_level_cached & 0x7f);
-  } else {
-    /* otherwise default to *info* */
-    log_level = LOG_LEVEL_INFO;
+  if (PMemState != PMEM_RETURN_ERROR){
+    PersistentMemory_ReadByte(LOG_LEVEL_STARTUP_INDEX, &log_level_cached);
+    PersistentMemory_ReadByte(LOG_SELECT_STARTUP_INDEX, &log_select_cached);
+
+    /* if the msb is set, then we know that the log-level command was issued before the reset */
+    if (log_level_cached & 0x80){
+      /* the cached log-level is stored in the lower 7 bits */
+      log_level = (tLogLevel) (log_level_cached & 0x7f);
+    } else {
+      /* otherwise default to *info* */
+      log_level = LOG_LEVEL_INFO;
+    }
+
+    /* if the msb is set, then we know that the log-select command was issued before the reset */
+    if (log_select_cached & 0x80){
+      /* the cached log-select is stored in the lower 7 bits */
+      log_select = (tLogSelect) (log_select_cached & 0x7f);
+    } else {
+      /* otherwise default to *all* */
+      log_select = LOG_SELECT_ALL;
+    }
   }
 
   set_log_level(log_level);
+  set_log_select(log_select);
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "---Entering main---\r\n");
   PrintVersionInfo();
@@ -864,27 +710,28 @@ int main()
   InitialiseInterruptControllerAndTimer(& Timer, & InterruptController);
   microblaze_enable_exceptions();
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "[DONE]\r\n");
-  FinishedBootingFromSdram();
 
-  // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
-  UpdateGBEPHYConfiguration();
+  num_links = if_enumerate_interfaces();
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Waiting for 1GBE SGMII to come out of reset ");
+  /* check if the one-gbe interface (physical id 0) is present */
+  if (IF_ID_PRESENT == check_interface_valid(0)){
+    // GT 7/3/2016 DIS_SLEEP = '1' and ENA_PAUSE = '1'
+    UpdateGBEPHYConfiguration();
 
-#define SGMII_1GBE_TIMEOUT 2000000  /* tweaked by experimentation -> about 3 - 4 seconds */
-  /* max value determined by watchdog timer */
-  /* try to continue before watchdog timer overflows */
-  /* TODO: verify any later dependancies linked to this initialization */
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Waiting for 1GBE SGMII to come out of reset ");
 
-  uTimeoutCounter = 20;
-  do
-  {
-    uReadReg = ReadBoardRegister(C_RD_BRD_CTL_STAT_0_ADDR);
-  }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
+    uTimeoutCounter = 20;
+    do
+    {
+      uReadReg = ReadBoardRegister(C_RD_BRD_CTL_STAT_0_ADDR);
+    }while(((uReadReg & 0x1) != 0x1) && (uTimeoutCounter != 0));
 
-  /* if we haven't TIMED OUT then we're OK */
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "%s", uTimeoutCounter == 0 ? "[TIMED OUT]" : "[OK]");
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "\r\n"); /* for formatting */
+    /* if we haven't TIMED OUT then we're OK */
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "%s\r\n", uTimeoutCounter == 0 ? "[TIMED OUT]" : "[OK]");
+
+  } else {
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Skipping 1GBE phy update...\r\n");
+  }
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Mezzanine locations\r\n");
   InitialiseMezzanineLocations();
@@ -900,22 +747,6 @@ int main()
   for (uIndex = 0; uIndex < 4; uIndex++){
         QSFPStateMachine(&QSFPContext);
         Delay(100000);  /* 100ms */
-  }
-
-
-  PMemState = PersistentMemory_Check();
-  if (PMemState == PMEM_RETURN_DEFAULT){
-    /* if the memory in it's default state, we're safe to proceed and clear
-     * the memory. This is an indication that 1) the FLASH location has not been
-     * set for the board and following this 2) the board has been hard power
-     * cycled. */
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] persistent memory contains default value. Clearing...\r\n");
-    PMemState = PersistentMemory_Clear();
-  }
-
-  /* catch any errors */
-  if (PMemState == PMEM_RETURN_ERROR){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] error setting up persistent memory.\r\n");
   }
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Waiting for HMC(s) to complete init...\r\n");
@@ -951,6 +782,7 @@ int main()
 #define BYTE_MASK_HMC_PRESENT  5  /* bxxxx0101 - look for this bit signature to determine HMC presence */
 
   uHMCBitMask = 0;
+  uHMCRunInit = 0;
 
   /* dynamically build the bit mask for the hmc cards which are present */
   uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
@@ -959,172 +791,177 @@ int main()
     if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] MEZZ %d has an HMC present. Trying to initialise...\r\n", uIndex);
       uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
+      uHMCRunInit++;
     }
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] bit mask 0x%08x\r\n", uHMCBitMask);
 
-  /* set timeout to a default value in case eeprom read fails */
-  uHMCTimeout = HMC_INIT_TIMEOUT;
+  if (uHMCRunInit > 0){
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] bit mask 0x%08x\r\n", uHMCBitMask);
 
-  /* only do if we have hmc cards present i.e. bitmask != 0 */
-  if (uHMCBitMask){
-    /* read hmc retry timeout and max attempts stored in pg15 of DS2433 EEPROM on Motherboard */
-    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
-      if (DS2433ReadMem(rom, 0, data, 3, 0xE4, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
-        /* overwrite default */
-        uHMCTimeout = (data[0] & 0xff) | (data[1] << 8);
-        /*
-         * Now ensure that the hmc timeout is a reasonable value since this is
-         * user data in eeprom. Let's say a reasonable range is 1-60s else leave
-         * as default value.
-         */
-        uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 10) ? uHMCTimeout : HMC_INIT_TIMEOUT;
-        /* set max number of attempts before giving up */
-        uHMC_Max_ReconfigCount = data[2];
-        /* a reasonable value for the max hmc retry count is any value larger
-         * than 3. This is to prevent it being set to zero when this feature is
-         * first run without the correct config in flash */
-        uHMC_Max_ReconfigCount = (uHMC_Max_ReconfigCount >= HMC_MAX_RECONFIG_COUNT) ? uHMC_Max_ReconfigCount : HMC_MAX_RECONFIG_COUNT; 
+    /* set timeout to a default value in case eeprom read fails */
+    uHMCTimeout = HMC_INIT_TIMEOUT;
+
+    /* only do if we have hmc cards present i.e. bitmask != 0 */
+    if (uHMCBitMask){
+      /* read hmc retry timeout and max attempts stored in pg15 of DS2433 EEPROM on Motherboard */
+      if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+        if (DS2433ReadMem(rom, 0, data, 3, 0xE4, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+          /* overwrite default */
+          uHMCTimeout = (data[0] & 0xff) | (data[1] << 8);
+          /*
+           * Now ensure that the hmc timeout is a reasonable value since this is
+           * user data in eeprom. Let's say a reasonable range is 1-60s else leave
+           * as default value.
+           */
+          uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 10) ? uHMCTimeout : HMC_INIT_TIMEOUT;
+          /* set max number of attempts before giving up */
+          uHMC_Max_ReconfigCount = data[2];
+          /* a reasonable value for the max hmc retry count is any value larger
+           * than 3. This is to prevent it being set to zero when this feature is
+           * first run without the correct config in flash */
+          uHMC_Max_ReconfigCount = (uHMC_Max_ReconfigCount >= HMC_MAX_RECONFIG_COUNT) ? uHMC_Max_ReconfigCount : HMC_MAX_RECONFIG_COUNT; 
+        }
       }
     }
-  }
 
-  uTimeoutCounter = uHMCTimeout;
+    uTimeoutCounter = uHMCTimeout;
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] setting hmc timeout to %d ms with %d max attempts\r\n", (u32) uTimeoutCounter * 100, uHMC_Max_ReconfigCount);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] setting hmc timeout to %d ms with %d max attempts\r\n", (u32) uTimeoutCounter * 100, uHMC_Max_ReconfigCount);
 
-  /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
-  do
-  {
-    uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
-    /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
-    if ((uTimeoutCounter % 10) == 0){    /* every second */
-      XWdtTb_RestartWdt(& WatchdogTimer);
-    }
-  }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
+    /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
+    do
+    {
+      uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+      /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
+      if ((uTimeoutCounter % 10) == 0){    /* every second */
+        XWdtTb_RestartWdt(& WatchdogTimer);
+      }
+    }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
-  /* if one or some or all of the HMC's don't init and post... */
-  if ((uReadReg & uHMCBitMask) != uHMCBitMask){
-    /*
-     * Read the current stats of the HMS'c stored in Persistent Memory - these are
-     * the stats stored since the last hard reset / power cycle.
-     */
+    /* if one or some or all of the HMC's don't init and post... */
+    if ((uReadReg & uHMCBitMask) != uHMCBitMask){
+      /*
+       * Read the current stats of the HMS'c stored in Persistent Memory - these are
+       * the stats stored since the last hard reset / power cycle.
+       */
 #if 0
-    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMCReconfigCount);
+      PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMCReconfigCount);
 #else
-    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMC_Total_ReconfigCount);
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC0_COUNT_INDEX, &(uHMC_ReconfigCount[0]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC1_COUNT_INDEX, &(uHMC_ReconfigCount[1]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC2_COUNT_INDEX, &(uHMC_ReconfigCount[2]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC3_COUNT_INDEX, &(uHMC_ReconfigCount[3]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMC_Total_ReconfigCount);
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC0_COUNT_INDEX, &(uHMC_ReconfigCount[0]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC1_COUNT_INDEX, &(uHMC_ReconfigCount[1]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC2_COUNT_INDEX, &(uHMC_ReconfigCount[2]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC3_COUNT_INDEX, &(uHMC_ReconfigCount[3]));
 #endif
 
-    //if (uTimeoutCounter == 0){
-    /* determine which ones did not init and post */
-    for (uIndex = 0; uIndex < 4; uIndex++){
-      if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init)){
-        if (((uReadReg >> uIndex * 8) & BYTE_MASK_HMC_INIT) != BYTE_MASK_HMC_INIT){
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMC-%d did not init/post!\r\n", uIndex);
-          /* increment the relevant failing HMC's counter */
-          uHMC_ReconfigCount[uIndex] = uHMC_ReconfigCount[uIndex] + 1;
-        }
-      }
-    }
-
-    if (PMemState != PMEM_RETURN_ERROR){
-      if (uHMC_Total_ReconfigCount < (uHMC_Max_ReconfigCount - 1)){   /* do n-1 times */
-
-        /* for each reconfigure, increment total counter */
-        uHMC_Total_ReconfigCount = uHMC_Total_ReconfigCount + 1;
-
-        /* write back all counters to persistent memory registers */
-        PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, uHMC_Total_ReconfigCount);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, uHMC_ReconfigCount[0]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, uHMC_ReconfigCount[1]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, uHMC_ReconfigCount[2]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, uHMC_ReconfigCount[3]);
-
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] invoking reconfigure of FPGA\r\n");
-        /* if currently a toolflow image - reboot from SDRAM else reboot from FLASH */
-        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
-          SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-          ResetSdramReadAddress();
-          AboutToBootFromSdram();
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
-        }
-        Delay(100000);
-        IcapeControllerInSystemReconfiguration();
-      } else {    /* and do this the n-th time */
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] maximum reconfiguration count reached [%d]\r\n", uHMC_Max_ReconfigCount);
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] current hmc reconfig stats - mezz0:%d | mezz1:%d | mezz2:%d | mezz3:%d\r\n",
-            uHMC_ReconfigCount[0], uHMC_ReconfigCount[1], uHMC_ReconfigCount[2], uHMC_ReconfigCount[3] );
-
-        /*
-         * The stats of each HMC will be recorded in the one-wire eeprom on the
-         * HMC mezzanine card. It will be located at the start of page 15 of the
-         * eeprom. Two values (32-bit unsigned) will be recorded, these are:
-         * 1) the number of times the HMC card did not init/post
-         * 2) the total number of maxed-out retries
-         * These values will only be recorded upon the HMC retry mechanism
-         * max'ing-out.
-         *
-         *  0x1E0 0x1E1 0x1E2 0x1E3
-         *  byte0 byte1 byte2 byte3 of retries
-         *
-         *  0x1E4 0x1E5 0x1E6 0x1E7
-         *  byte0 byte1 byte2 byte3 of total
-         */
-
-        u16 value[8];
-        u32 retries, total;
-
-        static const u16 one_wire_port_lookup[4] = {
-          [0] = MEZ_0_ONE_WIRE_PORT,
-          [1] = MEZ_1_ONE_WIRE_PORT,
-          [2] = MEZ_2_ONE_WIRE_PORT,
-          [3] = MEZ_3_ONE_WIRE_PORT };
-
-        for (uIndex = 0; uIndex < 4; uIndex++){
-          /* if this is an hmc card... */
-          if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
-            if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-              /* read from eeprom on respective hmc card */
-              if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-                /* increment the hmc stats */
-                retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
-                total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
-                value[0] = retries & 0xff;
-                value[1] = (retries >> 8) & 0xff;
-                value[2] = (retries >> 16) & 0xff;
-                value[3] = (retries >> 24) & 0xff;
-                value[4] = total & 0xff;
-                value[5] = (total >> 8) & 0xff;
-                value[6] = (total >> 16) & 0xff;
-                value[7] = (total >> 24) & 0xff;
-                /* write back to eeprom on the respective hmc card */
-                if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
-                } else {
-                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error writing to DS2433\r\n", uIndex);
-                }
-              } else {
-                log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
-              }
-            } else {
-              log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
-            }
+      /* determine which ones did not init and post */
+      for (uIndex = 0; uIndex < 4; uIndex++){
+        if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init)){
+          if (((uReadReg >> uIndex * 8) & BYTE_MASK_HMC_INIT) != BYTE_MASK_HMC_INIT){
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMC-%d did not init/post!\r\n", uIndex);
+            /* increment the relevant failing HMC's counter */
+            uHMC_ReconfigCount[uIndex] = uHMC_ReconfigCount[uIndex] + 1;
           }
         }
+      }
 
+      if (PMemState != PMEM_RETURN_ERROR){
+        if (uHMC_Total_ReconfigCount < (uHMC_Max_ReconfigCount - 1)){   /* do n-1 times */
+
+          /* for each reconfigure, increment total counter */
+          uHMC_Total_ReconfigCount = uHMC_Total_ReconfigCount + 1;
+
+          /* write back all counters to persistent memory registers */
+          PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, uHMC_Total_ReconfigCount);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, uHMC_ReconfigCount[0]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, uHMC_ReconfigCount[1]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, uHMC_ReconfigCount[2]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, uHMC_ReconfigCount[3]);
+
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] invoking reconfigure of FPGA\r\n");
+          /* if currently a toolflow image - reboot from SDRAM else reboot from FLASH */
+          if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+            SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+            ResetSdramReadAddress();
+            AboutToBootFromSdram();
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+          }
+          Delay(100000);
+          IcapeControllerInSystemReconfiguration();
+        } else {    /* and do this the n-th time */
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] maximum reconfiguration count reached [%d]\r\n", uHMC_Max_ReconfigCount);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] current hmc reconfig stats - mezz0:%d | mezz1:%d | mezz2:%d | mezz3:%d\r\n",
+              uHMC_ReconfigCount[0], uHMC_ReconfigCount[1], uHMC_ReconfigCount[2], uHMC_ReconfigCount[3] );
+
+          /*
+           * The stats of each HMC will be recorded in the one-wire eeprom on the
+           * HMC mezzanine card. It will be located at the start of page 15 of the
+           * eeprom. Two values (32-bit unsigned) will be recorded, these are:
+           * 1) the number of times the HMC card did not init/post
+           * 2) the total number of maxed-out retries
+           * These values will only be recorded upon the HMC retry mechanism
+           * max'ing-out.
+           *
+           *  0x1E0 0x1E1 0x1E2 0x1E3
+           *  byte0 byte1 byte2 byte3 of retries
+           *
+           *  0x1E4 0x1E5 0x1E6 0x1E7
+           *  byte0 byte1 byte2 byte3 of total
+           */
+
+          u16 value[8];
+          u32 retries, total;
+
+          static const u16 one_wire_port_lookup[4] = {
+            [0] = MEZ_0_ONE_WIRE_PORT,
+            [1] = MEZ_1_ONE_WIRE_PORT,
+            [2] = MEZ_2_ONE_WIRE_PORT,
+            [3] = MEZ_3_ONE_WIRE_PORT };
+
+          for (uIndex = 0; uIndex < 4; uIndex++){
+            /* if this is an hmc card... */
+            if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
+              if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                /* read from eeprom on respective hmc card */
+                if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                  /* increment the hmc stats */
+                  retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
+                  total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
+                  value[0] = retries & 0xff;
+                  value[1] = (retries >> 8) & 0xff;
+                  value[2] = (retries >> 16) & 0xff;
+                  value[3] = (retries >> 24) & 0xff;
+                  value[4] = total & 0xff;
+                  value[5] = (total >> 8) & 0xff;
+                  value[6] = (total >> 16) & 0xff;
+                  value[7] = (total >> 24) & 0xff;
+                  /* write back to eeprom on the respective hmc card */
+                  if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
+                  } else {
+                    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error writing to DS2433\r\n", uIndex);
+                  }
+                } else {
+                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
+                }
+              } else {
+                log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
+              }
+            }
+          }
+
+        }
+      } else {
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] error accessing persistent memory register\r\n");
       }
     } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] error accessing persistent memory register\r\n");
+      /* if we haven't TIMED OUT then we're OK */
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMCs initialized within %d ms[OK]\r\n", (u32) ((uHMCTimeout - uTimeoutCounter) * 100));
     }
   } else {
-    /* if we haven't TIMED OUT then we're OK */
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMCs initialized within %d ms[OK]\r\n", (u32) ((uHMCTimeout - uTimeoutCounter) * 100));
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] zero HMCs to initialize\r\n");
   }
 
   /*
@@ -1193,46 +1030,15 @@ int main()
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
   InitialiseEthernetInterfaceParameters();
 
+#if 0
   /* set bit#1 in C_WR_BRD_CTL_STAT_1_ADDR to 1 to connect 40gbe to user fabric */
   WriteBoardRegister(C_WR_BRD_CTL_STAT_1_ADDR, 0x2);
+#endif
 
   iStatus = XST_SUCCESS;
 
   ReadAndPrintFPGADNA();
-
-  /* DHCP State initializations for each interface */
-  /* TODO: perhaps create an inline function for the following to neaten up code */
-  /* the first 5 octets of the mac address /should/ never change across interfaces */
-  uTempMac[0] = (uEthernetFabricMacHigh[0] >> 8) & 0xff;
-  uTempMac[1] = (uEthernetFabricMacHigh[0]     ) & 0xff;
-  uTempMac[2] = (uEthernetFabricMacMid[0]  >> 8) & 0xff;
-  uTempMac[3] = (uEthernetFabricMacMid[0]      ) & 0xff;
-  uTempMac[4] = (uEthernetFabricMacLow[0]  >> 8) & 0xff;
-
-  u8 uTempHostNameString[16] = "skarab";   /* 15 chars plus '/0'. To be appended just now with partial mac & i/f. */
-  u8 uTempDigit;
-
-  /* stringify mac and append to hostname ("skarab" - see initialization above ) */
-
-  uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-mid */
-  uTempHostNameString[6] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-mid */
-  uTempHostNameString[7] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) / 0x10;  /* upper digit of lower octet of mac-mid */
-  uTempHostNameString[8] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacMid[0]) & 0xff) % 0x10;  /* lower digit of lower octet of mac-mid */
-  uTempHostNameString[9] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) / 0x10;  /* upper digit of upper octet of mac-low */
-  uTempHostNameString[10] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempDigit = ((uEthernetFabricMacLow[0] >> 8) & 0xff) % 0x10;  /* lower digit of upper octet of mac-low */
-  uTempHostNameString[11] = uTempDigit > 9 ? ((uTempDigit - 10) + 0x41) : (uTempDigit + 0x30);
-
-  uTempHostNameString[12] = '-';
+  ReadAndPrintPeralexSerial();
 
   /*
    * read dhcp init and retry times stored in pg15 of DS2433 EEPROM on Motherboard/
@@ -1248,39 +1054,39 @@ int main()
     }
   } /* else run with the default values automatically set when interface initialized */
 
-  for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
 
-    /* 6th octet of mac should equal id anyway */
-    uTempMac[5] = uEthernetFabricMacLow[uEthernetId] & 0xff;
+  //for (uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
+  for (logical_link = 0; logical_link < num_links; logical_link++){
+    uPhysicalEthernetId = get_physical_interface_id(logical_link);       /* returns the physical interface for a logical link id */
 
-    pIFObjectPtr[uEthernetId] = InterfaceInit(uEthernetId,
-        (u8 *) &(uReceiveBuffer[uEthernetId][0]),
+    u8 *mac_addr = if_generate_mac_addr_array(uPhysicalEthernetId);
+
+    pIFObjectPtr[uPhysicalEthernetId] = InterfaceInit(uPhysicalEthernetId,
+        (u8 *) uReceiveBuffer,
         (RX_BUFFER_MAX * 4),
         (u8 *) uTransmitBuffer,
         (TX_BUFFER_MAX * 4),
-        uTempMac);
+        mac_addr);
 
-    if (NULL == pIFObjectPtr[uEthernetId]){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_FATAL, "IF   [%02x] Init error!\r\n", uEthernetId);
+    if (NULL == pIFObjectPtr[uPhysicalEthernetId]){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_FATAL, "IF   [%02x] Init error!\r\n", uPhysicalEthernetId);
     } else {
 
-      /* fill in interface number in host name and terminate string */
-      uTempHostNameString[13] = (uEthernetId / 10) + 48;  /* tens digit of interface id*/
-      uTempHostNameString[14] = (uEthernetId % 10) + 48;  /* unit digit of interface id*/
-      uTempHostNameString[15] = '\0';  /* unit digit of interface id*/
+      u8 *hostname = if_generate_hostname_string(uPhysicalEthernetId);
 
-      eventDHCPOnMsgBuilt(pIFObjectPtr[uEthernetId], &vSendDHCPMsg, NULL);
-      eventDHCPOnLeaseAcqd(pIFObjectPtr[uEthernetId], &vSetInterfaceConfig, NULL);
-      vDHCPSetHostName(pIFObjectPtr[uEthernetId], (char *) &uTempHostNameString);
+      eventDHCPOnMsgBuilt(pIFObjectPtr[uPhysicalEthernetId], &vSendDHCPMsg, NULL);
+      eventDHCPOnLeaseAcqd(pIFObjectPtr[uPhysicalEthernetId], &vSetInterfaceConfig, NULL);
+
+      vDHCPSetHostName(pIFObjectPtr[uPhysicalEthernetId], (char *) hostname);
 
       /* the 1gbe link exhibits an UP - DOWN - UP behaviour most of the time.
          We thus want to delay the start of dhcp till these transitions have settled.
          The delay is determined by the DHCP_SM_WAIT macro. */
-      //if (uEthernetId == 0){  /* comment out since we now want it on all links */
-      uDHCPSetWaitOnInitFlag(pIFObjectPtr[uEthernetId]);
+      //if (uPhysicalEthernetId == 0){  /* comment out since we now want it on all links */
+      uDHCPSetWaitOnInitFlag(pIFObjectPtr[uPhysicalEthernetId]);
       if (dhcp_set){
-        uDHCPSetRetryInterval(pIFObjectPtr[uEthernetId], (u32) dhcp_retry);
-        uDHCPSetInitWait(pIFObjectPtr[uEthernetId], (u32) dhcp_wait);
+        uDHCPSetRetryInterval(pIFObjectPtr[uPhysicalEthernetId], (u32) dhcp_retry);
+        uDHCPSetInitWait(pIFObjectPtr[uPhysicalEthernetId], (u32) dhcp_wait);
       }
       //}
 
@@ -1291,7 +1097,7 @@ int main()
        * for this one ip to persist between reconfig's.
        * TODO: perhaps expand for all links - will require more persistent memory
        */
-      if (uEthernetId == 1){
+      if (uPhysicalEthernetId == 1){
         /* FIXME: move declarartions up */
         u8 byte;
         u32 tempIP = 0;
@@ -1310,7 +1116,7 @@ int main()
           tempIP = tempIP | ((u32) byte);
 
           /* pre-load state machine to attempt to request the same lease */
-          uDHCPSetRequestCachedIP(pIFObjectPtr[uEthernetId], tempIP);
+          uDHCPSetRequestCachedIP(pIFObjectPtr[uPhysicalEthernetId], tempIP);
           /*
            * Some more site-specific stuff:
            * Also set the fabric interface parameters "preemptively" with the
@@ -1329,12 +1135,12 @@ int main()
 #ifdef PREEMPT_CONFIGURE_FABRIC_IF
           u32 tempMask = 0;
 
-          SetFabricSourceIPAddress(uEthernetId, tempIP);
-          ProgramARPCacheEntry(uEthernetId, byte,
-              uEthernetFabricMacHigh[uEthernetId],
-              ((uEthernetFabricMacMid[uEthernetId] << 16) |
-               uEthernetFabricMacLow[uEthernetId]));
-          //uEthernetFabricIPAddress[uEthernetId] = tempIP;
+          SetFabricSourceIPAddress(uPhysicalEthernetId, tempIP);
+          ProgramARPCacheEntry(uPhysicalEthernetId, byte,
+              uEthernetFabricMacHigh[uPhysicalEthernetId],
+              ((uEthernetFabricMacMid[uPhysicalEthernetId] << 16) |
+               uEthernetFabricMacLow[uPhysicalEthernetId]));
+          //uEthernetFabricIPAddress[uPhysicalEthernetId] = tempIP;
 
           PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT0_INDEX, &byte);
           tempMask = tempMask | ((u32) byte << 24);
@@ -1345,22 +1151,22 @@ int main()
           PersistentMemory_ReadByte(DHCP_CACHED_MASK_OCT3_INDEX, &byte);
           tempMask = tempMask | ((u32) byte);
 
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IF   [%02x] setting cached netmask %x\r\n", uEthernetId, tempMask);
-          SetFabricNetmask(uEthernetId, tempMask);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IF   [%02x] setting cached netmask %x\r\n", uPhysicalEthernetId, tempMask);
+          SetFabricNetmask(uPhysicalEthernetId, tempMask);
 
           PersistentMemory_ReadByte(DHCP_CACHED_GW_OCT3_INDEX, &byte);
 
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IF   [%02x] setting cached gateway %x\r\n", uEthernetId, byte);
-          SetFabricGatewayARPCacheAddress(uEthernetId, byte);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "IF   [%02x] setting cached gateway %x\r\n", uPhysicalEthernetId, byte);
+          SetFabricGatewayARPCacheAddress(uPhysicalEthernetId, byte);
 
-          //uEthernetSubnet[uEthernetId] = (tempIP & tempMask);   /* TODO: global */
-          pIFObjectPtr[uEthernetId]->uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
+          //uEthernetSubnet[uPhysicalEthernetId] = (tempIP & tempMask);   /* TODO: global */
+          pIFObjectPtr[uPhysicalEthernetId]->uIFEnableArpRequests = ARP_REQUESTS_ENABLE;
 
-          IFConfig(pIFObjectPtr[uEthernetId], tempIP, tempMask);
+          IFConfig(pIFObjectPtr[uPhysicalEthernetId], tempIP, tempMask);
 
           /* legacy dhcp states */
-          uDHCPState[uEthernetId] = DHCP_STATE_COMPLETE;
-          EnableFabricInterface(uEthernetId, 1);
+          uDHCPState[uPhysicalEthernetId] = DHCP_STATE_COMPLETE;
+          EnableFabricInterface(uPhysicalEthernetId, 1);
 #endif
         }
       }
@@ -1370,6 +1176,30 @@ int main()
   iStatus = log_time_sync_devices();
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "TIME [..] {%s} sync monitoring run time counters\r\n", XST_SUCCESS == iStatus ? "OK" : "FAIL");
 
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+
+  if ((aux_flags & 0x2) == 0){  /* if write protection bit is not set - then this code section can write to it */
+    if (uReg & 0x40){
+      aux_flags = aux_flags | 0x3;   /* set the location bit for sdram and the protection bit*/
+      xil_printf("set sdram prev loc %d\r\n", aux_flags);
+    } else {
+      aux_flags = aux_flags & 0xE;   /* clear the bit - booted from flash */
+      aux_flags = aux_flags | 0x2;   /* and set the protection bit */
+      xil_printf("set flash prev loc\r\n");
+    }
+  } /* else do nothing - this bringup was probably caused by
+       a reset of some sort (register, wdt, etc.) and in this
+       case the FLASH_SDRAM_CONFIG_IO_REG_ADDRESS register
+       will not truly reflect where the previous reconfigure
+       was from.
+     */
+  PersistentMemory_WriteByte(AUX_SKARAB_FLAGS_INDEX, aux_flags);
+#if 0
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+#endif
 
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
@@ -1389,17 +1219,20 @@ int main()
       }
     }
 
-    for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
-    {
-      UpdateEthernetLinkUpStatus(pIFObjectPtr[uEthernetId]);
+    //for (uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
 
-      if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP)
+    for (logical_link = 0; logical_link < num_links; logical_link++){
+      uPhysicalEthernetId = get_physical_interface_id(logical_link);
+
+      UpdateEthernetLinkUpStatus(pIFObjectPtr[uPhysicalEthernetId]);
+
+      if (pIFObjectPtr[uPhysicalEthernetId]->uIFLinkStatus == LINK_UP)
       {
-        uNumWords = GetHostReceiveBufferLevel(uEthernetId);
+        uNumWords = GetHostReceiveBufferLevel(uPhysicalEthernetId);
         if (uNumWords != 0)
         {
           /* zero the receive buffer */
-          memset((u8 *) &(uReceiveBuffer[uEthernetId][0]), 0, RX_BUFFER_MAX * 4);
+          memset((u8 *) uReceiveBuffer, 0, RX_BUFFER_MAX * 4);
 
           /* General packet reception handling:
              FILTER ( by layer and packet type)
@@ -1411,7 +1244,7 @@ int main()
              PROCESS  (Do the work) */
 
           // Read packet into receive buffer
-          iStatus  = ReadHostPacket(uEthernetId, &(uReceiveBuffer[uEthernetId][0]), uNumWords);
+          iStatus  = ReadHostPacket(uPhysicalEthernetId, uReceiveBuffer, uNumWords);
           if (iStatus != XST_SUCCESS){
             log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "Read Host Packet Error!\r\n");
           } else {
@@ -1419,32 +1252,41 @@ int main()
             time1 = XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET);
 #endif
             log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Read %d words in host packet!\r\n", uNumWords);
-            pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
+            pBuffer = (u16*) uReceiveBuffer;
 
             /* convert the number of 32bit words to a number of 16bit half-words */
-            pIFObjectPtr[uEthernetId]->uNumWordsRead = uNumWords;
+            pIFObjectPtr[uPhysicalEthernetId]->uNumWordsRead = uNumWords;
             uSize = uNumWords << 1;
 
-            /* correct the endianess */
-            for (uIndex = 0; uIndex < uSize; uIndex++){
-              //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+            /*
+             * deep packet inspection - this was added to specifically improve programming performance by bypassing the
+             * subsequent half-word endian swapping since this is not needed for the control packet parsing code
+             */
+            if (pBuffer[18] != UDP_CONTROL_PORT){
+              /* correct the endianess */
+              for (uIndex = 0; uIndex < uSize; uIndex++){
+                //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
 #if 0
-              pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
+                pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
 #else
-              buf = (unsigned char *) (pBuffer + uIndex);
-              temp = buf[0];
-              buf[0] = buf[1];
-              buf[1] = temp;
-              //pBuffer++;
-              /* TODO: check this logic again!! */
+                buf = (unsigned char *) (pBuffer + uIndex);
+                temp = buf[0];
+                buf[0] = buf[1];
+                buf[1] = temp;
+                //pBuffer++;
+                /* TODO: check this logic again!! */
 #endif
+              }
+
+              /* reset pBuffer to point to start of buffer since we altered it */
+              //pBuffer = (u16*) &(uReceiveBuffer[uPhysicalEthernetId][0]);
+
+              uPacketType = uRecvPacketFilter(pIFObjectPtr[uPhysicalEthernetId]);
+            } else {
+              uPacketType = PACKET_FILTER_CONTROL;
             }
 
-            /* reset pBuffer to point to start of buffer since we altered it */
-            //pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
-
-            uPacketType = uRecvPacketFilter(pIFObjectPtr[uEthernetId]);
-            log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "PCKT [%02x] Received packet type %d\r\n", uEthernetId, uPacketType);
+            log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] Received packet type %d\r\n", uPhysicalEthernetId, uPacketType);
 
             /* do relevant checksum validation */
             switch(uPacketType){
@@ -1453,14 +1295,14 @@ int main()
                 /* verify udp checksum */
                 if (uUDPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                   if(uChecksum != 0xffff){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "%s [%02x] RX - Invalid UDP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : "CTRL", uEthernetId);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "%s [%02x] RX - Invalid UDP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : "CTRL", uPhysicalEthernetId);
 #if 0
                     for (u8 n = 0; n < 50; n++){
                       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "%04x ", (pBuffer[n]));
                     }
                     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "\r\n");
 #endif
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_UDP_CHK_ERR);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_UDP_CHK_ERR);
                     break;
                   }
                 }
@@ -1472,8 +1314,8 @@ int main()
                 /* verify ip header checksum */
                 if(uIPChecksumCalc((u8 *) pBuffer, &uChecksum) == 0){
                   if(uChecksum != 0xffff){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "%s [%02x] RX - Invalid IP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : uPacketType == PACKET_FILTER_ICMP ? "ICMP" : "CTRL", uEthernetId);
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_IP_CHK_ERR);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "%s [%02x] RX - Invalid IP Checksum!\r\n", uPacketType == PACKET_FILTER_DHCP ? "DHCP" : uPacketType == PACKET_FILTER_ICMP ? "ICMP" : "CTRL", uPhysicalEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_IP_CHK_ERR);
                     break;
                   }
                 }
@@ -1496,7 +1338,7 @@ int main()
               case PACKET_FILTER_UNKNOWN_IP:
               case PACKET_FILTER_UNKNOWN_UDP:
               case PACKET_FILTER_ERROR:
-                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter: %s\r\n", uEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unhandled");
+                log_printf(LOG_SELECT_IFACE, LOG_LEVEL_DEBUG, "PCKT [%02x] packet filter: %s\r\n", uPhysicalEthernetId, uPacketType == PACKET_FILTER_ERROR ? "error" : "unhandled");
               case PACKET_FILTER_DROP:
               default:
                 /* do nothing */
@@ -1509,59 +1351,61 @@ int main()
             if (uValidate){
               switch(uPacketType){
                 case PACKET_FILTER_DHCP:
-                  if (uDHCPMessageValidate(pIFObjectPtr[uEthernetId]) == DHCP_RETURN_OK){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "DHCP [%02x] valid packet received!\r\n", uEthernetId);
-                    uDHCPSetGotMsgFlag(pIFObjectPtr[uEthernetId]);
-                    uDHCPStateMachine(pIFObjectPtr[uEthernetId]);   /* run the DHCP state machine immediately */
+                  if (uDHCPMessageValidate(pIFObjectPtr[uPhysicalEthernetId]) == DHCP_RETURN_OK){
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "DHCP [%02x] valid packet received!\r\n", uPhysicalEthernetId);
+                    uDHCPSetGotMsgFlag(pIFObjectPtr[uPhysicalEthernetId]);
+                    uDHCPStateMachine(pIFObjectPtr[uPhysicalEthernetId]);   /* run the DHCP state machine immediately */
                   } else {
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_DHCP_INVALID);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_DHCP_INVALID);
                     /* quiet the debug output here a bit since there will be lots of dhcp bcast traffic at startup */
                     /* Note: dhcp server bcast replies will show up as invalid dhcp packets as well */
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "DHCP [%02x] invalid packet received!\r\n", uEthernetId);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "DHCP [%02x] invalid packet received!\r\n", uPhysicalEthernetId);
                   }
                   break;
 
                 case PACKET_FILTER_CONTROL:
                   /* the following printf statement should have trace print level in order to prevent performance hit during programming 
                      since printing out to the serial port adds quite a bit of overhead and therefore time */
-                  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "CTRL [%02x] valid packet received!\r\n", uEthernetId);
+                  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "CTRL [%02x] valid packet received!\r\n", uPhysicalEthernetId);
                   /* TODO: validate - for now, hand over to Peralex code */
-                  uFlagRunTask_CTRL[uEthernetId] = 1;
+                  uFlagRunTask_CTRL[uPhysicalEthernetId] = 1;
                   break;
 
                 case PACKET_FILTER_ICMP:
-                  if (uICMPMessageValidate(pIFObjectPtr[uEthernetId]) == ICMP_RETURN_OK){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ICMP [%02x] valid packet received!\r\n", uEthernetId);
-                    uFlagRunTask_ICMP_Reply[uEthernetId] = 1;
+                  if (uICMPMessageValidate(pIFObjectPtr[uPhysicalEthernetId]) == ICMP_RETURN_OK){
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ICMP [%02x] valid packet received!\r\n", uPhysicalEthernetId);
+                    uFlagRunTask_ICMP_Reply[uPhysicalEthernetId] = 1;
                   } else {
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ICMP_INVALID);
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ICMP [%02x] invalid packet received!\r\n", uEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ICMP_INVALID);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ICMP [%02x] invalid packet received!\r\n", uPhysicalEthernetId);
                   }
                   break;
 
                 case PACKET_FILTER_ARP:
-                  iStatus =  uARPMessageValidateReply(pIFObjectPtr[uEthernetId]);
-                  if (iStatus == ARP_RETURN_REPLY){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] valid reply received!\r\n", uEthernetId);
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_REPLY);
-                    uFlagRunTask_ARP_Process[uEthernetId] = 1;
+                  iStatus =  uARPMessageValidateReply(pIFObjectPtr[uPhysicalEthernetId]);
+                  if (iStatus == ARP_RETURN_OFF){
+                    asm("nop");
+                  } else if (iStatus == ARP_RETURN_REPLY){
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] valid reply received!\r\n", uPhysicalEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ARP_REPLY);
+                    uFlagRunTask_ARP_Process[uPhysicalEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_REQUEST){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] valid request received!\r\n", uEthernetId);
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_REQUEST);
-                    uFlagRunTask_ARP_Respond[uEthernetId] = 1;
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] valid request received!\r\n", uPhysicalEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ARP_REQUEST);
+                    uFlagRunTask_ARP_Respond[uPhysicalEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_CONFLICT){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "ARP  [%02x] network address conflict!\r\n", uEthernetId);
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_CONFLICT);
-                    vDHCPStateMachineReset(pIFObjectPtr[uEthernetId]);
-                    uDHCPSetStateMachineEnable(pIFObjectPtr[uEthernetId], SM_TRUE);
-                    //uDHCPStateMachine(&DHCPContextState[uEthernetId]);   /* run the DHCP state machine immediately */
-                    uFlagRunTask_DHCP = 1;
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "ARP  [%02x] network address conflict!\r\n", uPhysicalEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ARP_CONFLICT);
+                    vDHCPStateMachineReset(pIFObjectPtr[uPhysicalEthernetId]);
+                    uDHCPSetStateMachineEnable(pIFObjectPtr[uPhysicalEthernetId], SM_TRUE);
+                    //uDHCPStateMachine(&DHCPContextState[uPhysicalEthernetId]);   /* run the DHCP state machine immediately */
+                    uFlagRunTask_DHCP[uPhysicalEthernetId] = 1;
                   } else if (iStatus == ARP_RETURN_INVALID){
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ARP  [%02x] malformed packet!\r\n", uEthernetId);
-                    IFCounterIncr(pIFObjectPtr[uEthernetId], RX_ARP_INVALID);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "ARP  [%02x] malformed packet!\r\n", uPhysicalEthernetId);
+                    IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], RX_ARP_INVALID);
                   } else {
                     /* arp packet probably not meant for us */
-                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] dropping packet!\r\n", uEthernetId);
+                    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_TRACE, "ARP  [%02x] dropping packet!\r\n", uPhysicalEthernetId);
                   }
                   break;
 
@@ -1586,126 +1430,45 @@ int main()
             }
           }
         }
-#if 0
-        if (uIGMPSendMessage[uEthernetId] == IGMP_SEND_MESSAGE)
-        {
-          if (uIGMPState[uEthernetId] == IGMP_STATE_JOINED_GROUP)
-          {
-            // Send IGMP membership reports for each IP in group
-            if (uCurrentIGMPMessage[uEthernetId] <= (~uEthernetFabricMultiCastIPAddressMask[uEthernetId]))
-            {
-              uIGMPGroupAddress = (uEthernetFabricMultiCastIPAddress[uEthernetId] & uEthernetFabricMultiCastIPAddressMask[uEthernetId]) | uCurrentIGMPMessage[uEthernetId];
-              CreateIGMPPacket(uEthernetId, (u8*) uTransmitBuffer, & uResponsePacketLength, IGMP_MEMBERSHIP_REPORT, uIGMPGroupAddress);
-              uResponsePacketLength = (uResponsePacketLength >> 2);
-              iStatus =  TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
-              if (iStatus != XST_SUCCESS){
-                IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_IGMP_ERR);
-              } else {
-                IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_IGMP_OK);
-              }
-              uCurrentIGMPMessage[uEthernetId]++;
-            }
-            else
-              uIGMPSendMessage[uEthernetId] = IGMP_DONE_SENDING_MESSAGE;
+      }
 
-          }
-          else if (uIGMPState[uEthernetId] == IGMP_STATE_LEAVING)
-          {
-            // Send IGMP leave reports for each IP in group
-            if (uCurrentIGMPMessage[uEthernetId] <= (~uEthernetFabricMultiCastIPAddressMask[uEthernetId]))
-            {
-              uIGMPGroupAddress = (uEthernetFabricMultiCastIPAddress[uEthernetId] & uEthernetFabricMultiCastIPAddressMask[uEthernetId]) | uCurrentIGMPMessage[uEthernetId];
-              CreateIGMPPacket(uEthernetId, (u8*) uTransmitBuffer, & uResponsePacketLength, IGMP_LEAVE_REPORT, uIGMPGroupAddress);
-              uResponsePacketLength = (uResponsePacketLength >> 2);
-              iStatus =  TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
-              uCurrentIGMPMessage[uEthernetId]++;
-            }
-            else
-            {
-              // Once finished sending all the LEAVE messages, put into IDLE state
-              uIGMPState[uEthernetId] = IGMP_STATE_NOT_JOINED;
-              uIGMPSendMessage[uEthernetId] = IGMP_DONE_SENDING_MESSAGE;
-            }
-          }
+      /* simple interrupt driven multi-tasking scheduler */
 
+      //----------------------------------------------------------------------------//
+      //  DHCP TASK                                                                 //
+      //  Triggered on timer interrupt and DHCP message receipt                     //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_DHCP[uPhysicalEthernetId]){
+        uFlagRunTask_DHCP[uPhysicalEthernetId] = 0;     /* reset task flag */
+        uDHCPStateMachine(pIFObjectPtr[uPhysicalEthernetId]);
+      }
+
+      //----------------------------------------------------------------------------//
+      //  IGMP TASK                                                                 //
+      //  Triggered on timer interrupt and IGMP control command                     //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_IGMP[uPhysicalEthernetId]){
+        uFlagRunTask_IGMP[uPhysicalEthernetId] = 0;     /* reset task flag */
+        if (pIFObjectPtr[uPhysicalEthernetId]->uIFLinkStatus == LINK_UP){
+          uIGMPStateMachine(uPhysicalEthernetId);
         }
-#endif
       }
-    }
 
-    /* simple interrupt driven multi-tasking scheduler */
-    /*TODO: FIXME: wrap link up status check around all these tasks - especially the transmit tasks! */
-
-    //----------------------------------------------------------------------------//
-    //  DHCP TASK                                                                 //
-    //  Triggered on timer interrupt and DHCP message receipt                     //
-    //----------------------------------------------------------------------------//
-    if (uFlagRunTask_DHCP){
-      uFlagRunTask_DHCP = 0;     /* reset task flag */
-      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        uDHCPStateMachine(pIFObjectPtr[uEthernetId]);
-      }
-    }
-
-    //----------------------------------------------------------------------------//
-    //  IGMP TASK                                                                 //
-    //  Triggered on timer interrupt and IGMP control command                     //
-    //----------------------------------------------------------------------------//
-    if (uFlagRunTask_IGMP){
-      uFlagRunTask_IGMP = 0;     /* reset task flag */
-      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        uIGMPStateMachine(uEthernetId);
-      }
-    }
-
-    //----------------------------------------------------------------------------//
-    //  CONTROL TASK                                                              //
-    //  Triggered on CONTROL message receipt                                      //
-    //----------------------------------------------------------------------------//
-    for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      if (uFlagRunTask_CTRL[uEthernetId]){
-        log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "CTRL [%02x] Running control task...\r\n", uEthernetId);
+      //----------------------------------------------------------------------------//
+      //  CONTROL TASK                                                              //
+      //  Triggered on CONTROL message receipt                                      //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_CTRL[uPhysicalEthernetId]){
+        log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "CTRL [%02x] Running control task...\r\n", uPhysicalEthernetId);
         /* TODO: for now, run Peralex Control Protocol handler, slightly hackish */
         /* flip the endianess again */
-        pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserRxBufferPtr;
-        // pBuffer = (u16*) &(uReceiveBuffer[uEthernetId][0]);
+        pBuffer = (u16 *) pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr;
+        // pBuffer = (u16*) &(uReceiveBuffer[uPhysicalEthernetId][0]);
 
         /* convert the number of 32bit words to a number of 16bit half-words */
-        uSize = pIFObjectPtr[uEthernetId]->uNumWordsRead << 1;
+        uSize = pIFObjectPtr[uPhysicalEthernetId]->uNumWordsRead << 1;
 
-#if 0
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "uNumWordsRead = %d\r\n", IFContext[uEthernetId].uNumWordsRead);
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "uSize = %d\r\n", uSize);
-        /* debug packet dump */
-        for (u32 i=0; i<(512 * 2); i++){
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "%02x ", IFContext[uEthernetId].pUserRxBufferPtr[i] );
-          if ((i != 0) && (i % 15) == 0){
-            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-          }
-        }
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "\r\n");
-#endif
-
-        /* NOTE: the control response needs to be sent quickly since 
-           host has timeout in it's state machine (casperfpga),
-           therefore reduce over head (printf's, etc.) */
-
-
-        /* correct the endianess */
-        for (uIndex = 0; uIndex < uSize; uIndex++){
-          //pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
-#if 0
-          pBuffer[uIndex] = (u16) (((pBuffer[uIndex] & 0xFF00U) >> 8U) | ((pBuffer[uIndex] & 0x00FFU) << 8U));
-#else
-          buf = (unsigned char *) pBuffer;
-          temp = buf[0];
-          buf[0] = buf[1];
-          buf[1] = temp;
-          pBuffer++;
-#endif
-        }
-
-        iStatus = EthernetRecvHandler(uEthernetId, pIFObjectPtr[uEthernetId]->uNumWordsRead, &uResponsePacketLength);
+        iStatus = EthernetRecvHandler(uPhysicalEthernetId, pIFObjectPtr[uPhysicalEthernetId]->uNumWordsRead, &uResponsePacketLength);
 
         if (iStatus == XST_SUCCESS){
           // Send the response packet now
@@ -1713,146 +1476,141 @@ int main()
           time2 = XWdtTb_ReadReg(WatchdogTimerConfig->BaseAddr, XWT_TWCSR0_OFFSET);
 #endif
           uResponsePacketLength = (uResponsePacketLength >> 2);
-          iStatus = TransmitHostPacket(uEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
+          iStatus = TransmitHostPacket(uPhysicalEthernetId, & uTransmitBuffer[0], uResponsePacketLength);
           if (iStatus != XST_SUCCESS){
-            log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02x] Unable to send response\r\n", uEthernetId);
+            log_printf(LOG_SELECT_CTRL, LOG_LEVEL_ERROR, "CTRL [%02x] Unable to send response\r\n", uPhysicalEthernetId);
           } else {
-            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_UDP_CTRL_OK);
+            IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_UDP_CTRL_OK);
           }
 #ifdef TIME_PROFILE
           log_printf(LOG_SELECT_CTRL, LOG_LEVEL_TRACE, "time2 %08x - time1 %08x = %08x\r\n", time2, time1, time2 - time1);
 #endif
         }
 
-        uFlagRunTask_CTRL[uEthernetId] = 0;
+        uFlagRunTask_CTRL[uPhysicalEthernetId] = 0;
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ICMP TASK                                                                 //
-    //  Triggered on ICMP message receipt                                         //
-    //----------------------------------------------------------------------------//
-    for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      if (uFlagRunTask_ICMP_Reply[uEthernetId]){
-        iStatus = uICMPBuildReplyMessage(pIFObjectPtr[uEthernetId]);
+
+      //----------------------------------------------------------------------------//
+      //  ICMP TASK                                                                 //
+      //  Triggered on ICMP message receipt                                         //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_ICMP_Reply[uPhysicalEthernetId]){
+        iStatus = uICMPBuildReplyMessage(pIFObjectPtr[uPhysicalEthernetId]);
         if (iStatus != ICMP_RETURN_OK){
-          log_printf(LOG_SELECT_ICMP, LOG_LEVEL_INFO, "ICMP [%02x] Packet build error!\r\n", uEthernetId);
+          log_printf(LOG_SELECT_ICMP, LOG_LEVEL_INFO, "ICMP [%02x] Packet build error!\r\n", uPhysicalEthernetId);
         } else {
           /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-          uSize = (u32) pIFObjectPtr[uEthernetId]->uMsgSize;    /* bytes */
-          pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserTxBufferPtr;
+          uSize = (u32) pIFObjectPtr[uPhysicalEthernetId]->uMsgSize;    /* bytes */
+          pBuffer = (u16 *) pIFObjectPtr[uPhysicalEthernetId]->pUserTxBufferPtr;
           if (pBuffer != NULL){
             uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
             for (uIndex = 0; uIndex < uSize; uIndex++){
               pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
             }
             uSize = uSize >> 1;   /*  now convert quantity to amount of 32-bit words */
-            if (TransmitHostPacket(uEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
+            if (TransmitHostPacket(uPhysicalEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
               log_printf(LOG_SELECT_ICMP, LOG_LEVEL_ERROR, "ICMP [%02x] unable to send reply\r\n", 1);
-              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_ICMP_REPLY_ERR);
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_IP_ICMP_REPLY_ERR);
             } else {
-              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_IP_ICMP_REPLY_OK);
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_IP_ICMP_REPLY_OK);
             }
           }
         }
-        uFlagRunTask_ICMP_Reply[uEthernetId] = 0;
+        uFlagRunTask_ICMP_Reply[uPhysicalEthernetId] = 0;
         uFlagRunTask_Diagnostics = 1;   /* dump interface counters to console upon ping */
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ARP PROCESSING TASK                                                       //
-    //  Triggered on ARP reply message reception                                  //
-    //----------------------------------------------------------------------------//
-    for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      if (uFlagRunTask_ARP_Process[uEthernetId]){
+
+      //----------------------------------------------------------------------------//
+      //  ARP PROCESSING TASK                                                       //
+      //  Triggered on ARP reply message reception                                  //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_ARP_Process[uPhysicalEthernetId]){
 
         /* TODO FIXME refactor following lines: remove inline declarations, etc. */
         u32 ip;
-        ip = (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET + 3] & 0xff);
+        ip = (pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_PROTO_ADDR_OFFSET + 3] & 0xff);
 
-        u32 u = ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET] << 8) & 0xff00) |
-          (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 1] & 0xff); 
-        u32 l = ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 2] << 24) & 0xff000000) |
-          ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 3] << 16) & 0xff0000) |
-          ((pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 4] << 8) & 0xff00) |
-          (pIFObjectPtr[uEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 5] & 0xff); 
+        u32 u = ((pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET] << 8) & 0xff00) |
+          (pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 1] & 0xff); 
+        u32 l = ((pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 2] << 24) & 0xff000000) |
+          ((pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 3] << 16) & 0xff0000) |
+          ((pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 4] << 8) & 0xff00) |
+          (pIFObjectPtr[uPhysicalEthernetId]->pUserRxBufferPtr[ARP_FRAME_BASE + ARP_SRC_HW_ADDR_OFFSET + 5] & 0xff); 
 
-        log_printf(LOG_SELECT_ARP, LOG_LEVEL_INFO, "ARP  [%02x] ENTRY - IP#: %03d MAC: %04x.%04x.%04x\r\n", uEthernetId, ip, (u & 0xffff), ((l >> 16) & 0xffff), (l & 0xffff));
+        log_printf(LOG_SELECT_ARP, LOG_LEVEL_INFO, "ARP  [%02x] ENTRY - IP#: %03d MAC: %04x.%04x.%04x\r\n", uPhysicalEthernetId, ip, (u & 0xffff), ((l >> 16) & 0xffff), (l & 0xffff));
         /* TODO: API functions */
-        ProgramARPCacheEntry(uEthernetId, ip, u, l);
+        ProgramARPCacheEntry(uPhysicalEthernetId, ip, u, l);
 
-        uFlagRunTask_ARP_Process[uEthernetId] = 0;
+        uFlagRunTask_ARP_Process[uPhysicalEthernetId] = 0;
       }
-    }
 
-    //----------------------------------------------------------------------------//
-    //  ARP RESPOND TASK                                                          //
-    //  Triggered on ARP request message reception                                //
-    //----------------------------------------------------------------------------//
-    for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-      if (uFlagRunTask_ARP_Respond[uEthernetId]){
-        iStatus = uARPBuildMessage(pIFObjectPtr[uEthernetId], ARP_OPCODE_REPLY, 0);
+      //----------------------------------------------------------------------------//
+      //  ARP RESPOND TASK                                                          //
+      //  Triggered on ARP request message reception                                //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_ARP_Respond[uPhysicalEthernetId]){
+        iStatus = uARPBuildMessage(pIFObjectPtr[uPhysicalEthernetId], ARP_OPCODE_REPLY, 0);
         if (iStatus != ARP_RETURN_OK){
-          log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP  [%02x] Packet build error!\r\n", uEthernetId);
+          log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP  [%02x] Packet build error!\r\n", uPhysicalEthernetId);
         } else {
           /* TODO: move this code down one layer of abstraction - similar to DHCP API  */
-          uSize = (u32) pIFObjectPtr[uEthernetId]->uMsgSize;    /* bytes */
-          pBuffer = (u16 *) pIFObjectPtr[uEthernetId]->pUserTxBufferPtr;
+          uSize = (u32) pIFObjectPtr[uPhysicalEthernetId]->uMsgSize;    /* bytes */
+          pBuffer = (u16 *) pIFObjectPtr[uPhysicalEthernetId]->pUserTxBufferPtr;
           if (pBuffer != NULL){
             uSize = uSize >> 1;     /* convert number of bytes to number of 16bit half-words */
             for (uIndex = 0; uIndex < uSize; uIndex++){
               pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
             }
             uSize = uSize >> 1;   /*  now convert quantity to amount of 32-bit words */
-            if (TransmitHostPacket(uEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
+            if (TransmitHostPacket(uPhysicalEthernetId, (u32 *) pBuffer, uSize) != XST_SUCCESS){
               log_printf(LOG_SELECT_ARP, LOG_LEVEL_ERROR, "ARP  [%02x] unable to send reply\r\n", 1);
-              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_ARP_ERR);
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_ETH_ARP_ERR);
             } else {
-              IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_ARP_REPLY_OK);
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_ETH_ARP_REPLY_OK);
             }
           }
         }
-        uFlagRunTask_ARP_Respond[uEthernetId] = 0;
-      }
-    }
-
-    //----------------------------------------------------------------------------//
-    //  ARP REQUEST TASK                                                          //
-    //----------------------------------------------------------------------------//
-      if (uUpdateArpRequests == ARP_REQUEST_UPDATE){
-        uUpdateArpRequests = ARP_REQUEST_DONT_UPDATE;
-        for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-          ArpRequestHandler(pIFObjectPtr[uEthernetId]);
-        }
+        uFlagRunTask_ARP_Respond[uPhysicalEthernetId] = 0;
       }
 
-    //----------------------------------------------------------------------------//
-    //  LLDP TASK                                                                 //
-    //  Triggered on timer interrupt                                              //
-    //----------------------------------------------------------------------------//
-    if(uFlagRunTask_LLDP){
-      for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        iStatus = uLLDPBuildPacket(uEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
-        if(iStatus == XST_SUCCESS){
-          uSize = uResponsePacketLength >> 1; /* 16 bit words */
-          pBuffer = (u16 *) uTransmitBuffer;
+      //----------------------------------------------------------------------------//
+      //  ARP REQUEST TASK                                                          //
+      //----------------------------------------------------------------------------//
+      if (uFlagRunTask_ARP_Requests[uPhysicalEthernetId] == ARP_REQUEST_UPDATE){
+        uFlagRunTask_ARP_Requests[uPhysicalEthernetId] = ARP_REQUEST_DONT_UPDATE;
+        ArpRequestHandler(pIFObjectPtr[uPhysicalEthernetId]);
+      }
 
-          for(uIndex = 0; uIndex < uSize; uIndex++){
-            pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+      //----------------------------------------------------------------------------//
+      //  LLDP TASK                                                                 //
+      //  Triggered on timer interrupt                                              //
+      //----------------------------------------------------------------------------//
+      if(uFlagRunTask_LLDP[uPhysicalEthernetId]){
+        /* only send lldp packets if the link is up */
+        if (pIFObjectPtr[uPhysicalEthernetId]->uIFLinkStatus == LINK_UP){
+          iStatus = uLLDPBuildPacket(uPhysicalEthernetId, (u8*) uTransmitBuffer, &uResponsePacketLength);
+          if(iStatus == XST_SUCCESS){
+            uSize = uResponsePacketLength >> 1; /* 16 bit words */
+            pBuffer = (u16 *) uTransmitBuffer;
+
+            for(uIndex = 0; uIndex < uSize; uIndex++){
+              pBuffer[uIndex] = Xil_EndianSwap16(pBuffer[uIndex]);
+            }
+            uSize = uSize >> 1; /* 32 bit words*/
+            iStatus = TransmitHostPacket(uPhysicalEthernetId, (u32*) &pBuffer[0], uSize);
+            if (iStatus != XST_SUCCESS){
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_ETH_LLDP_ERR);
+            } else {
+              IFCounterIncr(pIFObjectPtr[uPhysicalEthernetId], TX_ETH_LLDP_OK);
+            }
           }
-          uSize = uSize >> 1; /* 32 bit words*/
-          iStatus = TransmitHostPacket(uEthernetId, (u32*) &pBuffer[0], uSize);
-          if (iStatus != XST_SUCCESS){
-            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_ERR);
-          } else {
-            IFCounterIncr(pIFObjectPtr[uEthernetId], TX_ETH_LLDP_OK);
-          }
         }
+        uFlagRunTask_LLDP[uPhysicalEthernetId] = 0;
       }
-      uFlagRunTask_LLDP = 0;  
-    }
 
+    }   /* end network for-loop */
 
     //----------------------------------------------------------------------------//
     //  40GBE RX LINK MONITOR TASK                                                //
@@ -1866,7 +1624,7 @@ int main()
      * combat/eliminate possible rx link issues on site.
      * FIXME: rather than reconfiguring & rebooting - why not just bounce the link? (TODO)
      */
-
+#if 0
 #if defined(LINK_MON_RX_40GBE) && (NUM_ETHERNET_INTERFACES > 1)
     if (uFlagRunTask_LinkWatchdog && (pIFObjectPtr[1]->uIFLinkStatus == LINK_UP)) {
       uFlagRunTask_LinkWatchdog = 0;
@@ -1908,7 +1666,7 @@ int main()
     }
 
 #endif
-
+#endif
 
     //----------------------------------------------------------------------------//
     //  CHECK DHCP BOUND TASK                                                     //
@@ -1925,23 +1683,26 @@ int main()
     if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
-      for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
+      //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
+      for (logical_link = 0; logical_link < num_links; logical_link++){
+        uPhysicalEthernetId = get_physical_interface_id(logical_link);
         /* TODO: create API function to get state */
-        if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
-          if (uDHCPBoundCount[uEthernetId] < uDHCPTimeoutMax){ /*  prevent overflows */
-            uDHCPBoundCount[uEthernetId]++;   /* keep track of how long we've been unbound */
+        if (pIFObjectPtr[uPhysicalEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
+          if (uDHCPBoundCount[uPhysicalEthernetId] < uDHCPTimeoutMax){ /*  prevent overflows */
+            uDHCPBoundCount[uPhysicalEthernetId]++;   /* keep track of how long we've been unbound */
           }
         } else {
-          uDHCPBoundCount[uEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
+          uDHCPBoundCount[uPhysicalEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
         }
-        if (uDHCPBoundCount[uEthernetId] >=  uDHCPTimeoutMax){
+        if (uDHCPBoundCount[uPhysicalEthernetId] >=  uDHCPTimeoutMax){
           uDHCPBoundTimeout++;
         }
       }
       /*
        * if we timeout on all the interfaces, line up a reset
        */
-      if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
+      //if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
+      if(uDHCPBoundTimeout >= num_links){
         log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] Timed out on all interfaces after %dms!\r\n", uDHCPTimeoutMax * 100);
 
         /* Keep track of the number of DHCP caused reboots */
@@ -1994,36 +1755,41 @@ int main()
       uFlagRunTask_Diagnostics = 0;
 
       /* also print some other useful info for debugging */
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Memory Test - expected 0x%08x, calculated 0x%08x\r\n", _location_checksum_, uMemTest );
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "Register C_RD_ETH_IF_LINK_UP_ADDR: 0x%08x\r\n", ReadBoardRegister(C_RD_ETH_IF_LINK_UP_ADDR));
 
-      for(uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++){
-        PrintInterfaceCounters(pIFObjectPtr[uEthernetId]);
+      //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
+      for (logical_link = 0; logical_link < num_links; logical_link++){
+        uPhysicalEthernetId = get_physical_interface_id(logical_link);
+        PrintInterfaceCounters(pIFObjectPtr[uPhysicalEthernetId]);
       }
     }
 
-#if NUM_ETHERNET_INTERFACES > 1   /* if we have at least one 40gbe compiled in */
+
+    /* set the 40gbe interface link and dhcp status in firmware LED-manager register */
+    u8 interface_id;
+
     if(uFlagRunTask_WriteLEDStatus){
       uFlagRunTask_WriteLEDStatus = 0;
       uFrontPanelLedsValue = 0;
-      /* historically, one qsfp module was implemented with four links and thus
-       * this implementation only services 40gbe link 1 up to max 4 */
-      n_links = (NUM_ETHERNET_INTERFACES < 5 ? NUM_ETHERNET_INTERFACES : 5);
-      for (uEthernetId = 1; uEthernetId < n_links; uEthernetId++){
-        if (pIFObjectPtr[uEthernetId]->uIFLinkStatus == LINK_UP){
-          uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 1);
-          if (pIFObjectPtr[uEthernetId]->DHCPContextState.tDHCPCurrentState >= BOUND){
-            uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((uEthernetId * 2) - 2);
+
+      for (interface_id = 1; interface_id <= 4;  interface_id++){     /* loop through physical interface id's */
+        /* check if the 40gbe core [1 to 4] is compiled into the firmware */
+        if (IF_ID_PRESENT == check_interface_valid_quietly(interface_id)){
+          /* check the link status */
+          if (pIFObjectPtr[interface_id]->uIFLinkStatus == LINK_UP){
+            uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 1);
+            /* check the dhcp status */
+            if (DHCP_RETURN_TRUE == uDHCPGetBoundStatus(pIFObjectPtr[interface_id])){
+              //uFrontPanelLedsValue = uFrontPanelLedsValue | 1 << ((interface_id * 2) - 2);
+              uFrontPanelLedsValue = uFrontPanelLedsValue | 1;    /* C_WR_FRONT_PANEL_STAT_LED_ADDR(0) now monitors dhcp
+                                                                     on all interfaces */
+            }
           }
         }
       }
-      /*
-       * NOTE: the C_WR_FRONT_PANEL_STAT_LED_ADDR register now monitors dhcp on
-       * interfaces
-       */
+
       WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, uFrontPanelLedsValue);
     }
-#endif
 
     /* General 100ms task */
     if (uTick_100ms){
@@ -2043,14 +1809,14 @@ int main()
       // Only do a reboot if all the Ethernet interfaces are no longer part of groups
       uOKToReboot = 1;
 
-      for (uEthernetId = 0; uEthernetId < NUM_ETHERNET_INTERFACES; uEthernetId++)
-      {
 #if 0
-        if (uIGMPState[uEthernetId] != IGMP_STATE_NOT_JOINED){
+      for (uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++)
+      {
+        if (uIGMPState[uPhysicalEthernetId] != IGMP_STATE_NOT_JOINED){
           uOKToReboot = 0;
         }
-#endif
       }
+#endif
       if (uOKToReboot == 1){
         /* just wait a little while to enable serial port to finish writing out */
         Delay(100000); /* 100ms */
@@ -2238,7 +2004,7 @@ static int vSetInterfaceConfig(struct sIFObject *pIFObjectPtr, void *pUserData){
   uDHCPState[id] = DHCP_STATE_COMPLETE;
 
   EnableFabricInterface(id, 1);
-  uFlagRunTask_LLDP = 1;
+  uFlagRunTask_LLDP[id] = 1;
 
   /* cache the ip in persistent memory for DHCP request on next reconfigure cycle */
   /* TODO: should we check the state of persistent memory again (?) - perhaps a

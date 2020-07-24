@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-u8 uDoMemoryTest(const u8 *pDataPtr, const u32 uDataSize, u32 *pChecksum);
+void vRunMemoryTest(void);
 
 #ifdef __cplusplus
 }

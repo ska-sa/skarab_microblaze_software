@@ -29,28 +29,9 @@ extern "C" {
 
 // GLOBAL VARIABLES
 
-//#define SKARAB_BSP
-
-#ifdef SKARAB_BSP
-#define NUM_ETHERNET_INTERFACES     0x1
-#define DO_1GBE_LOOPBACK_TEST
-#else
-#define NUM_ETHERNET_INTERFACES     0x2//AI: Single 40GbE Core 0x5
+#define NUM_ETHERNET_INTERFACES     5u//AI: Single 40GbE Core 0x5
 //#define DO_1GBE_LOOPBACK_TEST
-#endif
 
-//DEFINE INTERFACE NAMES
-
-#ifndef ONE_GBE_INTERFACE
-#define ONE_GBE_INTERFACE          "I/F-01GBE-00"
-#endif
-#ifndef FORTY_GBE_INTERFACE
-#define FORTY_GBE_INTERFACE       "I/F-40GBE-01"
-#endif
-
-#ifndef HOSTNAME
-#define HOSTNAME                   "skarab"
-#endif
 
 //uncomment relevant print output level
 //macro logic in print.h
@@ -78,7 +59,8 @@ volatile u32 uTransmitBuffer[TX_BUFFER_MAX];
                                we require 9000 plus extra 14 bytes for eth header
                                (preamble and FCS handled in FW).
                                2254 x 32bit words = 9016 bytes */
-volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
+//volatile u32 uReceiveBuffer[NUM_ETHERNET_INTERFACES][RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
+volatile u32 uReceiveBuffer[RX_BUFFER_MAX]; // GT 30/03/2017 NEEDS TO MATCH ACTUAL SIZE IN FIRMWARE
 
 // Transmit and receive buffers for loopback testing of second interface
 volatile u32 uLoopbackTransmitBuffer[256];
@@ -159,10 +141,10 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define I2C_2_ADDR          0x00030000
 #define I2C_3_ADDR          0x00038000
 #define I2C_4_ADDR          0x00040000
-#define ONE_GBE_MAC_ADDR      0x00048000
 
 #ifdef WISHBONE_LEGACY_MAP
 /* original/legacy wishbone slave map */
+#define ONE_GBE_MAC_ADDR        0x00048000
 #define FORTY_GBE_MAC_0_ADDR    0x00050000
 #define FORTY_GBE_MAC_1_ADDR    0x00058000
 #define FORTY_GBE_MAC_2_ADDR    0x00060000
@@ -170,11 +152,16 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define DSP_REGISTER_ADDR       0x00070000
 #else
 /* adjusted wishbone slave address map - provision for "jumbo" ethernet support */
-#define FORTY_GBE_MAC_0_ADDR    0x00054000
-#define FORTY_GBE_MAC_1_ADDR    0x00060000
-#define FORTY_GBE_MAC_2_ADDR    0x0006C000
-#define FORTY_GBE_MAC_3_ADDR    0x00078000
-#define DSP_REGISTER_ADDR       0x00084000
+/* These offsets are calculated as follows in firmware (each core aloocated 0x16000 of address space):
+ * core index x 0x16000 + dsp-offset of 0x84000
+ * Note : 1gbe = core number 5 with index 4
+ */
+#define FORTY_GBE_MAC_0_ADDR    0x84000     /* 0x84000 + (0 x 0x16000) */
+#define FORTY_GBE_MAC_1_ADDR    0x9A000     /* 0x84000 + (1 x 0x16000) */
+#define FORTY_GBE_MAC_2_ADDR    0xB0000     /* 0x84000 + (2 x 0x16000) */
+#define FORTY_GBE_MAC_3_ADDR    0xC6000     /* 0x84000 + (3 x 0x16000) */
+#define ONE_GBE_MAC_ADDR        0xDC000     /* 0x84000 + (4 x 0x16000) */
+#define DSP_REGISTER_ADDR       0x84000
 #endif
 
 /*#define DUAL_PORT_RAM_ADDR      0x00000
@@ -546,6 +533,12 @@ typedef struct sDHCPHeader {
   u16 uMagicCookieLow;
 } sDHCPHeaderT;
 #endif
+
+/* return this for any uStatus fields in the command response fields */
+#define CMD_STATUS_SUCCESS                 0
+#define CMD_STATUS_ERROR_GENERAL           1
+#define CMD_STATUS_ERROR_IF_OUT_OF_RANGE   2
+#define CMD_STATUS_ERROR_IF_NOT_PRESENT    3
 
 typedef struct sCommandHeader {
     u16  uCommandType;
@@ -956,7 +949,10 @@ typedef struct sPMBusReadI2CBytesResp {
 
 typedef struct sConfigureMulticastReq {
   sCommandHeaderT Header;
-  u16       uId;
+  u16       uId;                                /* set to interface identifier to be configured, or
+                                                 * set to 0xff to configure on the interface the
+                                                 * command is received on.
+                                                 */
   u16       uFabricMultiCastIPAddressHigh;
   u16       uFabricMultiCastIPAddressLow;
   u16       uFabricMultiCastIPAddressMaskHigh;
@@ -970,7 +966,8 @@ typedef struct sConfigureMulticastResp {
   u16       uFabricMultiCastIPAddressLow;
   u16       uFabricMultiCastIPAddressMaskHigh;
   u16       uFabricMultiCastIPAddressMaskLow;
-  u16       uPadding[4];
+  u16       uStatus;          /* set according to CMD_STATUS_* macros  */
+  u16       uPadding[3];
 } sConfigureMulticastRespT;
 
 typedef struct sDebugLoopbackTestReq {

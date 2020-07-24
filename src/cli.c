@@ -1,5 +1,6 @@
 #include <xil_printf.h>
 #include <xstatus.h>
+#include <stdlib.h>
 
 #include "cli.h"
 #include "logging.h"
@@ -11,6 +12,13 @@
 #include "scratchpad.h"
 #include "id.h"
 #include "time.h"
+#include "flash_sdram_controller.h"
+#include "init.h"
+#include "if.h"
+#include "igmp.h"
+#include "error.h"
+#include "memtest.h"
+#include "mezz.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -28,8 +36,9 @@ struct cli{
   unsigned int index;
   char curr_char;
   unsigned int cmd_id;
-  unsigned int curr_index; 
+  unsigned int curr_index;
   unsigned int opt_id;
+  unsigned int opt_value_u32;
   CLI_STATE state;
   unsigned int run_again;    /* used to run the state machine again interneally before
                               * passing control back to calling function */
@@ -41,12 +50,23 @@ typedef enum {
   CMD_INDEX_BOUNCE_LINK,
   CMD_INDEX_TEST_TIMER,
   CMD_INDEX_GET_CONFIG,
+  CMD_INDEX_GET_MEZZ_INV,
   CMD_INDEX_RESET_FW,
+  CMD_INDEX_REBOOT_FPGA,
   CMD_INDEX_STATS,
   CMD_INDEX_WHOAMI,
   CMD_INDEX_UNAME,
   CMD_INDEX_UPTIME,
   CMD_INDEX_DUMP,
+  CMD_INDEX_IF_MAP,
+  CMD_INDEX_IGMP,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  CMD_INDEX_PEEK,
+#endif
+  CMD_INDEX_WB_READ,
+  CMD_INDEX_ARP_REQ,
+  CMD_INDEX_ARP_PROC,
+  CMD_INDEX_MEMTEST,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -59,28 +79,51 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_BOUNCE_LINK] = "bounce-link",
   [CMD_INDEX_TEST_TIMER]  = "test-timer",
   [CMD_INDEX_GET_CONFIG]  = "get-config",
+  [CMD_INDEX_GET_MEZZ_INV]= "get-mezz-inv",
   [CMD_INDEX_RESET_FW]    = "reset-fw",
+  [CMD_INDEX_REBOOT_FPGA] = "reboot-fpga",
   [CMD_INDEX_STATS]       = "stats",
   [CMD_INDEX_WHOAMI]      = "whoami",
   [CMD_INDEX_UNAME]       = "uname",
   [CMD_INDEX_UPTIME]      = "uptime",
   [CMD_INDEX_DUMP]        = "dump",
+  [CMD_INDEX_IF_MAP]      = "if-map",
+  [CMD_INDEX_IGMP]        = "igmp",
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  [CMD_INDEX_PEEK]        = "peek",
+#endif
+  [CMD_INDEX_WB_READ]     = "wb-read",
+  [CMD_INDEX_ARP_REQ]     = "arp-req",
+  [CMD_INDEX_ARP_PROC]    = "arp-proc",
+  [CMD_INDEX_MEMTEST]     = "memtest",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
 
+#define CLI_KEYWORD_HEX "HEX"
 static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_LOG_LEVEL]    = {"trace",   "debug", "info", "warn", "error", "fatal",  "off",  NULL},
  [CMD_INDEX_LOG_SELECT]   = {"general", "dhcp",  "arp",  "icmp", "igmp",  "lldp",  "ctrl",   "buff", "hardw", "iface", "all", NULL},
  [CMD_INDEX_BOUNCE_LINK]  = {"0",       "1",     "2",    "3",    "4",     NULL},
  [CMD_INDEX_TEST_TIMER]   = { NULL },
  [CMD_INDEX_GET_CONFIG]   = { NULL },
+ [CMD_INDEX_GET_MEZZ_INV] = { NULL },
  [CMD_INDEX_RESET_FW]     = { NULL },
+ [CMD_INDEX_REBOOT_FPGA]  = { "",       "flash",  "sdram"},
  [CMD_INDEX_STATS]        = { NULL },
  [CMD_INDEX_WHOAMI]       = { NULL },
  [CMD_INDEX_UNAME]        = { NULL },
  [CMD_INDEX_UPTIME]       = { NULL },
- [CMD_INDEX_DUMP]         = {"stack",   "heap"/*, "text"*/},
+ [CMD_INDEX_DUMP]         = {"stack",   "heap", /*, "text"*/ NULL},
+ [CMD_INDEX_IF_MAP]       = { NULL },
+ [CMD_INDEX_IGMP]         = { NULL },
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = {"iface",   "dhcp"},
+#endif
+ [CMD_INDEX_WB_READ]      = {CLI_KEYWORD_HEX, NULL },
+ [CMD_INDEX_ARP_REQ]      = {"off",     "on",     "stat"},    /* order of "off" (index 0) and "on" (index 1) are important */
+ [CMD_INDEX_ARP_PROC]     = {"off",     "on",     "stat"},    /* order of "off" (index 0) and "on" (index 1) are important */
+ [CMD_INDEX_MEMTEST]      = { NULL },
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -90,12 +133,23 @@ static int cli_log_select_exe(struct cli *_cli);
 static int cli_bounce_link_exe(struct cli *_cli);
 static int cli_test_timer_exe(struct cli *_cli);
 static int cli_get_config_exe(struct cli *_cli);
+static int cli_get_mezz_inv_exe(struct cli *_cli);
 static int cli_reset_fw_exe(struct cli *_cli);
+static int cli_reboot_fpga_exe(struct cli *_cli);
 static int cli_stats_exe(struct cli *_cli);
 static int cli_whoami_exe(struct cli *_cli);
 static int cli_uname_exe(struct cli *_cli);
 static int cli_uptime_exe(struct cli *_cli);
 static int cli_dump_exe(struct cli *_cli);
+static int cli_if_map_exe(struct cli *_cli);
+static int cli_igmp_exe(struct cli *_cli);
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+static int cli_peek_exe(struct cli *_cli);
+#endif
+static int cli_wb_read_exe(struct cli *_cli);
+static int cli_arp_req_exe(struct cli *_cli);
+static int cli_arp_proc_exe(struct cli *_cli);
+static int cli_memtest_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -104,12 +158,23 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_BOUNCE_LINK]  = cli_bounce_link_exe,
  [CMD_INDEX_TEST_TIMER]   = cli_test_timer_exe,
  [CMD_INDEX_GET_CONFIG]   = cli_get_config_exe,
+ [CMD_INDEX_GET_MEZZ_INV] = cli_get_mezz_inv_exe,
  [CMD_INDEX_RESET_FW]     = cli_reset_fw_exe,
+ [CMD_INDEX_REBOOT_FPGA]  = cli_reboot_fpga_exe,
  [CMD_INDEX_STATS]        = cli_stats_exe,
  [CMD_INDEX_WHOAMI]       = cli_whoami_exe,
  [CMD_INDEX_UNAME]        = cli_uname_exe,
  [CMD_INDEX_UPTIME]       = cli_uptime_exe,
  [CMD_INDEX_DUMP]         = cli_dump_exe,
+ [CMD_INDEX_IF_MAP]       = cli_if_map_exe,
+ [CMD_INDEX_IGMP]         = cli_igmp_exe,
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+ [CMD_INDEX_PEEK]         = cli_peek_exe,
+#endif
+ [CMD_INDEX_WB_READ]      = cli_wb_read_exe,
+ [CMD_INDEX_ARP_REQ]      = cli_arp_req_exe,
+ [CMD_INDEX_ARP_PROC]     = cli_arp_proc_exe,
+ [CMD_INDEX_MEMTEST]      = cli_memtest_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -122,6 +187,7 @@ static void cli_print_help(void);
 static void cli_sm_run_again(struct cli *_cli);
 static int cli_isspace(char c);
 static int cli_strncmp(const char *first, const char *second, unsigned int n);
+static int cli_valid_hex(char *string, unsigned int size);
 
 typedef CLI_STATE (* const cli_state_func_ptr)(struct cli *);
 
@@ -179,6 +245,18 @@ CLI_STATE cli_sm(const char c){
   return _cli.state;
 }
 
+CLI_STATE cli_init(void){
+  /*
+   *  this function merely advances the state machine from the CLI_INIT state to the CLI_IDLE state. This is necessary
+   *  for the cli state machine to immediately start parsing the characters input (instead of the one character delay in
+   *  processing if this is not first called). The choice to wrap the cli_sm function with cli_init is due to the fact
+   *  that the <struct cli> is private to the cli_sm function and would need to be made global (file scope) if a call to
+   *  cli_reset_internals were to be made available via the API. The cli_sm function also needs a valid character to
+   *  advance and hence the function is called with the '?' character.
+   */
+
+  return cli_sm('?');
+}
 
 static CLI_STATE cli_init_state(struct cli *_cli){
 
@@ -356,6 +434,28 @@ static CLI_STATE cli_parse_opt_state(struct cli *_cli){
   }
   tmp_buffer[j] = '\0';
 
+  /* first check for cli keywords... */
+  if (cli_strncmp(CLI_KEYWORD_HEX, cli_cmd_options[_cli->cmd_id][m], 4)){
+    /* check that the argument is a valid *hex* format */
+    /* and only provide support for 32-bit hex values: 0xffffffff */
+    if (cli_valid_hex(tmp_buffer, j+1) && ((j+1) <= 11)){
+      /* convert hex string to a value */
+      _cli->opt_value_u32 = (unsigned int) strtoul(tmp_buffer, NULL, 16);    /* the string has already been
+                                                                             * validated, therefore pass in NULL as
+                                                                             * 2nd arg */
+      _cli->opt_id = m;
+      _cli->curr_index = i;
+      return CLI_EXE;
+    } else {
+      xil_printf("%s %s%s\r\n",cli_cmd_map[_cli->cmd_id], tmp_buffer,\
+          /* space formatting -> */ tmp_buffer[0] != '\0' ? " {invalid hex value, expected 32-bit format 0x1234abcd}" : "{hex value required}");
+
+      cli_reset_internals(_cli);
+      return CLI_IDLE;
+    }
+  }
+
+  /* if not a keyword then parse the arguments... */
   while(cli_cmd_options[_cli->cmd_id][m] != NULL){
     if (cli_strncmp(tmp_buffer, cli_cmd_options[_cli->cmd_id][m], j+1)){
       _cli->opt_id = m;
@@ -384,6 +484,7 @@ static CLI_STATE cli_parse_opt_state(struct cli *_cli){
 static CLI_STATE cli_exe_state(struct cli *_cli){
   int ret = 1;
 
+  /* run the relevant cmd callback according to the index */
   if (cli_cmd_callback[_cli->cmd_id] != NULL){
     ret = cli_cmd_callback[_cli->cmd_id](_cli);
   }
@@ -520,6 +621,41 @@ static int cli_strncmp(const char *first, const char *second, unsigned int n){
   return 0;
 }
 
+/* return 1 if hex, return 0 if not */
+/* valid hex format: 0x0000000... */
+static int cli_valid_hex(char *string, unsigned int size){
+  unsigned int i;
+
+  /*
+   * must have at least one digit, therefore
+   * size must be at least 4 => '0x' plus 1 digit plus '\0'
+   */
+  if (size < 4){
+    return 0;
+  }
+
+  /* check '0x' prefix */
+  if ((string[0] != '0') || (string[1] != 'x')){
+    return 0;
+  }
+
+  /* the characters in the cli are always converted to lower case */
+  /* check validity of each digit */
+  for (i = 2; i < (size-1); i++){
+
+    /* number or hex letter? */
+    if (((string[i] >= 0x30) && (string[i] <= 0x39)) || ((string[i] >= 0x61) && (string[i] <= 0x66))) {
+      continue; /* valid => check next char by advancing for-loop*/
+    } else {
+      return 0; /* not a valid char */
+    }
+  }
+
+  /* if we reach here we have a valid hex format */
+  return 1;
+}
+
+
 static void cli_print_help(void){
   int i = 0;
   int j = 0;
@@ -543,8 +679,20 @@ static void cli_print_help(void){
 
 
 static int cli_log_select_exe(struct cli *_cli){
+  u8 cache_log_select = 0;
   /* TODO: some error checking perhaps? */
   xil_printf("running log-select %d\r\n", _cli->opt_id);
+
+
+  /* cache the log select in persistent memory
+   * bit8 => set when this cmd issued to indicate a manual change in log-select upon reset
+   * bit7-0 => cached log select
+   */
+  cache_log_select = (_cli->opt_id) | 0x80;
+
+  xil_printf("caching log-select value 0x%02x to pmem\r\n", cache_log_select);
+  PersistentMemory_WriteByte(LOG_SELECT_STARTUP_INDEX, cache_log_select);
+
   set_log_select(_cli->opt_id);
   return 0;
 }
@@ -560,7 +708,7 @@ static int cli_log_level_exe(struct cli *_cli){
    */
   cache_log_level = (_cli->opt_id) | 0x80;
 
-  xil_printf("caching value 0x%02x to pmem\r\n", cache_log_level);
+  xil_printf("caching log-level value 0x%02x to pmem\r\n", cache_log_level);
   PersistentMemory_WriteByte(LOG_LEVEL_STARTUP_INDEX, cache_log_level);
 
   set_log_level(_cli->opt_id);
@@ -569,12 +717,9 @@ static int cli_log_level_exe(struct cli *_cli){
 
 static int cli_bounce_link_exe(struct cli *_cli){
   u32 l;
-  int r;
-  u16 config;
-  u16 wr[4], rd[4];
 
   /* check if the link is present - the option parsing state will catch the other end of the error modes */
-  if (_cli->opt_id >= NUM_ETHERNET_INTERFACES){
+  if (IF_ID_PRESENT != check_interface_valid(_cli->opt_id)){
     xil_printf("link %d not present\r\n", _cli->opt_id);
     return -1;
   }
@@ -583,62 +728,7 @@ static int cli_bounce_link_exe(struct cli *_cli){
 
   if (_cli->opt_id == 0){
     /* 1gbe - always link 0 */
-    /* FIXME: create a function for this since this was copy-pated from main.c -  UpdateGBEPHYConfiguration() */
-
-    /****************create function from here...**************************/
-    // Set the switch to the GBE PHY
-    wr[0] = ONE_GBE_SWITCH_SELECT;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to open I2C switch.\r\n");
-      return -1;
-    }
-
-    // Read register 0 to get current configuration
-    wr[0] = 0; // Address of register to read
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 1);
-
-    if (r == XST_FAILURE){
-      /* TODO: do we want to unwind the "open switch" command upon a failure here (and subsequent failures too)? */
-      log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to update current read register.\r\n");
-      return -1;
-    }
-
-    r = ReadI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, rd, 2);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to read CONTROL REG.\r\n");
-      return -1;
-    }
-
-    config = ((rd[0] << 8) | rd[1]);
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "1GBE [..] Current 1GBE PHY configuration: 0x%x.\r\n", config);
-
-    // Trigger a soft reset of 1GBE PHY to update configuration
-    // Do a soft reset
-    config = config | 0x8000;
-
-    wr[0] = 0; // Address of register to write
-    wr[1] = ((config >> 8) & 0xFF);
-    wr[2] = (config & 0xFF);
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, GBE_88E1111_I2C_DEVICE_ADDRESS, wr, 3);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to write CONTROL REG.\r\n");
-      return -1;
-    }
-
-    // Close I2C switch
-    wr[0] = 0x0;
-
-    r = WriteI2CBytes(MB_I2C_BUS_ID, PCA9546_I2C_DEVICE_ADDRESS, wr, 1);
-    if (r == XST_FAILURE){
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "UpdateGBEPHYConfiguration: Failed to close I2C switch.\r\n");
-      return -1;
-    }
-    /****************...create function till here**************************/
-
+    UpdateGBEPHYConfiguration();
   } else {
     /* 40gbe link */
     l = 0x1 << _cli->opt_id;
@@ -692,6 +782,13 @@ static int cli_get_config_exe(struct cli *_cli){
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "wishb legacy map: %s\r\n", str_wb);
 
+#ifdef MULTILINK_ARCH
+  const char *str_multi = "yes";
+#else
+  const char *str_multi = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "multi-link arch: %s\r\n", str_multi);
+
 #ifdef LINK_MON_RX_40GBE
   const char *str_lmon = "yes";
 #else
@@ -720,6 +817,14 @@ static int cli_get_config_exe(struct cli *_cli){
   const char *str_pre_ip = "no";
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "pre-config 40gbe link 1: %s\r\n", str_pre_ip);
+
+#ifdef PRUNE_CODEBASE_DIAGNOSTICS
+  const char *str_prune = "yes";
+#else
+  const char *str_prune = "no";
+#endif
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "prune code: %s\r\n", str_prune);
+
   return 0;
 }
 
@@ -737,13 +842,14 @@ static int cli_reset_fw_exe(struct cli *_cli){
 
 
 static int cli_stats_exe(struct cli *_cli){
-  u8 n, i;
+  u8 n, link, phy_id;
   struct sIFObject *iface;
 
   n = get_num_interfaces();
 
-  for (i = 0; i < n; i++){
-    iface = lookup_if_handle_by_id(i);
+  for (link = 0; link < n; link++){
+    phy_id = get_physical_interface_id(link);
+    iface = lookup_if_handle_by_id(phy_id);
     PrintInterfaceCounters(iface);
   }
 
@@ -875,75 +981,189 @@ static int cli_dump_exe(struct cli *_cli){
   return 0;
 }
 
+#define CLI_RBT_NOARG 0
+#define CLI_RBT_FLASH 1
+#define CLI_RBT_SDRAM 2
 
-#if 0
-static const char * const cmd_map[][12] = {
-  {"log-level",   "trace",   "debug", "info", "warn", "error", "off",  NULL},
-  {"log-select",  "general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl", "buff", "hardw", "iface", "all", NULL},
-  {NULL}
-};
+static int cli_reboot_fpga_exe(struct cli *_cli){
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
 
-static void cli_print_help(void){
-  int i = 0;
-  int j = 1;
+  switch(_cli->opt_id){
+    case CLI_RBT_NOARG:
+      xil_printf("rebooting from previous location\r\n");
+      sudo_reboot_now_from_last_location();
+      break;
 
-  xil_printf("usage:\r\n");
-  i = 0;
-  while(cmd_map[i][0] != NULL){
-    xil_printf("%s [", cmd_map[i][0]);
-    j = 1;
-    while(cmd_map[i][j] != NULL){
-      xil_printf("%s", cmd_map[i][j]);
-      cmd_map[i][j+1] == NULL ? xil_printf("]\r\n") : xil_printf("|");
-      j++;
+    case CLI_RBT_FLASH:
+      xil_printf("rebooting from flash\r\n");
+      sudo_reboot_now_from_flash_location();
+      break;
+
+    case CLI_RBT_SDRAM:
+      xil_printf("rebooting from sdram\r\n");
+      sudo_reboot_now_from_sdram_location();
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+
+
+static int cli_if_map_exe(struct cli *_cli){
+  print_interface_map();
+  return 0;
+}
+
+
+static int cli_igmp_exe(struct cli *_cli){
+  vIGMPPrintInfo();
+  return 0;
+}
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+#define CLI_PEEK_IFACE  0
+#define CLI_PEEK_DHCP   1
+
+static int cli_peek_exe(struct cli *_cli){
+  u8 logical_link;
+  u8 physical_interface_id;
+  u8 n;
+
+  n = get_num_interfaces();
+
+  /* TODO: could optimise this code a bit more */
+  switch(_cli->opt_id){
+    case CLI_PEEK_IFACE:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_interface_internals(physical_interface_id);
+      }
+      break;
+
+    case CLI_PEEK_DHCP:
+      for (logical_link = 0; logical_link < n; logical_link++){
+        physical_interface_id = get_physical_interface_id(logical_link);
+        print_dhcp_internals(physical_interface_id);
+      }
+      break;
+
+    default:
+      break;
+  }
+
+  return 0;
+}
+#endif
+
+
+static int cli_wb_read_exe(struct cli *_cli){
+  u32 addr;
+  u32 data;
+  u8 errno;
+
+  addr = _cli->opt_value_u32;
+  data = ReadWishboneRegister(addr);
+
+  /* check for wb memory addressing errors (out-of-range address)*/
+  errno = read_and_clear_error_flag();
+
+  if (errno == ERROR_AXI_DATA_BUS){
+    xil_printf("bus error\r\n") ;
+    return -1;
+  } else {
+    xil_printf("addr 0x%08x, data 0x%08x\r\n", addr, data) ;
+    return 0;
+  }
+}
+
+
+#define CLI_ARP_STAT   2
+static int cli_arp_req_exe(struct cli *_cli){
+  u8 logical_link;
+  u8 physical_interface_id;
+  u8 n, stat;
+  struct sIFObject *iface;
+
+  n = get_num_interfaces();
+  if (n < 1){
+    return -1;
+  }
+
+  if (CLI_ARP_STAT == _cli->opt_id){
+    /* show current status - all interfaces *should* have the same setting since this function loops through them when
+     * setting it so read only the first one */
+    physical_interface_id = get_physical_interface_id(0);
+    iface = lookup_if_handle_by_id(physical_interface_id);
+    stat = iface->uIFEnableArpRequests;   /* 0 or 1 */
+    /* display status */
+    xil_printf("%s %s\r\n", cli_cmd_map[_cli->cmd_id], cli_cmd_options[_cli->cmd_id][stat]);
+  } else {
+    /* TODO: create API function to enable/disable arp req on interface by id */
+    for (logical_link = 0; logical_link < n; logical_link++){
+      physical_interface_id = get_physical_interface_id(logical_link);
+      iface = lookup_if_handle_by_id(physical_interface_id);
+      iface->uIFEnableArpRequests = _cli->opt_id;   /* ensure the option id maps to arp req enable/disable */
     }
-    i++;
   }
-  /*xil_printf("log-level [trace|debug|info|warn|error|off]\r\n");*/
-  /*xil_printf("log-select [general|dhcp|arp|icmp|lldp|ctrl|buff|hardw|iface|all]\r\n");*/
+
+  return 0;
 }
-#endif
 
-#if 0
-/* trading bytes for simplicity - each row has n columns with '\0' if unused
-   this tradeoff cheap for small LUT and expensive for large LUT */
 
-static const char * lookup(char *){
-  static const char * const cmd_map[][] = {
-    {"log-level",   "trace",   "debug", "info", "warn", "error", "off",  "\0",   "\0",    "\0",    "\0",  "\0"},
-    {"log-select",  "general", "dhcp",  "arp",  "icmp", "lldp",  "ctrl", "buff", "hardw", "iface", "all", "\0"},
-    {"\0"}
+static int cli_arp_proc_exe(struct cli *_cli){
+  u8 logical_link;
+  u8 physical_interface_id;
+  u8 n, stat;
+  struct sIFObject *iface;
+
+  n = get_num_interfaces();
+  if (n < 1){
+    return -1;
   }
-}
-#endif
 
+  if (CLI_ARP_STAT == _cli->opt_id){
+    /* show current status - all interfaces *should* have the same setting since this function loops through them when
+     * setting it so read only the first one */
+    physical_interface_id = get_physical_interface_id(0);
+    iface = lookup_if_handle_by_id(physical_interface_id);
+    stat = iface->uIFEnableArpProcessing;   /* 0 or 1 */
+    /* display status */
+    xil_printf("%s %s\r\n", cli_cmd_map[_cli->cmd_id], cli_cmd_options[_cli->cmd_id][stat]);
+  } else {
+    /* TODO: create API function to enable/disable arp proc on interface by id */
+    for (logical_link = 0; logical_link < n; logical_link++){
+      physical_interface_id = get_physical_interface_id(logical_link);
+      iface = lookup_if_handle_by_id(physical_interface_id);
+      iface->uIFEnableArpProcessing = _cli->opt_id;   /* ensure the option id maps to arp proc enable/disable */
+    }
+  }
 
-#if 0
-/* the command interface only allows a command to have one of its registered
- * options selected */
-/* TODO: this could also be done with variable sized options ... */
-cli_register_cmd(_cli, "log-level", option_required);
-cli_register_option(_cli, "log-level", "trace");
-cli_register_option(_cli, "log-level", "debug");
-cli_register_option(_cli, "log-level", "info");
-cli_register_option(_cli, "log-level", "warn");
-cli_register_option(_cli, "log-level", "error");
-cli_register_option(_cli, "log-level", "off");
-
-struct cli_cmd{
-  const char * const name;
-  const char * const options[];
-
-}
-struct cli_cmd* cmd[CMD_MAP_SIZE];
-
-
-static int cli_register_cmd(struct cli *_cli, const char * const cmd){
-
-
+  return 0;
 }
 
 
-cli_build_command_map(_cli)
+static int cli_memtest_exe(struct cli *_cli){
 
-#endif
+  vRunMemoryTest();
+
+  return 0;
+}
+
+
+
+static int cli_get_mezz_inv_exe(struct cli *_cli){
+  u8 mezz;
+
+  for (mezz = 0; mezz < 4; mezz++){
+    /* these functions print mezz type, for hw and fw, internally */
+    read_mezz_type_id(mezz);
+    get_mezz_firmware_type(mezz);
+  }
+
+  return 0;
+}

@@ -29,6 +29,7 @@
 #include "logging.h"
 #include "icape_controller.h"
 #include "register.h"
+#include "scratchpad.h"
 
 //=================================================================================
 //  SetOutputMode
@@ -834,19 +835,80 @@ u32 ContinuityTest(u32 uOutput)
 //  ------
 //  void
 //=================================================================================
-void sudo_reboot_now( void ){
+enum {FROM_FLASH=0, FROM_SDRAM};
+const char *const loc_lut[] = {"flash", "sdram"};
 
-  log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] rebooting now...\r\n");
+static void sudo_reboot_now( u8 location ){
+
+  /* unlock the write protection bit in the AUX_SKARAB_FLAGS_INDEX of the pmem
+   * in order for the subsequent reboot which is about to follow, to write to
+   * the location bit of the same register - for this reason, it is also
+   * important that all reboots be done via one of the wrappers of this function
+   */
+
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  aux_flags = aux_flags & 0xD;
+  PersistentMemory_WriteByte(AUX_SKARAB_FLAGS_INDEX, aux_flags);
+
+  switch (location){
+    case FROM_SDRAM:
+      SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+      ResetSdramReadAddress();
+      AboutToBootFromSdram();
+    case FROM_FLASH:
+      log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] rebooting from %s\r\n", loc_lut[location]);
+      /* just wait a little while to enable serial port to finish writing out */
+      Delay(100000);    /* 100ms */
+      IcapeControllerInSystemReconfiguration();
+      break;
+
+    default:
+      /* invalid location arg - API misuse - assert??*/
+      return;
+  }
+}
+
+void sudo_reboot_now_from_flash_location(void){
+  sudo_reboot_now(FROM_FLASH);
+}
+
+void sudo_reboot_now_from_sdram_location(void){
+  sudo_reboot_now(FROM_SDRAM);
+}
+
+void sudo_reboot_now_from_last_location(void){
+#if 0
+  /* the following condition, which checks the image version to determine if it is a bsp/toolflow
+   * build, is not the most fool-proof way to determine whether the current runtime was booted from
+   * flash or sdram, since a toolflow image can also make its way into flash and a bsp image can be
+   * run from sdram. We have to find a better way to determine this condition. One way which could
+   * work and was experimented with is to read the "busy booting from sdram" flag in the
+   * C_CONFIG_IO_REG register. That method will however fall short if a fw/microblaze reset is
+   * triggered since that does not reconfigure the fpga but merely resets its state, in which case
+   * the registewr would not report that the fpga was booting from sdram. In this case, persistent
+   * memory will have to be utilized to maintain this state
+   */
 
   if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
-    SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-    ResetSdramReadAddress();
-    AboutToBootFromSdram();
-    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] toolflow image: reconfigure from SDRAM\r\n");
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] toolflow image detected\r\n");
+    sudo_reboot_now_from_sdram_location();
   } else {
-    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] bsp image: reconfigure from FLASH\r\n");
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] bsp image detected\r\n");
+    sudo_reboot_now_from_flash_location();
   }
-  /* just wait a little while to enable serial port to finish writing out */
-  Delay(100000);    /* 100ms */
-  IcapeControllerInSystemReconfiguration();
+#endif
+
+  u8 aux_flags = 0;
+  PersistentMemory_ReadByte(AUX_SKARAB_FLAGS_INDEX, &aux_flags);
+  xil_printf("aux_flags = %d\r\n", aux_flags);
+
+  if (aux_flags & 0x01){   /* sdram */
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] prev reconfig from sdram\r\n");
+    sudo_reboot_now_from_sdram_location();
+  } else {  /* flash */
+    log_printf(LOG_SELECT_ALL, LOG_LEVEL_ALWAYS, "RBT  [..] prev reconfig from flash\r\n");
+    sudo_reboot_now_from_flash_location();
+  }
+
 }

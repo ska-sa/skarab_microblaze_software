@@ -51,6 +51,9 @@ extern "C" {
 #define DHCP_RETURN_INVALID (3)
 #endif
 
+#define DHCP_RETURN_FALSE 0
+#define DHCP_RETURN_TRUE  1
+
 /* dhcp packet offsets */
 
 #define BOOTP_FRAME_BASE            (UDP_FRAME_BASE + UDP_HEADER_TOTAL_LEN) //42
@@ -263,8 +266,10 @@ struct sDHCPObject{
   u32 uDHCPLeaseTime;
 
   /* byte arrays */
-  u8  arrDHCPNextHopMacCached[6];       /* holds the mac address of the next hop on link */
-  u8  arrDHCPAddrServerCached[4];       /* holds the lease issuing dhcp server's ip address */
+#define DHCP_MAC_ARR_LEN  6
+  u8  arrDHCPNextHopMacCached[DHCP_MAC_ARR_LEN];       /* holds the mac address of the next hop on link */
+#define DHCP_IPADDR_ARR_LEN  4
+  u8  arrDHCPAddrServerCached[DHCP_IPADDR_ARR_LEN];       /* holds the lease issuing dhcp server's ip address */
 
   u32 uDHCPXidCached;
 
@@ -329,6 +334,9 @@ u8 uDHCPSetGotMsgFlag(struct sIFObject *pIFObjectPtr);
 
 /* set the host name to be used in message when requesting dhcp lease from server */
 u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName);
+
+/* get the dhcp lease-binding status */
+u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr);
 
 /* event-driven callbacks */
 

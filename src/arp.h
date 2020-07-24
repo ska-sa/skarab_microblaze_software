@@ -50,6 +50,10 @@ extern "C" {
 #define ARP_RETURN_IGNORE (6)
 #endif
 
+#ifndef ARP_RETURN_OFF
+#define ARP_RETURN_OFF (7)
+#endif
+
 #define ARP_FRAME_BASE                (ETH_FRAME_BASE + ETH_FRAME_TOTAL_LEN)
 #define ARP_HW_TYPE_OFFSET            0
 #define ARP_HW_TYPE_LEN               2

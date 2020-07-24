@@ -28,6 +28,20 @@
 #include "logging.h"
 #include "constant_defs.h"
 
+
+static u32 eth_mac_wb_offset[] = {
+  [0] = ONE_GBE_MAC_ADDR,
+  [1] = FORTY_GBE_MAC_0_ADDR,
+  [2] = FORTY_GBE_MAC_1_ADDR,
+  [3] = FORTY_GBE_MAC_2_ADDR,
+  [4] = FORTY_GBE_MAC_3_ADDR
+};
+
+/* only has local scope */
+/* c-like prototype:
+ * static u32 priv_GetAddressOffset(uId);
+ */
+#define priv_GetAddressOffset(uId)   eth_mac_wb_offset[uId]
 //=================================================================================
 //  GetAddressOffset
 //--------------------------------------------------------------------------------
@@ -43,17 +57,7 @@
 //=================================================================================
 u32 GetAddressOffset(u8 uId)
 {
-  if (uId == 0)
-    return ONE_GBE_MAC_ADDR;
-  else if (uId == 1)
-    return FORTY_GBE_MAC_0_ADDR;
-  else if (uId == 2)
-    return FORTY_GBE_MAC_1_ADDR;
-  else if (uId == 3)
-    return FORTY_GBE_MAC_2_ADDR;
-  else
-    return FORTY_GBE_MAC_3_ADDR;
-
+  return priv_GetAddressOffset(uId);
 }
 
 //=================================================================================
@@ -74,7 +78,7 @@ int SoftReset(u8 uId)
   unsigned uTimeout = 0x0;
   u32 uStatus = 0x0;
 
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
 
@@ -128,11 +132,15 @@ int SoftReset(u8 uId)
 //=================================================================================
 void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
+
+  /* write out the mac offset here since this is generally the first operation performed on mac */
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] base @ 0x%08x, mac offset @ 0x%08x \r\n", uId, XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR, uAddressOffset);
 
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_UPPER_16), uMACAddressUpper16Bits);
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_MAC_LOWER_32), uMACAddressLower32Bits);
 
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] set mac address [ok]\r\n", uId);
 }
 
 //=================================================================================
@@ -151,7 +159,7 @@ void SetFabricSourceMACAddress(u8 uId, u16 uMACAddressUpper16Bits, u32 uMACAddre
 //=================================================================================
 void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_GATEWAY), uGatewayARPCacheAddress);
 
@@ -173,7 +181,7 @@ void SetFabricGatewayARPCacheAddress(u8 uId, u8 uGatewayARPCacheAddress)
 //=================================================================================
 void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_IP_ADDRESS), uIPAddress);
 
@@ -195,7 +203,7 @@ void SetFabricSourceIPAddress(u8 uId, u32 uIPAddress)
 //=================================================================================
 void SetFabricNetmask(u8 uId, u32 uNetmask)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_NETMASK), uNetmask);
 }
@@ -217,7 +225,7 @@ void SetFabricNetmask(u8 uId, u32 uNetmask)
 //=================================================================================
 void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddressMask)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP), uMultiCastIPAddress);
   Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MC_RECV_IP_MASK), uMultiCastIPAddressMask);
@@ -240,7 +248,7 @@ void SetMultiCastIPAddress(u8 uId, u32 uMultiCastIPAddress, u32 uMultiCastIPAddr
 //=================================================================================
 void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE), uPortAddress);
@@ -266,7 +274,7 @@ void SetFabricSourcePortAddress(u8 uId, u16 uPortAddress)
 //=================================================================================
 void EnableFabricInterface(u8 uId, u8 uEnable)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
 #ifdef WISHBONE_LEGACY_MAP
   Xil_Out8(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_SOURCE_PORT_AND_ENABLE) + 2, uEnable);
@@ -294,7 +302,7 @@ void EnableFabricInterface(u8 uId, u8 uEnable)
 //=================================================================================
 void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper16Bits, u32 uMACAddressLower32Bits)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   //log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_TRACE, "Program ARP cache...\r\n");
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_ARP_CACHE_LOW_ADDRESS + (4*(2 * uIPAddressLower8Bits)), uMACAddressUpper16Bits);
@@ -319,7 +327,7 @@ void ProgramARPCacheEntry(u8 uId, u32 uIPAddressLower8Bits, u32 uMACAddressUpper
 u32 GetHostTransmitBufferLevel(u8 uId)
 {
   u32 uReg = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
@@ -346,7 +354,7 @@ u32 GetHostTransmitBufferLevel(u8 uId)
 u32 GetHostReceiveBufferLevel(u8 uId)
 {
   u32 uReg = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL));
 
@@ -378,7 +386,7 @@ u32 GetHostReceiveBufferLevel(u8 uId)
 void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel)
 {
   u16 uReg = uBufferLevel / 2;
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL) + 2, uReg);
 
@@ -399,7 +407,7 @@ void SetHostTransmitBufferLevel(u8 uId, u16 uBufferLevel)
 //=================================================================================
 void AckHostPacketReceive(u8 uId)
 {
-  u32 uAddressOffset = GetAddressOffset(uId);
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
 
   Xil_Out16(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_BUFFER_LEVEL), 0x0);
 
@@ -422,24 +430,25 @@ void AckHostPacketReceive(u8 uId)
 //=================================================================================
 int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 {
-  unsigned uTimeout = 0x0;
+  unsigned int uTimeout = 0x0;
   u32 uHostTransmitBufferLevel = 0x0;
   u32 uIndex = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
-  //u32 uReg;
-  u8 uPaddingWords = 0;
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
+  u32 uReg = 0x0;
+  unsigned int uPaddingWords = 0;
   u32 uPaddingIndex = 0;
+  u8 *t;
 
   // Must be a multiple of 64 bits
   if ((uNumWords % 2) != 0x0)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] Packet size must be multiple of 64 bits SIZE: %d 32-bit words\r\n", uId, uNumWords);
     return XST_FAILURE;
   }
 
   if (uNumWords < 16){
     uPaddingWords = (16 - uNumWords);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Packet size is smaller than 64 bytes, appending %d zero padding bytes\r\n", uId, (uPaddingWords * 4) /* bytes */ );
   }
 
   // Check that the transmit buffer is ready for a packet
@@ -452,11 +461,9 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Timeout waiting for transmit buffer to be empty. LEVEL: %d\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
-
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "[SEND %02x] Send %d 32-bit words\r\n", uId, uNumWords);
 
   // Program transmit packet words into FIFO
   for (uIndex = 0x0; uIndex < uNumWords; uIndex++)
@@ -464,6 +471,40 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
     //uReg = ((puTransmitPacket[uIndex] >> 16) & 0xFFFF) | ((puTransmitPacket[uIndex] & 0xFFFF) << 16);
     //Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, uReg);
     Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_TRANSMIT_BUFFER_LOW_ADDRESS + 4*uIndex, puTransmitPacket[uIndex]);
+    if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
+                                                 to print it anyway  */
+      /* the eth drivers need to be fast - especially from a programming point of view. Thus all trace level logging
+       * and related data operations are guarded by the above if-statement. This is to reduce the amount of conditional
+       * checks when trace level logging is not set since each log_printf maps to a conditional check to see if the
+       * trace level is set. Thus, all these conditionals are guarded by one check (i.e the line above). In normal
+       * operation, trace level will not be set and then we need this function to be as efficient as possible.
+       */
+
+      /* possibly a big performance hit when tracing receive buffer */
+      if (uIndex == 0){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\nTX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d[@x%x]", uId, uAddressOffset);   /* id and wb-addr-offset -
+                                                                                                useful to trace all the
+                                                                                                id-to-addr mappings in
+                                                                                                the netw stack */
+      }
+
+      /* formatting */
+      if ((uIndex == 0) || ((uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, " ");
+      }
+
+      t = (u8 *) &(puTransmitPacket[uIndex]);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                   word swapped - see
+                                                                                                   indices - for easier
+                                                                                                   reading on console */
+      if (uIndex == (uNumWords - 1)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");  /* only do once at the end */
+      }
+    }
   }
 
   // Write padding words (zero) to FIFO
@@ -487,11 +528,20 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 
   if (uTimeout == ETH_MAC_HOST_PACKET_TRANSMIT_TIMEOUT)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02x] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %x\r\n", uId, uHostTransmitBufferLevel);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "I/F  [%02d] TransmitHostPacket: Timeout waiting for packet to be sent. LEVEL: %d\r\n", uId, uHostTransmitBufferLevel);
     return XST_FAILURE;
   }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "[SEND %02x] Done sending data.\r\n", uId);
+  if (LOG_LEVEL_TRACE == get_log_level()){
+#ifndef WISHBONE_LEGACY_MAP
+    /* this code added to debug interface mapping */
+    uReg = uAddressOffset | uId;
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d wr 0x%x to @x%x\r\n", uId, uReg, (uAddressOffset + (4*ETH_MAC_REG_CNT_RESET)));
+    Xil_Out32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + (4*ETH_MAC_REG_CNT_RESET), uReg);
+#endif
+
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "TX%02d send done\r\n", uId);
+  }
 
   return XST_SUCCESS;
 
@@ -514,10 +564,11 @@ int TransmitHostPacket(u8 uId, volatile u32 *puTransmitPacket, u32 uNumWords)
 //=================================================================================
 int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 {
-  unsigned uIndex = 0x0;
-  u32 uAddressOffset = GetAddressOffset(uId);
-  u16 pktlen = 0, padlen = 0;
+  unsigned int uIndex = 0x0;
+  u32 uAddressOffset = priv_GetAddressOffset(uId);
+  u32 pktlen = 0, padlen = 0;
   //u32 uReg;
+  u8 *t;
 
   // GT 31/03/2017 NEED TO CHECK THAT DON'T OVERFLOW ReceivePacket ARRAY
   //if (uNumWords > GetHostReceiveBufferLevel(uId))
@@ -528,7 +579,7 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
 
   if (uNumWords > RX_BUFFER_MAX)
   {
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "RECV [%02x] Packet size exceeds %d words. SIZE: %x\r\n", uId, RX_BUFFER_MAX, uNumWords);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_ERROR, "RX   [%02d] Packet size exceeds %d words. SIZE: %d\r\n", uId, RX_BUFFER_MAX, uNumWords);
     return XST_FAILURE;
   }
 
@@ -540,18 +591,37 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     //uReg = Xil_In32(XPAR_AXI_SLAVE_WISHBONE_CLASSIC_MASTER_0_BASEADDR + uAddressOffset + ETH_MAC_CPU_RECEIVE_BUFFER_LOW_ADDRESS + (4*uIndex));
     //puReceivePacket[uIndex] = ((uReg & 0xFFFF) << 16) | ((uReg >> 16) & 0xFFFF);
 
-    /* possibly a big performance hit when tracing receive buffer */
-    u8 *t = (u8 *) &(puReceivePacket[uIndex]);
-    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[0],t[1],t[2],t[3]);
-    if (((uIndex != 0) && (uIndex % 15) == 0)){
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
-    } else {
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+    if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
+                                                 to print it anyway  */
+      /* possibly a big performance hit when tracing receive buffer */
+      if (uIndex == 0){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\nRX%02d %d 32bit words\r\n", uId, uNumWords); /* size - num 32-bit words */
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d[@x%x]", uId, uAddressOffset);    /* do once for index 0 -
+                                                                                                 id and wb-addr-offset -
+                                                                                                 useful to trace all the
+                                                                                                 id-to-addr mappings in
+                                                                                                 the netw stack */
+      }
+
+      /* formatting */
+      if ((uIndex == 0) || ((uIndex % 8) == 0)){
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+      } else {
+        log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "");
+      }
+
+      t = (u8 *) &(puReceivePacket[uIndex]);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%02x%02x%02x%02x ",t[1],t[0],t[3],t[2]);    /* NOTE - these are half
+                                                                                                   word swapped - see
+                                                                                                   indices - for easier
+                                                                                                   reading on console */
     }
   }
 
   if (LOG_LEVEL_TRACE == get_log_level()){  /* only do all this if we're going
                                                to print it anyway  */
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "\r\n");
+
     /* added to debug packet length and firmware read buffer length discrepancy */
     if ((puReceivePacket[3] & 0xffff) == 0x0806 ){ /* arp */
       pktlen = ((((puReceivePacket[4] >> 16) & 0xff) + ((puReceivePacket[4] >> 24) & 0xff)) * 2) + 8 + 14;
@@ -569,16 +639,16 @@ int ReadHostPacket(u8 uId, volatile u32 *puReceivePacket, u32 uNumWords)
     pktlen = pktlen < 16 ? 16 : pktlen;     /* lowest value is 16 */
 
     if (uNumWords != pktlen){
-      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RECV [%02x] **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
+      log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d **ERROR** - buff len (%u words) != pkt len (%u words)\r\n", uId, uNumWords, pktlen);
 #if 0
       for (uIndex = 0x0; uIndex < uNumWords; uIndex++){
         log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "%08x\r\n", puReceivePacket[uIndex]);
       }
 #endif
     }
-  }
 
-  log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RECV [%02x] Done reading cpu receive buffer\r\n", uId);
+    log_printf(LOG_SELECT_BUFF, LOG_LEVEL_TRACE, "RX%02d read done\r\n", uId);
+  }
 
   // Acknowledge reading the packet from the FIFO
   AckHostPacketReceive(uId);

@@ -57,7 +57,6 @@ static void __sanity_check_igmp(struct sIGMPObject *pIGMPObjectPtr){
   Xil_AssertVoid(IGMP_MAGIC_CANARY == pIGMPObjectPtr->uIGMPMagic);    /* API usage error */
 }
 
-/* TODO: if NUM_ETHERNET_INTERFACES > 17 -> throw compile-time/preprocessor error */
 /* TODO: use get_num_interfaces() */
 static void __sanity_check_igmp_interface_id(u8 if_id){
   Xil_AssertVoid((if_id >= 0) && (if_id < NUM_ETHERNET_INTERFACES));    /* API usage error */
@@ -110,8 +109,8 @@ static struct sIGMPObject *pIGMPGetContext(u8 uId){
 u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast join failed\r\n");
     return XST_FAILURE;
   }
 
@@ -136,6 +135,8 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 
     pIGMPObjectPtr->uIGMPJoinRequestFlag = TRUE;
     /*pIGMPObjectPtr->tIGMPCurrentState = IGMP_IDLE_STATE;*/
+  } else {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] Already subscribed with base %08x and mask %08x\r\n", uId, uMulticastBaseAddr,uMulticastAddrMask);
   }
 
   return XST_SUCCESS;
@@ -146,8 +147,10 @@ u8 uIGMPJoinGroup(u8 uId, u32 uMulticastBaseAddr, u32 uMulticastAddrMask){
 u8 uIGMPLeaveGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [..] Leaving groups on if-%d\r\n", uId);
+
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast leave failed\r\n");
     return XST_FAILURE;
   }
 
@@ -168,12 +171,38 @@ u8 uIGMPLeaveGroup(u8 uId){
   return XST_SUCCESS;
 }
 
+
+u8 uIGMPLeaveGroupFlush(u8 uId){
+  struct sIGMPObject *pIGMPObjectPtr;
+  int ret;
+
+  ret = uIGMPLeaveGroup(uId);
+  if (XST_FAILURE == ret){
+    return XST_FAILURE;
+  }
+
+  /*
+   * now run the igmp state machine until all the leave messages have been flushed
+   * This function should block till all the leave messages have been sent.
+   * i.e. until the state machine has returned to the idle state from leave state
+   */
+  pIGMPObjectPtr = pIGMPGetContext(uId);
+
+  while (pIGMPObjectPtr->tIGMPCurrentState != IGMP_IDLE_STATE){
+    uIGMPStateMachine(uId);
+  }
+
+  return XST_SUCCESS;
+}
+
+
+
 /* This function was introduced to deal with link-flap scenarios and rejoin the mc group */
 u8 uIGMPRejoinPrevGroup(u8 uId){
   struct sIGMPObject *pIGMPObjectPtr;
 
-  if (uId >= NUM_ETHERNET_INTERFACES){
-    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Interface ID %02d out of range\r\n", uId);
+  if (IF_ID_PRESENT != check_interface_valid(uId)) {
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_ERROR, "IGMP [..] Multicast rejoin failed\r\n");
     return XST_FAILURE;
   }
 
@@ -187,6 +216,32 @@ u8 uIGMPRejoinPrevGroup(u8 uId){
   }
 
   return XST_SUCCESS;
+}
+
+
+void vIGMPPrintInfo(void){
+  u8 num_links;
+  u8 logical_link;
+  u8 physical_id;
+  u32 base_addr;
+  u32 mask_addr;
+  typeIGMPState current_state;
+  u8 cached_id;
+  struct sIGMPObject *pIGMPObjectPtr;
+
+  num_links = get_num_interfaces();
+  for (logical_link = 0; logical_link < num_links; logical_link++){
+    physical_id = get_physical_interface_id(logical_link);
+    pIGMPObjectPtr = pIGMPGetContext(physical_id);
+
+    base_addr = pIGMPObjectPtr->uIGMPJoinMulticastAddress;
+    mask_addr = pIGMPObjectPtr->uIGMPJoinMulticastAddressMask;
+    cached_id = pIGMPObjectPtr->uIGMPIfId;   /* included as cross-check to verify that the id mapping is correct */
+    current_state = pIGMPObjectPtr->tIGMPCurrentState;
+
+    log_printf(LOG_SELECT_IGMP, LOG_LEVEL_INFO, "IGMP [%02d] id: %02d base: %08x mask: %08x state: %s\r\n", physical_id,
+        cached_id, base_addr, mask_addr, igmp_state_name_lookup[current_state]);
+  }
 }
 
 /*-------------------IGMP state machine and its internal functions--------------------------------*/

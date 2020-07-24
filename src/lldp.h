@@ -17,6 +17,15 @@
 extern "C" {
 #endif
 
+//DEFINE INTERFACE NAMES
+#define LLDP_ONE_GBE_INTERFACE         "I/F-01GBE-00"
+#define LLDP_FORTY_GBE_INTERFACE_0     "I/F-40GBE-01"
+#define LLDP_FORTY_GBE_INTERFACE_1     "I/F-40GBE-02"
+#define LLDP_FORTY_GBE_INTERFACE_2     "I/F-40GBE-03"
+#define LLDP_FORTY_GBE_INTERFACE_3     "I/F-40GBE-04"
+#define LLDP_FORTY_GBE_INTERFACE_x     "I/F-40GBE-xx"
+#define LLDP_HOSTNAME                  "skarab"
+
 /*link custom return values */
 #define LLDP_RETURN_FAIL     XST_FAILURE
 #define LLDP_RETURN_OK       XST_SUCCESS
