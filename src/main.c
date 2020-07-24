@@ -553,6 +553,7 @@ int main()
   u16 *pBuffer = NULL;  /* pointer to working buffer */
   u16 uChecksum = 0;
   u32 uHMCBitMask;
+  unsigned int uHMCRunInit = 0;
 
 #define HMC_MAX_RECONFIG_COUNT 3
   u8 uHMC_Total_ReconfigCount = HMC_MAX_RECONFIG_COUNT;
@@ -781,6 +782,7 @@ int main()
 #define BYTE_MASK_HMC_PRESENT  5  /* bxxxx0101 - look for this bit signature to determine HMC presence */
 
   uHMCBitMask = 0;
+  uHMCRunInit = 0;
 
   /* dynamically build the bit mask for the hmc cards which are present */
   uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
@@ -789,172 +791,177 @@ int main()
     if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] MEZZ %d has an HMC present. Trying to initialise...\r\n", uIndex);
       uHMCBitMask = uHMCBitMask | (BYTE_MASK_HMC_INIT << (uIndex*8));
+      uHMCRunInit++;
     }
   }
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] bit mask 0x%08x\r\n", uHMCBitMask);
 
-  /* set timeout to a default value in case eeprom read fails */
-  uHMCTimeout = HMC_INIT_TIMEOUT;
+  if (uHMCRunInit > 0){
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] bit mask 0x%08x\r\n", uHMCBitMask);
 
-  /* only do if we have hmc cards present i.e. bitmask != 0 */
-  if (uHMCBitMask){
-    /* read hmc retry timeout and max attempts stored in pg15 of DS2433 EEPROM on Motherboard */
-    if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
-      if (DS2433ReadMem(rom, 0, data, 3, 0xE4, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
-        /* overwrite default */
-        uHMCTimeout = (data[0] & 0xff) | (data[1] << 8);
-        /*
-         * Now ensure that the hmc timeout is a reasonable value since this is
-         * user data in eeprom. Let's say a reasonable range is 1-60s else leave
-         * as default value.
-         */
-        uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 10) ? uHMCTimeout : HMC_INIT_TIMEOUT;
-        /* set max number of attempts before giving up */
-        uHMC_Max_ReconfigCount = data[2];
-        /* a reasonable value for the max hmc retry count is any value larger
-         * than 3. This is to prevent it being set to zero when this feature is
-         * first run without the correct config in flash */
-        uHMC_Max_ReconfigCount = (uHMC_Max_ReconfigCount >= HMC_MAX_RECONFIG_COUNT) ? uHMC_Max_ReconfigCount : HMC_MAX_RECONFIG_COUNT; 
+    /* set timeout to a default value in case eeprom read fails */
+    uHMCTimeout = HMC_INIT_TIMEOUT;
+
+    /* only do if we have hmc cards present i.e. bitmask != 0 */
+    if (uHMCBitMask){
+      /* read hmc retry timeout and max attempts stored in pg15 of DS2433 EEPROM on Motherboard */
+      if (OneWireReadRom(rom, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+        if (DS2433ReadMem(rom, 0, data, 3, 0xE4, 0x1, MB_ONE_WIRE_PORT) == XST_SUCCESS){
+          /* overwrite default */
+          uHMCTimeout = (data[0] & 0xff) | (data[1] << 8);
+          /*
+           * Now ensure that the hmc timeout is a reasonable value since this is
+           * user data in eeprom. Let's say a reasonable range is 1-60s else leave
+           * as default value.
+           */
+          uHMCTimeout = (uHMCTimeout <= 600 && uHMCTimeout >= 10) ? uHMCTimeout : HMC_INIT_TIMEOUT;
+          /* set max number of attempts before giving up */
+          uHMC_Max_ReconfigCount = data[2];
+          /* a reasonable value for the max hmc retry count is any value larger
+           * than 3. This is to prevent it being set to zero when this feature is
+           * first run without the correct config in flash */
+          uHMC_Max_ReconfigCount = (uHMC_Max_ReconfigCount >= HMC_MAX_RECONFIG_COUNT) ? uHMC_Max_ReconfigCount : HMC_MAX_RECONFIG_COUNT; 
+        }
       }
     }
-  }
 
-  uTimeoutCounter = uHMCTimeout;
+    uTimeoutCounter = uHMCTimeout;
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] setting hmc timeout to %d ms with %d max attempts\r\n", (u32) uTimeoutCounter * 100, uHMC_Max_ReconfigCount);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] setting hmc timeout to %d ms with %d max attempts\r\n", (u32) uTimeoutCounter * 100, uHMC_Max_ReconfigCount);
 
-  /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
-  do
-  {
-    uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
-    /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
-    if ((uTimeoutCounter % 10) == 0){    /* every second */
-      XWdtTb_RestartWdt(& WatchdogTimer);
-    }
-  }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
+    /* Now wait for all HMC cards present to POST and INIT otherwise time-out */
+    do
+    {
+      uReadReg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
+      /* Pat the Microblaze watchdog since this loop may potentially be longer than a watchdog timeout */
+      if ((uTimeoutCounter % 10) == 0){    /* every second */
+        XWdtTb_RestartWdt(& WatchdogTimer);
+      }
+    }while(((uReadReg & uHMCBitMask) != uHMCBitMask) && (uTimeoutCounter != 0));
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] Mezzanine status register: 0x%08x\r\n", ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR));
 
-  /* if one or some or all of the HMC's don't init and post... */
-  if ((uReadReg & uHMCBitMask) != uHMCBitMask){
-    /*
-     * Read the current stats of the HMS'c stored in Persistent Memory - these are
-     * the stats stored since the last hard reset / power cycle.
-     */
+    /* if one or some or all of the HMC's don't init and post... */
+    if ((uReadReg & uHMCBitMask) != uHMCBitMask){
+      /*
+       * Read the current stats of the HMS'c stored in Persistent Memory - these are
+       * the stats stored since the last hard reset / power cycle.
+       */
 #if 0
-    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMCReconfigCount);
+      PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMCReconfigCount);
 #else
-    PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMC_Total_ReconfigCount);
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC0_COUNT_INDEX, &(uHMC_ReconfigCount[0]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC1_COUNT_INDEX, &(uHMC_ReconfigCount[1]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC2_COUNT_INDEX, &(uHMC_ReconfigCount[2]));
-    PersistentMemory_ReadByte(HMC_RECONFIG_HMC3_COUNT_INDEX, &(uHMC_ReconfigCount[3]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, &uHMC_Total_ReconfigCount);
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC0_COUNT_INDEX, &(uHMC_ReconfigCount[0]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC1_COUNT_INDEX, &(uHMC_ReconfigCount[1]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC2_COUNT_INDEX, &(uHMC_ReconfigCount[2]));
+      PersistentMemory_ReadByte(HMC_RECONFIG_HMC3_COUNT_INDEX, &(uHMC_ReconfigCount[3]));
 #endif
 
-    //if (uTimeoutCounter == 0){
-    /* determine which ones did not init and post */
-    for (uIndex = 0; uIndex < 4; uIndex++){
-      if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init)){
-        if (((uReadReg >> uIndex * 8) & BYTE_MASK_HMC_INIT) != BYTE_MASK_HMC_INIT){
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMC-%d did not init/post!\r\n", uIndex);
-          /* increment the relevant failing HMC's counter */
-          uHMC_ReconfigCount[uIndex] = uHMC_ReconfigCount[uIndex] + 1;
-        }
-      }
-    }
-
-    if (PMemState != PMEM_RETURN_ERROR){
-      if (uHMC_Total_ReconfigCount < (uHMC_Max_ReconfigCount - 1)){   /* do n-1 times */
-
-        /* for each reconfigure, increment total counter */
-        uHMC_Total_ReconfigCount = uHMC_Total_ReconfigCount + 1;
-
-        /* write back all counters to persistent memory registers */
-        PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, uHMC_Total_ReconfigCount);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, uHMC_ReconfigCount[0]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, uHMC_ReconfigCount[1]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, uHMC_ReconfigCount[2]);
-        PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, uHMC_ReconfigCount[3]);
-
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] invoking reconfigure of FPGA\r\n");
-        /* if currently a toolflow image - reboot from SDRAM else reboot from FLASH */
-        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
-          SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
-          ResetSdramReadAddress();
-          AboutToBootFromSdram();
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
-        }
-        Delay(100000);
-        IcapeControllerInSystemReconfiguration();
-      } else {    /* and do this the n-th time */
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] maximum reconfiguration count reached [%d]\r\n", uHMC_Max_ReconfigCount);
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] current hmc reconfig stats - mezz0:%d | mezz1:%d | mezz2:%d | mezz3:%d\r\n",
-            uHMC_ReconfigCount[0], uHMC_ReconfigCount[1], uHMC_ReconfigCount[2], uHMC_ReconfigCount[3] );
-
-        /*
-         * The stats of each HMC will be recorded in the one-wire eeprom on the
-         * HMC mezzanine card. It will be located at the start of page 15 of the
-         * eeprom. Two values (32-bit unsigned) will be recorded, these are:
-         * 1) the number of times the HMC card did not init/post
-         * 2) the total number of maxed-out retries
-         * These values will only be recorded upon the HMC retry mechanism
-         * max'ing-out.
-         *
-         *  0x1E0 0x1E1 0x1E2 0x1E3
-         *  byte0 byte1 byte2 byte3 of retries
-         *
-         *  0x1E4 0x1E5 0x1E6 0x1E7
-         *  byte0 byte1 byte2 byte3 of total
-         */
-
-        u16 value[8];
-        u32 retries, total;
-
-        static const u16 one_wire_port_lookup[4] = {
-          [0] = MEZ_0_ONE_WIRE_PORT,
-          [1] = MEZ_1_ONE_WIRE_PORT,
-          [2] = MEZ_2_ONE_WIRE_PORT,
-          [3] = MEZ_3_ONE_WIRE_PORT };
-
-        for (uIndex = 0; uIndex < 4; uIndex++){
-          /* if this is an hmc card... */
-          if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
-            if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-              /* read from eeprom on respective hmc card */
-              if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-                /* increment the hmc stats */
-                retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
-                total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
-                value[0] = retries & 0xff;
-                value[1] = (retries >> 8) & 0xff;
-                value[2] = (retries >> 16) & 0xff;
-                value[3] = (retries >> 24) & 0xff;
-                value[4] = total & 0xff;
-                value[5] = (total >> 8) & 0xff;
-                value[6] = (total >> 16) & 0xff;
-                value[7] = (total >> 24) & 0xff;
-                /* write back to eeprom on the respective hmc card */
-                if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
-                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
-                } else {
-                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error writing to DS2433\r\n", uIndex);
-                }
-              } else {
-                log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
-              }
-            } else {
-              log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
-            }
+      /* determine which ones did not init and post */
+      for (uIndex = 0; uIndex < 4; uIndex++){
+        if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init)){
+          if (((uReadReg >> uIndex * 8) & BYTE_MASK_HMC_INIT) != BYTE_MASK_HMC_INIT){
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMC-%d did not init/post!\r\n", uIndex);
+            /* increment the relevant failing HMC's counter */
+            uHMC_ReconfigCount[uIndex] = uHMC_ReconfigCount[uIndex] + 1;
           }
         }
+      }
 
+      if (PMemState != PMEM_RETURN_ERROR){
+        if (uHMC_Total_ReconfigCount < (uHMC_Max_ReconfigCount - 1)){   /* do n-1 times */
+
+          /* for each reconfigure, increment total counter */
+          uHMC_Total_ReconfigCount = uHMC_Total_ReconfigCount + 1;
+
+          /* write back all counters to persistent memory registers */
+          PersistentMemory_WriteByte(HMC_RECONFIG_TOTAL_COUNT_INDEX, uHMC_Total_ReconfigCount);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC0_COUNT_INDEX, uHMC_ReconfigCount[0]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC1_COUNT_INDEX, uHMC_ReconfigCount[1]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, uHMC_ReconfigCount[2]);
+          PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, uHMC_ReconfigCount[3]);
+
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] invoking reconfigure of FPGA\r\n");
+          /* if currently a toolflow image - reboot from SDRAM else reboot from FLASH */
+          if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
+            SetOutputMode(SDRAM_READ_MODE, 0x0); // Release flash bus when about to do a reboot
+            ResetSdramReadAddress();
+            AboutToBootFromSdram();
+            log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
+          }
+          Delay(100000);
+          IcapeControllerInSystemReconfiguration();
+        } else {    /* and do this the n-th time */
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] maximum reconfiguration count reached [%d]\r\n", uHMC_Max_ReconfigCount);
+          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] current hmc reconfig stats - mezz0:%d | mezz1:%d | mezz2:%d | mezz3:%d\r\n",
+              uHMC_ReconfigCount[0], uHMC_ReconfigCount[1], uHMC_ReconfigCount[2], uHMC_ReconfigCount[3] );
+
+          /*
+           * The stats of each HMC will be recorded in the one-wire eeprom on the
+           * HMC mezzanine card. It will be located at the start of page 15 of the
+           * eeprom. Two values (32-bit unsigned) will be recorded, these are:
+           * 1) the number of times the HMC card did not init/post
+           * 2) the total number of maxed-out retries
+           * These values will only be recorded upon the HMC retry mechanism
+           * max'ing-out.
+           *
+           *  0x1E0 0x1E1 0x1E2 0x1E3
+           *  byte0 byte1 byte2 byte3 of retries
+           *
+           *  0x1E4 0x1E5 0x1E6 0x1E7
+           *  byte0 byte1 byte2 byte3 of total
+           */
+
+          u16 value[8];
+          u32 retries, total;
+
+          static const u16 one_wire_port_lookup[4] = {
+            [0] = MEZ_0_ONE_WIRE_PORT,
+            [1] = MEZ_1_ONE_WIRE_PORT,
+            [2] = MEZ_2_ONE_WIRE_PORT,
+            [3] = MEZ_3_ONE_WIRE_PORT };
+
+          for (uIndex = 0; uIndex < 4; uIndex++){
+            /* if this is an hmc card... */
+            if ((MezzHandle[uIndex]->m_type == MEZ_BOARD_TYPE_HMC_R1000_0005) && (MezzHandle[uIndex]->m_allow_init == 1)){
+              if (OneWireReadRom(rom, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                /* read from eeprom on respective hmc card */
+                if (DS2433ReadMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                  /* increment the hmc stats */
+                  retries = value[0] + (value[1] << 8) + (value[2] << 16) + (value[3] << 24) + uHMC_ReconfigCount[uIndex] ;
+                  total = value[4] + (value[5] << 8) + (value[6] << 16) + (value[7] << 24) + uHMC_Max_ReconfigCount;
+                  value[0] = retries & 0xff;
+                  value[1] = (retries >> 8) & 0xff;
+                  value[2] = (retries >> 16) & 0xff;
+                  value[3] = (retries >> 24) & 0xff;
+                  value[4] = total & 0xff;
+                  value[5] = (total >> 8) & 0xff;
+                  value[6] = (total >> 16) & 0xff;
+                  value[7] = (total >> 24) & 0xff;
+                  /* write back to eeprom on the respective hmc card */
+                  if (DS2433WriteMem(rom, 0, value, 8, 0xE0, 0x1, one_wire_port_lookup[uIndex]) == XST_SUCCESS){
+                    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] stored hmc stats in flash: retries=%d | total=%d\r\n", uIndex, retries, total);
+                  } else {
+                    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error writing to DS2433\r\n", uIndex);
+                  }
+                } else {
+                  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading from DS2433\r\n", uIndex);
+                }
+              } else {
+                log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [%02x] error reading ROM from DS2433\r\n", uIndex);
+              }
+            }
+          }
+
+        }
+      } else {
+        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] error accessing persistent memory register\r\n");
       }
     } else {
-      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "HMC  [..] error accessing persistent memory register\r\n");
+      /* if we haven't TIMED OUT then we're OK */
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMCs initialized within %d ms[OK]\r\n", (u32) ((uHMCTimeout - uTimeoutCounter) * 100));
     }
   } else {
-    /* if we haven't TIMED OUT then we're OK */
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] HMCs initialized within %d ms[OK]\r\n", (u32) ((uHMCTimeout - uTimeoutCounter) * 100));
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC  [..] zero HMCs to initialize\r\n");
   }
 
   /*
