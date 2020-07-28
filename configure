@@ -1,21 +1,90 @@
 #!/bin/bash
 
-set -e
+# This script relies on the conventional Xilinx installation directory structure.
+# The following paths are critical to the functioning of this script:
+# <path/to/xilinx/install>/SDK/<YYYY.x>/bin
+# <path/to/xilinx/install>/SDK/<YYYY.x>/gnu/microblaze/lin/bin
+
+
+function fail_exit() {
+  echo "";
+  echo "+--------------------------+";
+  echo "|      config failed       |";
+  echo "+--------------------------+";
+  exit 1;
+}
+
+function print_usage_exit() {
+  echo "usage: ./configure [--force] [--gui <none|zenity|dialog>]"
+  exit
+}
+
+#commented out - this causes script to exit without notice e.g. running 'find' on dir without permissions
+#set -e
+
+#this script has to be run from directory where ./configure is found
+#since ${PWD} is used
+test ! -e configure && echo "run from ./configure location" && exit
+
+#parse cmd line args
+while test ! -z $1; do
+  case $1 in
+  "--force")
+          force=1
+          ;;
+  "--gui")
+          shift
+          test -z $1 && print_usage_exit
+          test $1 = "none" || test $1 = "zenity" || test $1 = "dialog" || print_usage_exit
+          gui=$1
+          ;;
+  *)
+          print_usage_exit
+          ;;
+
+  esac
+  shift
+done
+
+#if unset, set to zero
+force=${force:-0}
+
+if test $force -eq 1; then
+  echo "running with force"
+else
+  (test -d bsp/skarab_microblaze_bsp || test -d bsp/hw_0) && echo -e "BSP already built.\nOverride (with caution) using './configure --force'\nWARNING: this will delete any existing bsp and you will lose any custom changes made to the bsp sources." && exit
+fi
 
 OPTION=0
 
-#the order of the following are important - last one preffered over previous
-which dialog > /dev/null && OPTION=1
-which zenity > /dev/null && OPTION=2
+#if unset, set to zenity
+gui=${gui:-"zenity"}
+
+if test $gui = "dialog"; then
+  which dialog > /dev/null && OPTION=1
+elif test $gui = "zenity"; then
+  which zenity > /dev/null && OPTION=2
+fi
+
+#ssh connections (without -X) do not have DISPLAY required for gui - use xhost to check
+#TODO: could also fall back to dialog if installed
+! xhost >& /dev/null && echo "no display, fallback to no-gui mode" && OPTION=0
 
 #create a temp file
 tmpfile=$(mktemp -q .Makefile.inc.tmp.XXXX)
-#create a file descritor to write data to after closing temp file
+#create a file descriptor to write data to after closing temp file
 exec 3>"$tmpfile"
 #create another file descriptor for later reading
 exec 4<"$tmpfile"
 #delete temp file
 rm "$tmpfile"
+
+#re-used strings
+ASK_SDK_LOC="Please point me to your Xilinx SDK install directory..."
+TELL_SDK_LOC_FAIL="Failed to find SDK installations"
+ASK_SDK_SELECT="Please select SDK installation..."
+TELL_SDK_SELECT_FAIL="Expected to find '<sdk>/bin/xsdk' but not found!"
+TELL_SDK_SET="Setting sdk location to:"
 
 case "$OPTION" in
 
@@ -23,108 +92,86 @@ case "$OPTION" in
   dialog --msgbox "TIP: use <SPACE> to auto-complete directory- or file-names" 10 60
 
   while : ; do
-    XILDIR=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your Xilinx install directory..." \
+    SELECTDIR=$(dialog --no-cancel --clear --no-collapse --title  "${ASK_SDK_LOC}"\
         --stdout --dselect "/" 14 60)
-    (find ${XILDIR} -name 'mb-gcc' -printf "%h " | tee 1>&3) | dialog --infobox "Searching..." 0 0
-    CCPATH_INT=$(cat <&4)
-    test -z "${CCPATH_INT}" && dialog --msgbox "Expected to find 'mb-gcc' but not found!" 0 0 || break
+    (find ${SELECTDIR} -type d -name *[0-9][0-9][0-9][0-9].[0-9] -printf "${SELECTDIR%*/}/%P\\\n" 2>/dev/null | tee 1>&3 || echo "failed") | dialog --infobox "Searching..." 0 0
+    PATHS_FOUND=$(cat <&4)
+
+    test -z "${PATHS_FOUND}" && dialog --msgbox "${TELL_SDK_LOC_FAIL}" 0 0 || break
   done
+
+  #SDK installation directories have naming scheme YYYY.x e.g. 2019.2
+  SDKPATH_ALL=$(echo -e ${PATHS_FOUND} | grep "SDK/[0-9][0-9][0-9][0-9].[0-9]")
+  echo sdkpath all:${SDKPATH_ALL}
+
   exec 5>&1
-  CCPATH=$(dialog --no-tags --no-items --menu "Choose toolchain location:" 0 100 0 ${CCPATH_INT} 2>&1 1>&5)
+  SDKPATH=$(dialog --no-tags --no-items --menu "${ASK_SDK_SELECT}" 0 100 0 ${SDKPATH_ALL} 2>&1 1>&5)
   exec 5>&-
-  test ! -e "${CCPATH}/mb-gcc" && dialog --msgbox "Expected to find 'mb-gcc' but not found!" 0 0 || break
-  dialog --msgbox "Setting toolchain location to: ${CCPATH}" 0 0
 
-  while : ; do
-    LIBDIR_INT=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your microblaze software bsp library directory..." \
-        --stdout --dselect "/" 14 0)
-    #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
-    #selected a higher level parent directory.
-    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | dialog --infobox "Searching..." 0 0
-    LIBDIR=$(cat <&4)
-    test ! -e "${LIBDIR}/libxil.a" && dialog --msgbox "Expected to find 'libxil.a' but not found!" 0 0 || break
-  done
-  dialog --msgbox "Setting microblaze library path to: ${LIBDIR}" 0 0
+  test ! -e "${SDKPATH}/bin/xsdk" && dialog --msgbox "${TELL_SDK_SELECT_FAIL}" 0 0 && fail_exit 
 
-  while : ; do
-    INCDIR_INT=$(dialog --no-cancel --clear --no-collapse --title "Please point me to your microblaze software bsp library include headers..." \
-        --stdout --dselect "${LIBDIR/lib/include}" 14 0)
-    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | dialog --infobox "Searching..." 0 0
-    INCDIR=$(cat <&4)
-    test ! -e "${INCDIR}/xparameters.h" && dialog --msgbox "Expected to find 'xparameters.h' but not found!" 0 0 || break
-  done
-  dialog --msgbox "Setting microblaze library headers include path to: ${INCDIR}" 0 0
+  dialog --msgbox "${TELL_SDK_SET} ${SDKPATH}" 0 0
+
   clear
   ;;
 
 "2")
-  while : ; do
-    zenity --info --ok-label="select" --text="Please point me to your Xilinx install directory..."
-    XILDIR=$(zenity --file-selection --directory --filename="/")
-    #CCPATH_INT=$((find ${XILDIR} -name 'mb-gcc' -printf "%h\n" 2>/dev/null) | zenity --progress --auto-close)
-    (find ${XILDIR} -name 'mb-gcc' -printf "%h " 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
-    CCPATH_INT=$(cat <&4)
-    #test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" && exit 1
-    test -z "${CCPATH_INT}" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" || break
-  done
 
+  #attempt to determine the SDK installation top-level path
   while : ; do
-    #if found - list possibilities (since there may be multiple installs)
-    CCPATH=$(zenity --list --title "Search Results" --text "Finding possible toolchain location(s)" --column "Directory" ${CCPATH_INT})
-    #earlier versions of zenity actually returned option twice seperated by pipe upon double-click selecting
+    zenity --info --ok-label="select" --text="${ASK_SDK_LOC}" 2>/dev/null
+    SELECTDIR=$(zenity --file-selection --directory --filename="/" 2>/dev/null)
+
+    #if set -e is commented out - we need to exit upon 'cancel'
+    test -z "${SELECTDIR}"  && fail_exit
+
+    echo "selected: ${SELECTDIR}"
+    (find ${SELECTDIR} -type d -name *[0-9][0-9][0-9][0-9].[0-9] -printf "${SELECTDIR%*/}/%P\\\n" 2>/dev/null | tee 1>&3 || echo "failed") | zenity --progress --auto-close --pulsate --auto-kill 2>/dev/null
+    PATHS_FOUND=$(cat <&4)
+
+    test -z "${PATHS_FOUND}" && zenity --warning --text="${TELL_SDK_LOC_FAIL}" 2>/dev/null && continue
+    #echo paths:${PATHS_FOUND}
+
+    #SDK installation directories have naming scheme YYYY.x e.g. 2019.2
+    SDKPATH_ALL=$(echo -e ${PATHS_FOUND} | grep "SDK/[0-9][0-9][0-9][0-9].[0-9]")
+    echo sdkpath all:${SDKPATH_ALL}
+
+    SDKPATH=$(zenity --list --title "Search Results" --text "${ASK_SDK_SELECT}" --column "version" ${SDKPATH_ALL} 2>/dev/null)
+    #earlier versions of zenity actually returned option twice separated by pipe upon double-click selecting
     #therefore clean in case this happens
-    CCPATH=${CCPATH%|*}
-    echo ${CCPATH}
-    #sanity check - expecting to find compiler mb-gcc in this directory
-    #test ! -e "${CCPATH}/mb-gcc" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" && exit 1
-    test ! -e "${CCPATH}/mb-gcc" && zenity --warning --text="Expected to find 'mb-gcc' but not found!" || break
-  done
-  zenity --info --text="Setting toolchain location to: ${CCPATH}" --no-wrap
+    SDKPATH=${SDKPATH%|*}
 
-  while : ; do
-    #next is the path where the libs to be linked into the microblaze source/elf build lives
-    zenity --info --ok-label="select" --text="Please point me to your microblaze software bsp library directory..."
-    LIBDIR_INT=$(zenity --file-selection --directory --filename="/")
-    #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
-    #selected a higher level parent directory.
-    #LIBDIR=$(find ${LIBDIR_INT} -name 'libxil.a' -printf "%h\n" 2>/dev/null)
-    (find ${LIBDIR_INT} -name 'libxil.a' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
-    LIBDIR=$(cat <&4)
-    #test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" && exit 1
-    test ! -e "${LIBDIR}/libxil.a" && zenity --warning --text="Expected to find 'libxil.a' but not found!" || break
-  done
-  echo ${LIBDIR}
-  zenity --info --text="Setting microblaze library path to: ${LIBDIR}" --no-wrap
+    #if set -e is commented out - we need to exit upon 'cancel'
+    test -z "${SDKPATH}"  && fail_exit
 
-  while : ; do
-    #next is the path where the microblaze bsp library headers live - usually in same parent directory as libs
-    zenity --info --ok-label="select" --text="Please point me to your microblaze software bsp library include headers..."
-    INCDIR_INT=$(zenity --file-selection --directory --filename="${LIBDIR}/../include")
-    #let's try to do a sanity check on this directory - we expect xparameters.h to be here since the user may have
-    #selected a higher level parent directory.
-    (find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit 2>/dev/null | tee 1>&3) | zenity --progress --auto-close --pulsate --auto-kill
-    INCDIR=$(cat <&4)
-    #test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" && exit 1
-    test ! -e "${INCDIR}/xparameters.h" && zenity --warning --text="Expected to find 'xparameters.h' but not found!" || break
+    echo "sdk path set:${SDKPATH}"
+
+    test ! -e "${SDKPATH}/bin/xsdk" && zenity --warning --text="${TELL_SDK_SELECT_FAIL} ... let's try again" 2>/dev/null || break
   done
-  echo ${INCDIR}
-  zenity --info --text="Setting microblaze library headers include path to: ${INCDIR}" --no-wrap
+
+  zenity --info --text="${TELL_SDK_SET} ${SDKPATH}" --no-wrap 2>/dev/null
   ;;
 
 *)
   echo "dialog or zenity not installed - running interactive text mode."
-  echo ">>>Please point me to your Xilinx install directory:"
-  read -e XILDIR
+  echo "${ASK_SDK_LOC}"
+  read -e -p"$>" SELECTDIR
   #force expansions - example '~'
-  eval XILDIR=${XILDIR}
+  eval SELECTDIR=${SELECTDIR}
   echo "Searching..."
-  CCPATH_INT=$(find ${XILDIR} -name 'mb-gcc' -printf "%h ")
-  test -z "${CCPATH_INT}" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
+
+  PATHS_FOUND=$(find ${SELECTDIR} -type d -name *[0-9][0-9][0-9][0-9].[0-9] -printf "${SELECTDIR%*/}/%P\\\n" 2>/dev/null)
+
+  #echo paths:${PATHS_FOUND}
+  test -z "${PATHS_FOUND}" && echo "${TELL_SDK_LOC_FAIL}" && fail_exit 
+
+  SDKPATH_ALL=$(echo -e ${PATHS_FOUND} | grep "SDK/[0-9][0-9][0-9][0-9].[0-9]")
+  echo sdkpath all:${SDKPATH_ALL}
 
   #it's possible to have multiple Xilinx installs...
-  echo -e "\nFound $(echo $CCPATH_INT | wc -w) option(s):"
+  echo -e "\nFound $(echo $SDKPATH_ALL | wc -w) option(s):"
   COUNT=0
-  for i in ${CCPATH_INT}; do
+  for i in ${SDKPATH_ALL}; do
     COUNT=$((COUNT+1))
     echo "${COUNT}> ${i}"
     #using bash array - probably will not port well to other shells
@@ -135,50 +182,70 @@ case "$OPTION" in
 
   NUMBER=0
   while (( ${NUMBER} == 0 || ${NUMBER} > ${#ARRAY[*]})); do
-    echo ">>>Please choose one of the above paths by selecting the corresponding number:"
-    read NUMBER
+    read -p "Please choose one of the above paths by selecting the corresponding number:" -e NUMBER
     #don't break script on "Enter" with no value
     test -z ${NUMBER} && NUMBER=0
   done
 
-  CCPATH=${ARRAY[${NUMBER}]}
-  #expecting to find compiler mb-gcc in this directory
-  test ! -e "${CCPATH}/mb-gcc" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
-  echo -e "\nSetting toolchain location to: ${CCPATH}\n"
-
-  #next is the path where the libs to be linked into the microblaze source/elf build lives
-  echo ">>>Please point me to your microblaze software bsp library directory:"
-  read -e LIBDIR_INT
-  eval LIBDIR_INT=${LIBDIR_INT}
-  #let's try to do a sanity check on this directory - we expect libxil.a to be here since the user may have
-  #selected a higher level parent directory.
-  LIBDIR=$(find "${LIBDIR_INT}" -name 'libxil.a' -printf "%h" -quit)
-  #force shell expansion - for example for "~"
-  eval LIBDIR=${LIBDIR}
-  test ! -e "${LIBDIR}/libxil.a" && echo "**Error** Expected to find 'mb-gcc' but not found!" && exit 1
-  echo -e "\nSetting microblaze library path to: ${LIBDIR}\n"
-
-  #next is the path where the microblaze bsp library headers live - usually in same parent directory as libs
-  echo ">>>Please point me to your microblaze software bsp library include headers:"
-  read -e INCDIR_INT
-  eval INCDIR_INT=${INCDIR_INT}
-  #let's try to do a sanity check on this directory - we expect xparameters.h to be here since the user may have
-  #selected a higher level parent directory.
-  INCDIR=$(find ${INCDIR_INT} -name 'xparameters.h' -printf "%h" -quit)
-  test ! -e "${INCDIR}/xparameters.h" && echo "**Error** Expected to find 'xparameters.h' but not found!" && exit 1
-  echo -e "\nSetting microblaze library headers include path to: ${INCDIR}\n"
+  SDKPATH=${ARRAY[${NUMBER}]}
+  echo -e "\n${TELL_SDK_SET} ${SDKPATH}\n"
   ;;
 esac
 
-#test the validity of the input data ie do paths exist?
-#test -d "$LIBDIR" || (echo "\"${LIBDIR}\" is not a valid directory or does not exist" && exit 1)
-#test -d "$INCDIR" || (echo "\"${INCDIR}\" is not a valid directory or does not exist" && exit 1)
-#test -d "$CCPATH" || (echo "\"${CCPATH}\" is not a valid directory or does not exist" && exit 1)
+#...assuming the xilinx directory structure is as expected
+CCPATH=${SDKPATH}/gnu/microblaze/lin/bin
+XSCTPATH=${SDKPATH}/bin
+
+#now test that all the required tools exist
+test ! -e ${CCPATH}/mb-gcc && echo "mb-gcc not found" && fail_exit
+test ! -e ${CCPATH}/mb-ar  && echo "mb-gcc not found" && fail_exit
+test ! -e ${XSCTPATH}/xsct && echo "xsct not found" && fail_exit
+
+
+#run the bsp framework scripts - lazy evaluation: the bsp should be regenerated
+#if it already exists since generation will fail. The '--force' option at beginning
+#of this script should have prompted for this.
+#${XSCTPATH}/xsct bsp/gen_bsp_framework.tcl || ${XSCTPATH}/xsct bsp/regen_bsp.tcl
+
+#if the bsp already exists - clean
+rm -rf bsp/hw_0/ bsp/skarab_microblaze_bsp/ bsp/SDK.log bsp/.metadata/
+
+${XSCTPATH}/xsct bsp/gen_bsp_framework.tcl
+
+#TODO: handle error case when bsp already exists - regenerate or perhaps create new directory?
+
+#initial dir check should ensure ${PWD} path is correct
+BSPPATH=${PWD}/bsp/skarab_microblaze_bsp
+
+#now run make
+(export PATH=${PATH}:${CCPATH}; make -C ${BSPPATH}) || fail_exit
+
+LIBDIR=${BSPPATH}/microblaze_0/lib
+INCDIR=${BSPPATH}/microblaze_0/include
+
+#at this point we should have everything set up...
+#just as a sanity check - test the following files and paths exist
+
+test ! -e ${LIBDIR}/libxil.a && echo "libxil.a not found" && fail_exit
+test ! -e ${INCDIR}/mb_interface.h && echo "mb_interface.h not found" && fail_exit
+
+MBSTRING=$(cat ${BSPPATH}/system.mss | grep '\-mcpu')
+#echo $MBSTRING
+MBSUFFIX=${MBSTRING#*"-mcpu="}
+#echo $MBSUFFIX
+MBINDEX=$(( ${#MBSTRING} - ${#MBSUFFIX} ))
+#echo ${MBINDEX}
+MBVERSION=${MBSTRING:$MBINDEX:5}
+#if above fails, set to v11.0
+MBVERSION=${MBVERSION:-v11.0}
+echo "microblaze version: ${MBVERSION}"
 
 #build the content to be written to file and first write to temp file descriptor
-echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"$LIBDIR/\"\n" >&3
-echo -e "#path to microblaze bsp library hearders:\nINCDIR=\"$INCDIR/\"\n" >&3
-echo -e "#path to cross-compiler installation directory\nCCPATH=\"$CCPATH/\"" >&3
+echo -e "#path to microblaze bsp libraries:\nLIBDIR=\"${LIBDIR}/\"\n" >&3
+echo -e "#path to microblaze bsp library headers:\nINCDIR=\"${INCDIR}/\"\n" >&3
+echo -e "#path to cross-compiler installation directory\nCCPATH=\"${CCPATH}/\"\n" >&3
+echo -e "#Microblaze cpu version\nMBVERSION=${MBVERSION}\n" >&3
+echo -e "#path to xsct directory\nXSCTPATH=\"${XSCTPATH}/\"" >&3
 
 #create Makefile.inc if it doesn't exist
 touch "./Makefile.inc"

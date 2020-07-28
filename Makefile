@@ -55,7 +55,10 @@ OBJ := $(SRC:.c=.o)
 
 #compiler flags:
 #microblaze cpu specific
-MBFLAGS := -mlittle-endian -mcpu=v9.4 -mxl-soft-mul -mno-xl-soft-div
+ifndef MBVERSION
+MBVERSION = v11.0
+endif
+MBFLAGS := -mlittle-endian -mcpu=$(MBVERSION) -mxl-soft-mul -mno-xl-soft-div
 #common flags
 CFLAGS += -Wall -Wl,--no-relax -Wuninitialized -Wpedantic
 #some extra flags to check switch statements (not automatically enabled by -Wall)
@@ -91,6 +94,9 @@ RED_COLOUR ="\033[0;31m"
 END_COLOUR = "\033[0m"
 
 all: check .build
+
+lib:
+	 export PATH=${PATH}:${CCPATH}; ${MAKE} -C bsp/skarab_microblaze_bsp
 
 check: .FORCE
 ifeq ("$(EXISTS)","NO")
