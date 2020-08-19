@@ -105,6 +105,8 @@ static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 static volatile u8 uFlagRunTask_LinkWatchdog = 0;
 #endif
 
+static volatile u8 uFlagRunTask_Aux = 0;
+
 static volatile u16 uTimeoutCounter = 255;
 static volatile u8 uTick_100ms = 0;
 
@@ -147,54 +149,62 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   //u8 uIndex;
   int i;
 
-  if (uTimeoutCounter != 0){
-    uTimeoutCounter--;
-  }
+	XTmrCtr *InstancePtr = (XTmrCtr *)CallBackRef;
 
-  uTick_100ms = 1;
-
-  /* every 5 mins */
-  if (uPrintStatsCounter >= 3000){
-    uFlagRunTask_Diagnostics = 1;
-    uPrintStatsCounter = 0;
-  } else {
-    uPrintStatsCounter++;
-  }
-
-  // LLDP every 15 seconds (timer every 100 ms)
-  if(uLLDPTimerCounter >= 150){
-    uLLDPTimerCounter = 0x0;
-    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-      uFlagRunTask_LLDP[i] = 1;
+	if (XTmrCtr_IsExpired(InstancePtr, DHCP_RETRY_TIMER_ID)) {
+    if (uTimeoutCounter != 0){
+      uTimeoutCounter--;
     }
-  } else{
-    uLLDPTimerCounter++;
-  }
 
-  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-    /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
-    uFlagRunTask_DHCP[i] = 1;
+    uTick_100ms = 1;
 
-    /* set the igmp task flag every 100ms which in turn runs igmp state machine */
-    uFlagRunTask_IGMP[i] = 1;
+    /* every 5 mins */
+    if (uPrintStatsCounter >= 3000){
+      uFlagRunTask_Diagnostics = 1;
+      uPrintStatsCounter = 0;
+    } else {
+      uPrintStatsCounter++;
+    }
 
-    // Every 100 ms, send another ARP request
-    uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
-  }
+    // LLDP every 15 seconds (timer every 100 ms)
+    if(uLLDPTimerCounter >= 150){
+      uLLDPTimerCounter = 0x0;
+      for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+        uFlagRunTask_LLDP[i] = 1;
+      }
+    } else{
+      uLLDPTimerCounter++;
+    }
+
+    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+      /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+      uFlagRunTask_DHCP[i] = 1;
+
+      /* set the igmp task flag every 100ms which in turn runs igmp state machine */
+      uFlagRunTask_IGMP[i] = 1;
+
+      // Every 100 ms, send another ARP request
+      uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
+    }
 
 #ifdef RECONFIG_UPON_NO_DHCP
-  uFlagRunTask_CheckDHCPBound = 1;
+    uFlagRunTask_CheckDHCPBound = 1;
 #endif
 
 #ifdef LINK_MON_RX_40GBE
-  uFlagRunTask_LinkWatchdog = 1;
+    uFlagRunTask_LinkWatchdog = 1;
 #endif
 
-  uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
+    uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
 
-  uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
+    uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
-  uFlagRunTask_WriteLEDStatus = 1;
+    uFlagRunTask_WriteLEDStatus = 1;
+  }
+
+	if (XTmrCtr_IsExpired(InstancePtr, AUX_RETRY_TIMER_ID)) {
+    uFlagRunTask_Aux = 1;
+  }
 }
 
 
@@ -490,10 +500,12 @@ void InitialiseInterruptControllerAndTimer(XTmrCtr * pTimer, XIntc * pInterruptC
   XTmrCtr_SetResetValue(pTimer, DHCP_RETRY_TIMER_ID, DHCP_TIMER_RESET_VALUE);
   XTmrCtr_Start(pTimer, DHCP_RETRY_TIMER_ID);
 
-#if 0
-  uIGMPTimerCounter = 0;
-  uIGMPTimerCounter = 0;
-#endif
+  XTmrCtr_SetOptions(pTimer, AUX_RETRY_TIMER_ID, uDHCPTimerOptions);          /* same options as dhcp timer above */
+  XTmrCtr_SetResetValue(pTimer, AUX_RETRY_TIMER_ID, AUX_TIMER_RESET_VALUE);
+
+  /* uncomment to start the second timer and enable the associated interrupt and task */
+  /* XTmrCtr_Start(pTimer, AUX_RETRY_TIMER_ID); */
+
 }
 
 
@@ -1803,6 +1815,13 @@ int main()
         incr_microblaze_uptime_seconds();
       }
     }
+
+
+    if(uFlagRunTask_Aux){
+      uFlagRunTask_Aux = 0;
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, ">>>>>>>>>>>aux timer<<<<<<<<<<<<<<<\r\n");
+    }
+
 
     if (uDoReboot == REBOOT_REQUESTED)
     {
