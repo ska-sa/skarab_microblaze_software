@@ -93,6 +93,7 @@ static volatile u8 uFlagRunTask_IGMP[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_LLDP[NUM_ETHERNET_INTERFACES] = {0};
 #ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
+static volatile u8 uFlagRunTask_LinkRecovery = 0;
 #endif
 static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
@@ -189,6 +190,7 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 
 #ifdef RECONFIG_UPON_NO_DHCP
     uFlagRunTask_CheckDHCPBound = 1;
+    uFlagRunTask_LinkRecovery = 1;
 #endif
 
 #ifdef LINK_MON_RX_40GBE
@@ -613,7 +615,6 @@ int main()
   u8 dhcp_set = 0;
 
   u16 uHMCTimeout;
-  u8 uValidPacketRx = FALSE;
 
   u8 post_scale = 0;
 
@@ -1334,7 +1335,7 @@ int main()
                 /* else no break statement - fall through */
 
               case PACKET_FILTER_ARP:
-                uValidPacketRx = TRUE;
+                if_valid_rx_set(uPhysicalEthernetId);
                 uValidate = 1;
                 break;
 
@@ -1343,7 +1344,7 @@ int main()
               case PACKET_FILTER_TCP_UNHANDLED:
               case PACKET_FILTER_LLDP_UNHANDLED:
                 /* disable the dhcp unbound monitor loop upon receipt of any valid known packet */
-                uValidPacketRx = TRUE;
+                if_valid_rx_set(uPhysicalEthernetId);
 
               case PACKET_FILTER_UNKNOWN:
               case PACKET_FILTER_UNKNOWN_ETH:
@@ -1692,7 +1693,9 @@ int main()
      */
 
 #ifdef RECONFIG_UPON_NO_DHCP
-    if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
+#if 0
+    //if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
+    if((uFlagRunTask_CheckDHCPBound)){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
       //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
@@ -1757,6 +1760,25 @@ int main()
 
       }
     }
+#endif
+
+
+
+
+    /* link monitor and recovery task */
+    if (uFlagRunTask_LinkRecovery){
+      uFlagRunTask_LinkRecovery = 0;
+
+      for (logical_link = 0; logical_link < num_links; logical_link++){
+        uPhysicalEthernetId = get_physical_interface_id(logical_link);
+
+        if_link_recovery_task(uPhysicalEthernetId, uDHCPTimeoutMax);
+      }
+
+    }
+
+
+
 #endif
 
     //----------------------------------------------------------------------------//

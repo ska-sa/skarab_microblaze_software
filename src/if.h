@@ -32,6 +32,7 @@ struct sIFObject{
 
   u8 uIFLinkStatus;
   u8 uIFLinkRxActive;
+  u8 uIFValidPacketRx;      /* set when valid network packet received */
 
 #define IF_MAC_ARR_LEN  6
   u8 arrIFAddrMac[IF_MAC_ARR_LEN];
@@ -127,6 +128,11 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
 u8 if_enumerate_interfaces(void);   /* returns number of interfaces */
 u8 get_num_interfaces(void);
 u8 get_physical_interface_id(u8 logical_link_id);
+
+void if_valid_rx_set(u8 physical_interface_id);
+int if_valid_rx_get(u8 physical_interface_id);
+
+void if_link_recovery_task(u8 phy_if_id, u32 timeout);
 
 void print_interface_map(void);
 
