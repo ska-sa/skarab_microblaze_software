@@ -121,9 +121,11 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   mezz_mask = 1 << mezz_site;           /* shift to relevant mezz position */
   one_wire_port = mezz_site + 1;
 
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MEZZ [%02x] Hardware status: ", mezz_site);
+
   reg = ReadBoardRegister(C_RD_MEZZANINE_STAT_0_ADDR);
   if (0 == (reg & mezz_mask)){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MEZZ [%02x] NONE\r\n", mezz_site);
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "NONE\r\n");
     return MEZ_BOARD_TYPE_OPEN;
   }
 
@@ -132,8 +134,6 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   mezz_ctl_shadow_reg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
   mezz_ctl_shadow_reg = mezz_ctl_shadow_reg | mezz_mask;
   WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, mezz_ctl_shadow_reg);
-
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MEZZ [%02x] ", mezz_site);
 
   /* get the ID from one-wire EEPROM */
   ret = OneWireReadRom(device_rom, one_wire_port);
@@ -175,43 +175,42 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
  * bit signatures to detect firmware support/presence of the various mezzanine
  * cards
  */
-#define BYTE_MASK_NONE_PRESENT  1  /* bxxxx0001 */
-#define BYTE_MASK_QSFP_PRESENT  3  /* bxxxx0011 */
-#define BYTE_MASK_HMC_PRESENT   5  /* bxxxx0101 */
-#define BYTE_MASK_ADC_PRESENT   7  /* bxxxx0111 */
+#define BYTE_MASK_FIRMW_ID_NONE  0  /* b000 */
+#define BYTE_MASK_FIRMW_ID_QSFP  1  /* b001 */
+#define BYTE_MASK_FIRMW_ID_HMC   2  /* b010 */
+#define BYTE_MASK_FIRMW_ID_ADC   3  /* b011 */
 
 /* static */ MezzFirmwType get_mezz_firmware_type(u8 mezz_site){
   u32 reg;
   u32 masked_byte;
-  u32 mask;
   MezzFirmwType firmw_type;
 
   SANE_MEZZ_SITE(mezz_site);
 
   reg = ReadBoardRegister(C_RD_MEZZANINE_STAT_1_ADDR);
-  mask = 0x0f << (mezz_site * 8);
-  masked_byte = reg & mask;
-  masked_byte = masked_byte >> (mezz_site * 8);
+
+  masked_byte = (reg >> (mezz_site * 8)) & 0x0f;      /* get the relevant nibble */
+  masked_byte = masked_byte >> 1;                     /* shift one more place to get ID bits */
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Firmware status: (%d) ", mezz_site, masked_byte);
 
   switch (masked_byte){
-    case BYTE_MASK_NONE_PRESENT:
+    case BYTE_MASK_FIRMW_ID_NONE:
       firmw_type = MEZ_FIRMW_TYPE_OPEN;
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "OPEN\r\n");
       break;
 
-    case BYTE_MASK_QSFP_PRESENT:
+    case BYTE_MASK_FIRMW_ID_QSFP:
       firmw_type = MEZ_FIRMW_TYPE_QSFP;
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP\r\n");
       break;
 
-    case BYTE_MASK_HMC_PRESENT:
+    case BYTE_MASK_FIRMW_ID_HMC:
       firmw_type = MEZ_FIRMW_TYPE_HMC_R1000_0005;
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC\r\n");
       break;
 
-    case BYTE_MASK_ADC_PRESENT:
+    case BYTE_MASK_FIRMW_ID_ADC:
       firmw_type = MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2;
       log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ADC\r\n");
       break;

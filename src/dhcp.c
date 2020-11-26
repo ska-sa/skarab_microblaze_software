@@ -182,6 +182,8 @@ u8 uDHCPInit(struct sIFObject *pIFObjectPtr){
   pDHCPObjectPtr->uDHCPTimeout = 0;
   pDHCPObjectPtr->uDHCPTimeoutStatus = 0;
 
+  pDHCPObjectPtr->uDHCPInitUnboundTimer = 0;
+
   pDHCPObjectPtr->uDHCPInternalTimer = 0;
   pDHCPObjectPtr->uDHCPCurrentClkTick = 0;
   pDHCPObjectPtr->uDHCPCachedClkTick = 0;
@@ -626,6 +628,7 @@ u8 uDHCPSetRequestCachedIP(struct sIFObject *pIFObjectPtr, u32 uCachedIP){
 //  DHCP_RETURN_TRUE or DHCP_RETURN_FALSE
 //=================================================================================
 u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr){
+  SANE_DHCP(pIFObjectPtr);
 
   typeDHCPState state = pIFObjectPtr->DHCPContextState.tDHCPCurrentState;
 
@@ -647,12 +650,36 @@ u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr){
 }
 
 
+//=================================================================================
+//  uDHCPGetUnboundTime
+//---------------------------------------------------------------------------------
+//  This function returns the amount of time the dhcp s/m has been unbound.
+//
+//  Parameter       Dir   Description
+//  ---------       ---   -----------
+//  pIFObjectPtr    IN    handle to IF state object
+//
+//  Return
+//  ------
+//  unbound time in dhcp state machine ticks (1 tick = POLL_INTERVAL in milliseconds)
+//=================================================================================
+u32 uDHCPGetInitUnboundTime(struct sIFObject *pIFObjectPtr){
+  struct sDHCPObject *pDHCPObjectPtr;
+
+  SANE_DHCP(pIFObjectPtr);
+
+  pDHCPObjectPtr = &(pIFObjectPtr->DHCPContextState);
+
+  return pDHCPObjectPtr->uDHCPInitUnboundTimer;
+}
+
+
 #if 0
 //=================================================================================
 //  uDHCPGetTimeoutStatus
 //---------------------------------------------------------------------------------
-//  
-//  
+//
+//
 //
 //  Parameter       Dir   Description
 //  ---------       ---   -----------
@@ -660,7 +687,7 @@ u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr){
 //
 //  Return
 //  ------
-//  
+//
 //=================================================================================
 u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
   /* check if the object exists */
@@ -668,7 +695,7 @@ u8 uDHCPGetTimeoutStatus(struct sDHCPObject *pDHCPObjectPtr){
     return 0;
   }
 
-  return pDHCPObjectPtr->uDHCPTimeoutStatus; 
+  return pDHCPObjectPtr->uDHCPTimeoutStatus;
 }
 #endif
 
@@ -808,6 +835,15 @@ u8 uDHCPStateMachine(struct sIFObject *pIFObjectPtr){
 
   /* do the work */
   pDHCPObjectPtr->tDHCPCurrentState = dhcp_state_table[pDHCPObjectPtr->tDHCPCurrentState](pIFObjectPtr);
+
+  /* timer to keep track of how long the dhcp s/m has been unbound */
+  if (pDHCPObjectPtr->tDHCPCurrentState < BOUND){
+    /* this timer increments at the rate at which the dhcp-sm is called - ie POLL_INTERVAL */
+    /* don't allow this timer to overflow - upper bount is u32_max */
+    if (pDHCPObjectPtr->uDHCPInitUnboundTimer < UINT32_MAX){
+      pDHCPObjectPtr->uDHCPInitUnboundTimer++;
+    }
+  }
 
   return DHCP_RETURN_OK;
 }
@@ -1164,6 +1200,7 @@ static typeDHCPState bound_dhcp_state(struct sIFObject *pIFObjectPtr){
       pDHCPObjectPtr->uDHCPTimeout = 0;   /* reset timeout counter  */
       pDHCPObjectPtr->uDHCPRandomWait = 0;
       pDHCPObjectPtr->uDHCPRetries = 0;
+      pDHCPObjectPtr->uDHCPInitUnboundTimer = 0;
       return RANDOMIZE;
     }
   }
@@ -1209,7 +1246,7 @@ static typeDHCPState renew_dhcp_state(struct sIFObject *pIFObjectPtr){
       return BOUND;
     } else {
       pDHCPObjectPtr->uDHCPErrors++;
-    } 
+    }
   }
 
   if ((pDHCPObjectPtr->uDHCPInternalTimer * POLL_INTERVAL) >= (pDHCPObjectPtr->uDHCPT2 * 1000)){
@@ -1277,6 +1314,7 @@ static typeDHCPState rebind_dhcp_state(struct sIFObject *pIFObjectPtr){
       pDHCPObjectPtr->uDHCPInternalTimer = 0;
       pDHCPObjectPtr->uDHCPRandomWait = 0;
       pDHCPObjectPtr->uDHCPRetries = 0;
+      pDHCPObjectPtr->uDHCPInitUnboundTimer = 0;
     }
     return RANDOMIZE;
   }

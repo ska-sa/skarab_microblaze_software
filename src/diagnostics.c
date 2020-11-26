@@ -225,8 +225,9 @@ void print_interface_internals(u8 physical_interface_id){
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFEthernetSubnet x%08x\r\n", ifptr->uIFEthernetSubnet);
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFEnableArpRequests u%u\r\n", ifptr->uIFEnableArpRequests);
   log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFCurrentArpRequest u%u\r\n", ifptr->uIFCurrentArpRequest);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uIFValidPacketRx u%u\r\n", ifptr->uIFValidPacketRx);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n", ifptr->uIFCurrentArpRequest);
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
 }
 
 
@@ -253,50 +254,51 @@ void print_dhcp_internals(u8 physical_interface_id){
   ifptr = lookup_if_handle_by_id(physical_interface_id);
   dhcpptr = &(ifptr->DHCPContextState);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "physical interface id u%u\r\n", physical_interface_id);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMagic x%08x\r\n", dhcpptr->uDHCPMagic);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "physical interface id u%u\r\n", physical_interface_id);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPMagic x%08x\r\n", dhcpptr->uDHCPMagic);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPMessageReady u%u\r\n", dhcpptr->uDHCPMessageReady);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTx u%u\r\n", dhcpptr->uDHCPTx);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRx u%u\r\n", dhcpptr->uDHCPRx);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPErrors u%u\r\n", dhcpptr->uDHCPErrors);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPInvalid u%u\r\n", dhcpptr->uDHCPInvalid);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRetries u%u\r\n", dhcpptr->uDHCPRetries);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTimeoutStatus u%u\r\n", dhcpptr->uDHCPTimeoutStatus);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRebootReqs u%u\r\n", dhcpptr->uDHCPRebootReqs);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPTimeout u%u\r\n", dhcpptr->uDHCPTimeout);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "tDHCPCurrentState %s\r\n", dhcp_state_string_lookup[dhcpptr->tDHCPCurrentState] );
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPInternalTimer u%u\r\n", dhcpptr->uDHCPInternalTimer);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPCurrentClkTick u%u\r\n", dhcpptr->uDHCPCurrentClkTick);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPCachedClkTick u%u\r\n", dhcpptr->uDHCPCachedClkTick);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPExternalTimerTick u%u\r\n", dhcpptr->uDHCPExternalTimerTick);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRandomWait u%u\r\n", dhcpptr->uDHCPRandomWait);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRandomWaitCached u%u\r\n", dhcpptr->uDHCPRandomWaitCached);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPSMRetryInterval u%u\r\n", dhcpptr->uDHCPSMRetryInterval);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPSMInitWait u%u\r\n", dhcpptr->uDHCPSMInitWait);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPT1 u%u\r\n", dhcpptr->uDHCPT1);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPT2 u%u\r\n", dhcpptr->uDHCPT2);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPLeaseTime u%u\r\n", dhcpptr->uDHCPLeaseTime);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPMessageReady u%u\r\n", dhcpptr->uDHCPMessageReady);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPTx u%u\r\n", dhcpptr->uDHCPTx);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRx u%u\r\n", dhcpptr->uDHCPRx);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPErrors u%u\r\n", dhcpptr->uDHCPErrors);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPInvalid u%u\r\n", dhcpptr->uDHCPInvalid);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRetries u%u\r\n", dhcpptr->uDHCPRetries);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPTimeoutStatus u%u\r\n", dhcpptr->uDHCPTimeoutStatus);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRebootReqs u%u\r\n", dhcpptr->uDHCPRebootReqs);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPTimeout u%u\r\n", dhcpptr->uDHCPTimeout);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "tDHCPCurrentState %s\r\n", dhcp_state_string_lookup[dhcpptr->tDHCPCurrentState] );
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPInternalTimer u%u\r\n", dhcpptr->uDHCPInternalTimer);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPCurrentClkTick u%u\r\n", dhcpptr->uDHCPCurrentClkTick);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPCachedClkTick u%u\r\n", dhcpptr->uDHCPCachedClkTick);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPExternalTimerTick u%u\r\n", dhcpptr->uDHCPExternalTimerTick);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRandomWait u%u\r\n", dhcpptr->uDHCPRandomWait);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRandomWaitCached u%u\r\n", dhcpptr->uDHCPRandomWaitCached);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPSMRetryInterval u%u\r\n", dhcpptr->uDHCPSMRetryInterval);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPSMInitWait u%u\r\n", dhcpptr->uDHCPSMInitWait);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPT1 u%u\r\n", dhcpptr->uDHCPT1);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPT2 u%u\r\n", dhcpptr->uDHCPT2);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPLeaseTime u%u\r\n", dhcpptr->uDHCPLeaseTime);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPNextHopMacCached[%d]", DHCP_MAC_ARR_LEN);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "arrDHCPNextHopMacCached[%d]", DHCP_MAC_ARR_LEN);
   for (i = 0; i < DHCP_MAC_ARR_LEN; i++){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPNextHopMacCached[i])
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPNextHopMacCached[i])
   }
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "\r\n");
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPAddrServerCached[%d]", DHCP_IPADDR_ARR_LEN);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "arrDHCPAddrServerCached[%d]", DHCP_IPADDR_ARR_LEN);
   for (i = 0; i < DHCP_IPADDR_ARR_LEN; i++){
-    log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPAddrServerCached[i])
+    log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, " %02x", dhcpptr->arrDHCPAddrServerCached[i])
   }
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "\r\n");
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPXidCached x%08x\r\n", dhcpptr->uDHCPXidCached);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPXidCached x%08x\r\n", dhcpptr->uDHCPXidCached);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "arrDHCPHostName %s\r\n", dhcpptr->arrDHCPHostName);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "arrDHCPHostName %s\r\n", dhcpptr->arrDHCPHostName);
 
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "uDHCPRegisterFlags x%02x\r\n", dhcpptr->uDHCPRegisterFlags);
-  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "\r\n");
-
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPRegisterFlags x%02x\r\n", dhcpptr->uDHCPRegisterFlags);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "uDHCPInitUnboundTimer u%u\r\n", dhcpptr->uDHCPInitUnboundTimer);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "poll interval %u ms\r\n", POLL_INTERVAL);
+  log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "\r\n");
 }
 
 #endif

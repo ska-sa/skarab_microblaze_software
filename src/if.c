@@ -20,6 +20,9 @@
 #include "constant_defs.h"
 #include "igmp.h"
 #include "eth_mac.h"
+#include "scratchpad.h"
+#include "flash_sdram_controller.h"
+#include "dhcp.h"
 
 /*********** Sanity Checks ***************/
 #ifdef DO_SANITY_CHECKS
@@ -115,6 +118,7 @@ struct sIFObject *InterfaceInit(u8 uEthernetId, u8 *pRxBufferPtr, u16 uRxBufferS
   pIFObjectPtr->uIFEthernetId = uEthernetId;
   pIFObjectPtr->uIFLinkStatus = LINK_DOWN;
   pIFObjectPtr->uIFLinkRxActive = 0;
+  pIFObjectPtr->uIFValidPacketRx = 0;
 
   pIFObjectPtr->uMsgSize = 0;
   pIFObjectPtr->uNumWordsRead = 0;
@@ -242,6 +246,10 @@ void UpdateEthernetLinkUpStatus(struct sIFObject *pIFObjectPtr){
     // Check if the link was previously up
     if (pIFObjectPtr->uIFLinkStatus == LINK_UP){
       log_printf(LOG_SELECT_IFACE, LOG_LEVEL_INFO, "I/F  [%02x] LINK %x HAS GONE DOWN!\r\n", uId, uId);
+      pIFObjectPtr->uIFValidPacketRx = 0;   /* reset the valid pck flag here - a link flap has also been shown to lead
+                                               to rx-link bringup issues (when the image has the issue). Thus this flag
+                                               must be cleared in order for the link mon task to catch any rx issues.
+                                               see function **if_link_recovery_task()** */
 
       if (uId == 0){  /* 1gbe i/f */
         /* do not set in loopback mode */
@@ -777,6 +785,110 @@ u8 if_enumerate_interfaces(void){
   runtime_num_interfaces = n;
 
   return n;
+}
+
+
+void if_valid_rx_set(u8 physical_interface_id){
+  struct sIFObject *pIFObjectPtr;
+
+  if (IF_ID_PRESENT != _check_interface_valid(physical_interface_id)){
+    return;
+  }
+
+  pIFObjectPtr = lookup_if_handle_by_id(physical_interface_id);
+
+  pIFObjectPtr->uIFValidPacketRx = 1;
+}
+
+
+int if_valid_rx_get(u8 physical_interface_id){
+  struct sIFObject *pIFObjectPtr;
+
+  if (IF_ID_PRESENT != _check_interface_valid(physical_interface_id)){
+    return FALSE;
+  }
+
+  pIFObjectPtr = lookup_if_handle_by_id(physical_interface_id);
+
+  if (0 == pIFObjectPtr->uIFValidPacketRx){
+    return FALSE;
+  } else {
+    return TRUE;
+  }
+}
+
+
+void if_link_recovery_task(u8 phy_if_id, u32 timeout){
+  struct sIFObject *pIFObjectPtr;
+  u32 ut = 0;
+  u8 uDHCPReconfigCount = 25;   /* 25 feels like a sane value */
+  u8 PMemState = PMEM_RETURN_ERROR;
+  tPMemReturn ret;
+  static int first = 1;
+
+  if (IF_ID_PRESENT != _check_interface_valid(phy_if_id)){
+    return;
+  }
+
+  pIFObjectPtr = lookup_if_handle_by_id(phy_if_id);
+
+  /* only continue if link is up */
+  if (pIFObjectPtr->uIFLinkStatus != LINK_UP){
+    return;
+  }
+
+  /* if no valid packet has been parsed before, continue. This valid pkt check is done since
+     the 1st 40gbe core (on site) is pre-set with the lease cached in persitent memory even before dhcp has been
+     resolved. This was to speed up system bringup due to dhcp issues. This then allows comms with the skarab and
+     parameters can thus be set before dhcp completes. If the link is up but dhcp times out for some reason (e.g. dhcp
+     server bottleneck), this flag prevents the link monitor timeout rebooting the board and thus leading to potential
+     inconsistent state between skarab and control software. The link monitor must therefore only kick in if no valid
+     packet has been received. This is the only way currently to determine rx link failures.
+   */
+
+  if (0 != pIFObjectPtr->uIFValidPacketRx){
+    /* only print once upon first occurence */
+    if (first){
+      first = 0;
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_WARN, "LINK [%02d] valid packet detected - link recovery stopped on this i/f\r\n", phy_if_id);
+    }
+    return;
+  }
+  /* we should never pass this point if we have obtained a dhcp lease before.
+   * If the dhcp server should go down and we do not rebind, the above condition
+   * should prevent the fpga from reconfiguring since this valid packet flag
+   * would have been set by prev netw traffic and this flag never gets cleared.
+   */
+
+  /* check if the dhcp has timed out */
+  ut = uDHCPGetInitUnboundTime(pIFObjectPtr);
+  if (ut < timeout){
+    return;
+  }
+
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_WARN, "LINK [%02d] timed out on this i/f\r\n", phy_if_id);
+
+  PMemState = PersistentMemory_Check();
+
+  /* Keep track of the number of DHCP caused reboots. This is also used to increment the timeout gradually - see main.c */
+  if (PMemState != PMEM_RETURN_ERROR){
+    ret = PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
+    if (PMEM_RETURN_OK == ret){
+      uDHCPReconfigCount = uDHCPReconfigCount + 1;
+      ret = PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
+      if (PMEM_RETURN_OK == ret){
+        log_printf(LOG_SELECT_IFACE, LOG_LEVEL_WARN, "LINK [%02d] increment reset count to %d\r\n", phy_if_id, uDHCPReconfigCount);
+      }
+    }
+    /* print error message if pmem read or write fails */
+    if (ret != PMEM_RETURN_OK){
+      log_printf(LOG_SELECT_IFACE, LOG_LEVEL_ERROR, "LINK [%02d] failed to store reset count in pmem\r\n", phy_if_id);
+    }
+  }
+
+  /* reconfigure the fpga from its last boot location - either sdram or flash */
+  log_printf(LOG_SELECT_IFACE, LOG_LEVEL_WARN, "LINK [%02d] rebooting from previous location\r\n", phy_if_id);
+  sudo_reboot_now_from_last_location();
 }
 
 

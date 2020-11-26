@@ -327,9 +327,11 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 
 // TIMER DEFINES
 #define DHCP_RETRY_TIMER_ID   0x0
+#define AUX_RETRY_TIMER_ID    0x1
 
 #ifdef REDUCED_CLK_ARCH
 #define DHCP_TIMER_RESET_VALUE     3906250 // (39.0625x10^6 x 0.1) 0.1 second
+#define AUX_TIMER_RESET_VALUE      39062500 // 1 second
 #else
 #define DHCP_TIMER_RESET_VALUE  15625000 // (156.25x10^6 x 0.1) 0.1 second
 #endif

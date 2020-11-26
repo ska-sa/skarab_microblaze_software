@@ -258,6 +258,8 @@ struct sDHCPObject{
   u32 uDHCPRandomWait;
   u32 uDHCPRandomWaitCached;
 
+  u32 uDHCPInitUnboundTimer;      /* timer to keep track of total time that the dhcp has been unresolved at startup */
+
   u32 uDHCPSMRetryInterval;   /* time between dhcp retries */
   u32 uDHCPSMInitWait;        /* time to wait before sending out first dhcp discover packet */
 
@@ -337,6 +339,8 @@ u8 vDHCPSetHostName(struct sIFObject *pIFObjectPtr, const char *stringHostName);
 
 /* get the dhcp lease-binding status */
 u8 uDHCPGetBoundStatus(struct sIFObject *pIFObjectPtr);
+
+u32 uDHCPGetInitUnboundTime(struct sIFObject *pIFObjectPtr);
 
 /* event-driven callbacks */
 

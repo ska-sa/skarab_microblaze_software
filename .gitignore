@@ -5,3 +5,8 @@ elf/
 Makefile.inc
 tags
 utils/adler32/adler32
+
+bsp/.metadata/
+bsp/SDK.log
+bsp/hw_0/
+bsp/skarab_microblaze_bsp/

@@ -93,6 +93,7 @@ static volatile u8 uFlagRunTask_IGMP[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_LLDP[NUM_ETHERNET_INTERFACES] = {0};
 #ifdef RECONFIG_UPON_NO_DHCP
 static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
+static volatile u8 uFlagRunTask_LinkRecovery = 0;
 #endif
 static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_ARP_Process[NUM_ETHERNET_INTERFACES] = {0};
@@ -104,6 +105,8 @@ static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 #ifdef LINK_MON_RX_40GBE
 static volatile u8 uFlagRunTask_LinkWatchdog = 0;
 #endif
+
+static volatile u8 uFlagRunTask_Aux = 0;
 
 static volatile u16 uTimeoutCounter = 255;
 static volatile u8 uTick_100ms = 0;
@@ -147,54 +150,63 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
   //u8 uIndex;
   int i;
 
-  if (uTimeoutCounter != 0){
-    uTimeoutCounter--;
-  }
+	XTmrCtr *InstancePtr = (XTmrCtr *)CallBackRef;
 
-  uTick_100ms = 1;
-
-  /* every 5 mins */
-  if (uPrintStatsCounter >= 3000){
-    uFlagRunTask_Diagnostics = 1;
-    uPrintStatsCounter = 0;
-  } else {
-    uPrintStatsCounter++;
-  }
-
-  // LLDP every 15 seconds (timer every 100 ms)
-  if(uLLDPTimerCounter >= 150){
-    uLLDPTimerCounter = 0x0;
-    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-      uFlagRunTask_LLDP[i] = 1;
+	if (XTmrCtr_IsExpired(InstancePtr, DHCP_RETRY_TIMER_ID)) {
+    if (uTimeoutCounter != 0){
+      uTimeoutCounter--;
     }
-  } else{
-    uLLDPTimerCounter++;
-  }
 
-  for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
-    /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
-    uFlagRunTask_DHCP[i] = 1;
+    uTick_100ms = 1;
 
-    /* set the igmp task flag every 100ms which in turn runs igmp state machine */
-    uFlagRunTask_IGMP[i] = 1;
+    /* every 5 mins */
+    if (uPrintStatsCounter >= 3000){
+      uFlagRunTask_Diagnostics = 1;
+      uPrintStatsCounter = 0;
+    } else {
+      uPrintStatsCounter++;
+    }
 
-    // Every 100 ms, send another ARP request
-    uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
-  }
+    // LLDP every 15 seconds (timer every 100 ms)
+    if(uLLDPTimerCounter >= 150){
+      uLLDPTimerCounter = 0x0;
+      for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+        uFlagRunTask_LLDP[i] = 1;
+      }
+    } else{
+      uLLDPTimerCounter++;
+    }
+
+    for (i = 0; i < NUM_ETHERNET_INTERFACES; i++){
+      /* set the dhcp task flag every 100ms which in turn runs dhcp state machine */
+      uFlagRunTask_DHCP[i] = 1;
+
+      /* set the igmp task flag every 100ms which in turn runs igmp state machine */
+      uFlagRunTask_IGMP[i] = 1;
+
+      // Every 100 ms, send another ARP request
+      uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
+    }
 
 #ifdef RECONFIG_UPON_NO_DHCP
-  uFlagRunTask_CheckDHCPBound = 1;
+    uFlagRunTask_CheckDHCPBound = 1;
+    uFlagRunTask_LinkRecovery = 1;
 #endif
 
 #ifdef LINK_MON_RX_40GBE
-  uFlagRunTask_LinkWatchdog = 1;
+    uFlagRunTask_LinkWatchdog = 1;
 #endif
 
-  uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
+    uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
 
-  uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
+    uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
-  uFlagRunTask_WriteLEDStatus = 1;
+    uFlagRunTask_WriteLEDStatus = 1;
+  }
+
+	if (XTmrCtr_IsExpired(InstancePtr, AUX_RETRY_TIMER_ID)) {
+    uFlagRunTask_Aux = 1;
+  }
 }
 
 
@@ -490,10 +502,12 @@ void InitialiseInterruptControllerAndTimer(XTmrCtr * pTimer, XIntc * pInterruptC
   XTmrCtr_SetResetValue(pTimer, DHCP_RETRY_TIMER_ID, DHCP_TIMER_RESET_VALUE);
   XTmrCtr_Start(pTimer, DHCP_RETRY_TIMER_ID);
 
-#if 0
-  uIGMPTimerCounter = 0;
-  uIGMPTimerCounter = 0;
-#endif
+  XTmrCtr_SetOptions(pTimer, AUX_RETRY_TIMER_ID, uDHCPTimerOptions);          /* same options as dhcp timer above */
+  XTmrCtr_SetResetValue(pTimer, AUX_RETRY_TIMER_ID, AUX_TIMER_RESET_VALUE);
+
+  /* uncomment to start the second timer and enable the associated interrupt and task */
+  /* XTmrCtr_Start(pTimer, AUX_RETRY_TIMER_ID); */
+
 }
 
 
@@ -601,7 +615,6 @@ int main()
   u8 dhcp_set = 0;
 
   u16 uHMCTimeout;
-  u8 uValidPacketRx = FALSE;
 
   u8 post_scale = 0;
 
@@ -1322,7 +1335,7 @@ int main()
                 /* else no break statement - fall through */
 
               case PACKET_FILTER_ARP:
-                uValidPacketRx = TRUE;
+                if_valid_rx_set(uPhysicalEthernetId);
                 uValidate = 1;
                 break;
 
@@ -1331,7 +1344,7 @@ int main()
               case PACKET_FILTER_TCP_UNHANDLED:
               case PACKET_FILTER_LLDP_UNHANDLED:
                 /* disable the dhcp unbound monitor loop upon receipt of any valid known packet */
-                uValidPacketRx = TRUE;
+                if_valid_rx_set(uPhysicalEthernetId);
 
               case PACKET_FILTER_UNKNOWN:
               case PACKET_FILTER_UNKNOWN_ETH:
@@ -1680,7 +1693,9 @@ int main()
      */
 
 #ifdef RECONFIG_UPON_NO_DHCP
-    if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
+#if 0
+    //if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
+    if((uFlagRunTask_CheckDHCPBound)){
       uFlagRunTask_CheckDHCPBound = 0;
       uDHCPBoundTimeout = 0;
       //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
@@ -1747,6 +1762,25 @@ int main()
     }
 #endif
 
+
+
+
+    /* link monitor and recovery task */
+    if (uFlagRunTask_LinkRecovery){
+      uFlagRunTask_LinkRecovery = 0;
+
+      for (logical_link = 0; logical_link < num_links; logical_link++){
+        uPhysicalEthernetId = get_physical_interface_id(logical_link);
+
+        if_link_recovery_task(uPhysicalEthernetId, uDHCPTimeoutMax);
+      }
+
+    }
+
+
+
+#endif
+
     //----------------------------------------------------------------------------//
     //  DUMP INTERFACE COUNTERS AND OTHER USEFUL DEBUG INFO TO TERMINAL           //
     //  Triggered on ICMP ping and timer                                          //
@@ -1803,6 +1837,13 @@ int main()
         incr_microblaze_uptime_seconds();
       }
     }
+
+
+    if(uFlagRunTask_Aux){
+      uFlagRunTask_Aux = 0;
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ALWAYS, ">>>>>>>>>>>aux timer<<<<<<<<<<<<<<<\r\n");
+    }
+
 
     if (uDoReboot == REBOOT_REQUESTED)
     {
