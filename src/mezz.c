@@ -155,10 +155,10 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+ PHY MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_QSFP_PHY;
-
-  } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&(read_bytes[0x6] == 0xE5)){
+    
+ } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&((read_bytes[0x6] == 0xE5)||(read_bytes[0x6] == 0xE6)||(read_bytes[0x6] == 0xE7))){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ADC32RF45X2 MEZZANINE\r\n");
-    return MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;
+    return MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;    
 
   } else if ((read_bytes[0x0] == 0x53)&&(read_bytes[0x4] == 0xFF)&&(read_bytes[0x5] == 0x00)&&(read_bytes[0x6] == 0x01)){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC R1000-0005 MEZZANINE\r\n");
