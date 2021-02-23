@@ -805,20 +805,12 @@ static int cli_get_config_exe(struct cli *_cli){
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "multi-link arch: %s\r\n", str_multi);
 
-#ifdef LINK_MON_RX_40GBE
-  const char *str_lmon = "yes";
-#else
-  const char *str_lmon = "no";
-#endif
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "40gbe link 1 mon: %s\r\n", str_lmon);
-
-
-#ifdef RECONFIG_UPON_NO_DHCP
+#ifdef LINK_MONITOR
   const char *str_dmon = "yes";
 #else
   const char *str_dmon = "no";
 #endif
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "dhcp mon: %s\r\n", str_dmon);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "link mon: %s\r\n", str_dmon);
 
 #ifdef HMC_RECONFIG_RETRY
   const char *str_hmc = "yes";

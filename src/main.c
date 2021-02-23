@@ -66,10 +66,6 @@
 
 #define DHCP_MAX_RECONFIG_COUNT 2
 
-#if defined(LINK_MON_RX_40GBE) && defined(RECONFIG_UPON_NO_DHCP)
-#error "Cannot enable both link monitoring and dhcp unbound monitoring tasks - edit in Makefile.config"
-#endif
-
 #define LINK_MON_COUNTER_DEFAULT_VALUE  600
 #define LINK_MON_COUNTER_MIN_VALUE  600
 
@@ -91,8 +87,7 @@ void IllegalOpcodeException(void *Data);
 static volatile u8 uFlagRunTask_DHCP[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_IGMP[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_LLDP[NUM_ETHERNET_INTERFACES] = {0};
-#ifdef RECONFIG_UPON_NO_DHCP
-static volatile u8 uFlagRunTask_CheckDHCPBound = 0;
+#ifdef LINK_MONITOR
 static volatile u8 uFlagRunTask_LinkRecovery = 0;
 #endif
 static volatile u8 uFlagRunTask_ICMP_Reply[NUM_ETHERNET_INTERFACES] = {0};
@@ -102,9 +97,6 @@ static volatile u8 uFlagRunTask_CTRL[NUM_ETHERNET_INTERFACES] = {0};
 static volatile u8 uFlagRunTask_Diagnostics = 0;
 static volatile u8 uFlagRunTask_ARP_Requests[NUM_ETHERNET_INTERFACES] = {ARP_REQUEST_DONT_UPDATE};
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
-#ifdef LINK_MON_RX_40GBE
-static volatile u8 uFlagRunTask_LinkWatchdog = 0;
-#endif
 
 static volatile u8 uFlagRunTask_Aux = 0;
 
@@ -188,13 +180,8 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
       uFlagRunTask_ARP_Requests[i] = ARP_REQUEST_UPDATE;
     }
 
-#ifdef RECONFIG_UPON_NO_DHCP
-    uFlagRunTask_CheckDHCPBound = 1;
+#ifdef LINK_MONITOR
     uFlagRunTask_LinkRecovery = 1;
-#endif
-
-#ifdef LINK_MON_RX_40GBE
-    uFlagRunTask_LinkWatchdog = 1;
 #endif
 
     uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
@@ -540,11 +527,12 @@ int main()
 
   //u32 uIGMPGroupAddress;
   u8 uOKToReboot;
-#ifdef RECONFIG_UPON_NO_DHCP
-  u16 uDHCPBoundCount[NUM_ETHERNET_INTERFACES] = {0};
-  u8 uDHCPBoundTimeout = 0;
+#ifdef LINK_MONITOR
   u8 uDHCPReconfigCount = DHCP_MAX_RECONFIG_COUNT;
+  u16 uDHCPTimeoutMax = DHCP_MON_COUNTER_DEFAULT_VALUE;
+  tPMemReturn ret;
 #endif
+
 #ifdef DO_40GBE_LOOPBACK_TEST
   u32 uTemp40GBEIPAddress = 0x0A000802;
   u8 uConfig40GBE[4];
@@ -589,22 +577,6 @@ int main()
   //u8 n_links;
   u8 num_links;
   u8 logical_link;
-
-#ifdef LINK_MON_RX_40GBE
-  u32 LinkTimeout = 1;
-  u16 uLinkTimeoutMax = LINK_MON_COUNTER_DEFAULT_VALUE;
-#endif
-
-#ifdef RECONFIG_UPON_NO_DHCP
-  u16 uDHCPTimeoutMax = DHCP_MON_COUNTER_DEFAULT_VALUE;
-  tPMemReturn ret;
-#endif
-
-#if 0
-#if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
-  u16 uLinkTimeoutMax = LINK_MON_COUNTER_DEFAULT_VALUE;
-#endif
-#endif
 
   unsigned char *buf,temp;
 
@@ -988,7 +960,7 @@ int main()
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC2_COUNT_INDEX, 0);
   PersistentMemory_WriteByte(HMC_RECONFIG_HMC3_COUNT_INDEX, 0);
 
-#if defined(LINK_MON_RX_40GBE) || defined(RECONFIG_UPON_NO_DHCP)
+#if defined(LINK_MONITOR)
   u16 timeout;
 
   /* read link/dhcp monitor timeout stored in pg15 of DS2433 EEPROM on Motherboard */
@@ -999,7 +971,7 @@ int main()
       /*
        * The link/dhcp timeout value is a user set parameter in eeprom. We
        * therefore have to ensure that it is always set to a sane value which is
-       * determined by the amount time a switch can potentially take to set up
+       * determined by the amount of time a switch can potentially take to set up
        * the link. To ensure that we do not get ourselves into a link-reset loop
        * where we do not allow the switch sufficient time to set up the link, we
        * will progressively increment this timeout value based on the previous
@@ -1007,9 +979,6 @@ int main()
        * Now ensure that the link timeout is a reasonable (minimum) value since this is user data in eeprom and the
        * switch may take some time to initialize the link before we see activity, else leave as default value.
        */
-#ifdef LINK_MON_RX_40GBE
-      uLinkTimeoutMax = (timeout >= LINK_MON_COUNTER_MIN_VALUE) ? timeout : LINK_MON_COUNTER_DEFAULT_VALUE;
-#elif defined(RECONFIG_UPON_NO_DHCP)
 
       if (PMemState != PMEM_RETURN_ERROR){
         ret = PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
@@ -1026,18 +995,10 @@ int main()
        * TODO: wrap in module functions and remove global scope
        */
       GlobalDHCPMonitorTimeout = uDHCPTimeoutMax;
-#endif
     }
   }
-#ifdef LINK_MON_RX_40GBE
-  const char *const s = "40gbe-link-mon";
-  timeout = uLinkTimeoutMax;
-#else
-  const char *const s = "no-dhcp-mon";
-  timeout = uDHCPTimeoutMax;
-#endif
 
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting %s timeout to %d ms\r\n", s, (u32) timeout * 100);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "INIT [..] setting link monitor timeout to %d ms\r\n", (u32) uDHCPTimeoutMax * 100);
 #endif
 
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Interface parameters\r\n");
@@ -1142,7 +1103,7 @@ int main()
            * Background: this feature added to help overcome the DHCP "bottleneck"
            * issue currently experienced on site. This allows us to communicate
            * with the skarab before DHCP actually completes. Use of this feature
-           * together with the RECONFIG_UPON_NO_DHCP feature is strongly
+           * together with the LINK_MONITOR feature is strongly
            * discouraged.
            */
 #ifdef PREEMPT_CONFIGURE_FABRIC_IF
@@ -1630,156 +1591,21 @@ int main()
     //  Triggered on timer interrupt                                              //
     //----------------------------------------------------------------------------//
 
-    /*
-     * This is another MeerKAT site-specific feature. This feature will
-     * reconfigure the FGPA if the 40gbe link on interface id:1 is up but no
-     * *rx* activity has been detected after n seconds. This is to
-     * combat/eliminate possible rx link issues on site.
-     * FIXME: rather than reconfiguring & rebooting - why not just bounce the link? (TODO)
-     */
-#if 0
-#if defined(LINK_MON_RX_40GBE) && (NUM_ETHERNET_INTERFACES > 1)
-    if (uFlagRunTask_LinkWatchdog && (pIFObjectPtr[1]->uIFLinkStatus == LINK_UP)) {
-      uFlagRunTask_LinkWatchdog = 0;
-
-      /* if the rx side of the link is active, stop the timer by setting timeout
-       * to zero */
-      if (pIFObjectPtr[1]->uIFLinkRxActive == 1){
-        LinkTimeout = 0;
-      }
-
-      /*
-       * If 40gbe link one is not up yet, increment timeout counter.  However,
-       * once the link comes up, this should never-ever run again since
-       * LinkTimeout is set to 0 and can never enter this conditional to alter
-       * it. This also relies on LinkTimeout not equalling 0 at startup - see
-       * initialisation of LinkTimeout at start of main().
-       */
-
-      /* FIXME TODO: we may actually want the link to be monitored constantly since we've been experiencing "link
-       * failures" on site... */
-
-      if (LinkTimeout != 0){
-        LinkTimeout++;
-      }
-
-      /* timeout after n seconds */
-      if (LinkTimeout > uLinkTimeoutMax){
-        log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "REBOOT - 40gbe rx link-1 inactive for %dms!\r\n", uLinkTimeoutMax * 100);
-        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
-          /* if it's a toolflow image */
-          SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
-          ResetSdramReadAddress();
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
-          AboutToBootFromSdram();
-          /* TODO: wouldn't it be better/safer to just reset the 40gbe link via the register? */
-        }
-        uDoReboot = REBOOT_REQUESTED;
-      }
-    }
-
-#endif
-#endif
-
-    //----------------------------------------------------------------------------//
-    //  CHECK DHCP BOUND TASK                                                     //
-    //  Triggered on timer interrupt                                              //
-    //----------------------------------------------------------------------------//
-    /*
-     * keep track of how long we have been "unbound" w.r.t. dhcp - this could be
-     * an indication that the link did not come up cleanly and the only way to
-     * fix this is through a reset. Note: this loop stops upon receipt of a valid
-     * known packet
+    /* The link monitor task is responsible for recovering the SKARAB in the event
+     * of possible rx link failures, as seen in the past.
      */
 
-#ifdef RECONFIG_UPON_NO_DHCP
-#if 0
-    //if((uFlagRunTask_CheckDHCPBound) && (TRUE != uValidPacketRx)){
-    if((uFlagRunTask_CheckDHCPBound)){
-      uFlagRunTask_CheckDHCPBound = 0;
-      uDHCPBoundTimeout = 0;
-      //for(uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
-      for (logical_link = 0; logical_link < num_links; logical_link++){
-        uPhysicalEthernetId = get_physical_interface_id(logical_link);
-        /* TODO: create API function to get state */
-        if (pIFObjectPtr[uPhysicalEthernetId]->DHCPContextState.tDHCPCurrentState < BOUND){
-          if (uDHCPBoundCount[uPhysicalEthernetId] < uDHCPTimeoutMax){ /*  prevent overflows */
-            uDHCPBoundCount[uPhysicalEthernetId]++;   /* keep track of how long we've been unbound */
-          }
-        } else {
-          uDHCPBoundCount[uPhysicalEthernetId] = 0; /* reset the counter if we have progressed passed the BOUND state at any point */
-        }
-        if (uDHCPBoundCount[uPhysicalEthernetId] >=  uDHCPTimeoutMax){
-          uDHCPBoundTimeout++;
-        }
-      }
-      /*
-       * if we timeout on all the interfaces, line up a reset
-       */
-      //if(uDHCPBoundTimeout >= NUM_ETHERNET_INTERFACES){
-      if(uDHCPBoundTimeout >= num_links){
-        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] Timed out on all interfaces after %dms!\r\n", uDHCPTimeoutMax * 100);
-
-        /* Keep track of the number of DHCP caused reboots */
-        if (PMemState != PMEM_RETURN_ERROR){
-          ret = PersistentMemory_ReadByte(DHCP_RECONFIG_COUNT_INDEX, &uDHCPReconfigCount);
-          if (PMEM_RETURN_OK == ret){
-            uDHCPReconfigCount = uDHCPReconfigCount + 1;
-            ret = PersistentMemory_WriteByte(DHCP_RECONFIG_COUNT_INDEX, uDHCPReconfigCount);
-            if (PMEM_RETURN_OK == ret){
-              log_printf(LOG_SELECT_DHCP, LOG_LEVEL_INFO, "DHCP [..] increment reset count to %d\r\n", uDHCPReconfigCount);
-            }
-          }
-          /* print error message if pmem read or write fails */
-          if (ret != PMEM_RETURN_OK){
-            log_printf(LOG_SELECT_DHCP, LOG_LEVEL_ERROR, "DHCP [..] failed to store reset count in pmem\r\n");
-          }
-        }
-
-        /*********************REBOOT THE FPGA****************************/
-        //sudo_reboot_now();
-        /****************************************************************/
-
-        log_printf(LOG_SELECT_DHCP, LOG_LEVEL_WARN, "DHCP [..] resetting firmware\r\n");
-
-        /* just wait a little while to enable serial port to finish writing out */
-        Delay(100000); /* 100ms */
-
-        WriteBoardRegister(C_WR_BRD_CTL_STAT_0_ADDR, 1 << 30);    /* set bit 30 of board ctl reg 0 to reset the fw */
-
-#if 0
-        if (((ReadBoardRegister(C_RD_VERSION_ADDR) & 0xff000000) >> 24) == 0){
-          /* if it's a toolflow image */
-          SetOutputMode(SDRAM_READ_MODE, 0x0); /* Release flash bus when about to reboot */
-          ResetSdramReadAddress();
-          log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "REBOOT - toolflow image: reconfigure from SDRAM\r\n");
-          AboutToBootFromSdram();
-        }
-        uDoReboot = REBOOT_REQUESTED;
-#endif
-
-      }
-    }
-#endif
-
-
-
-
+#ifdef LINK_MONITOR
     /* link monitor and recovery task */
     if (uFlagRunTask_LinkRecovery){
       uFlagRunTask_LinkRecovery = 0;
-
       for (logical_link = 0; logical_link < num_links; logical_link++){
         uPhysicalEthernetId = get_physical_interface_id(logical_link);
-
         if_link_recovery_task(uPhysicalEthernetId, uDHCPTimeoutMax);
       }
-
     }
-
-
-
 #endif
+
 
     //----------------------------------------------------------------------------//
     //  DUMP INTERFACE COUNTERS AND OTHER USEFUL DEBUG INFO TO TERMINAL           //
