@@ -68,9 +68,10 @@ The convention used to generate the relese version number is as follows:
 |   +--skarab_microblaze_bsp/  -> directory containing the bsp libraries generated
 |                                 after ./configure script has been run.
 |
++ doc/                         -> notes and documentation
+|
 + src/                         -> directory containing Microblaze application
 |                                 source/header/linker files.
-|
 |
 + output/                      -> directory containing compiler generated auxiliary
 |                                 files (only created after first make build).
