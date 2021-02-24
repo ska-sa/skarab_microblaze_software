@@ -50,7 +50,7 @@ This will compile the source code and generate the elf file in the elf/ dir.
 ## Release software versioning
 
 The convention used to generate the relese version number is as follows:
-<MAJOR>.<YEAR>.<DAY_OF_YEAR>
+\<MAJOR\>.\<YEAR\>.\<DAY\_OF\_YEAR\>
 
 ## Directory Structure:
 ```

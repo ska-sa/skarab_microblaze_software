@@ -1,10 +1,8 @@
-# Command Line Interpreter
+# Serial Connection
 
-A basic Command Line Interpreter (CLI) is provided by the running Microblaze via the
-serial console. This provides a useful interface for debugging.
-
-## How the serial ports are enumerated on the SKARAB...  Each SKARAB serial
-connection enumerates 4 serial devices on the host, namely ttyUSBxx. To list, type:
+## How the serial ports are enumerated on the SKARAB...
+Each SKARAB serial connection enumerates 4 serial devices on the host, namely
+ttyUSBxx. To list, type:
 
 ```% ls /dev/ttyUSB*```
 
@@ -17,13 +15,18 @@ have, the UARTs will be connected on devices ttyUSB6, ttyUSB10, ttyUSB14, etc.
 NOTE: A useful CLI command to determine which SKARAB is connected to your current
 serial connection is the ```whoami``` command.
 
-## Serial Connection
+## Connecting to the SKARAB
 Using a serial communication program, such as minicom, connect to the relevant
 ttyUSBx device with the following parameters:
 
 ```115200, 8N1, no HW or SW flow control```
 
-## CLI Commands
+## Command Line Interpreter
+
+A basic Command Line Interpreter (CLI) is provided by the running Microblaze via the
+serial console. This provides a useful interface for debugging.
+
+### CLI Commands
 
 To get the CLI prompt, type '?' over the serial connection. This has to be done each
 time a command is to be entered. This will display the following list of available
@@ -52,6 +55,8 @@ arp-req [off|on|stat]
 arp-proc [off|on|stat]
 memtest
 clr-link-mon-count
+fan-runtime [lf|lm|lb|rb|fpga]
+fan-pwm-avg [lf|lm|lb|rb|fpga]
 help
 
 ```
@@ -139,7 +144,7 @@ accepts a 32-bit formatted hex address.
 ```arp-req [off|on|stat]```
 By default, the SKARAB sends out ARP requests (at about 10Hz) in order to populate the
 ARP table in firmware. This command can be used to disable/enable these messages.
-This is usefuli during debugging to quiet down the link or the trace-level output, if
+This is useful during debugging to quiet down the link or the trace-level output, if
 necessary.
 
 ```arp-proc [off|on|stat]```
@@ -154,3 +159,9 @@ value calculated at compile-and-link time.
 The link monitor logic keeps state of the resets invoked by link issues. This counter
 value is also added to the link monitor timeout upon each reset. This command
 can be used to clear this counter.
+
+```fan-runtime [lf|lm|lb|rb|fpga]```
+Returns the total number of hours of fan runtime.
+
+```fan-pwm-avg [lf|lm|lb|rb|fpga]```
+Returns the total runtime average of the fan PWM duty cycle (%).
