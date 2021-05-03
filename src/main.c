@@ -1237,26 +1237,6 @@ int main()
     }
 
 
-#if 0
-    if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT){
-      //UpdateQSFPStatus();
-      if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
-        uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-        QSFPStateMachine(QSFPContext_hdl);
-      }
-    }
-
-    if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_PRESENT){
-      if (uADC32RF45X2UpdateStatusEnable == UPDATE_ADC32RF45X2_STATUS){
-        uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
-        AdcStateMachine(&AdcContext);
-      }
-    }
-#endif
-
-
-    //for (uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
-
     for (logical_link = 0; logical_link < num_links; logical_link++){
       uPhysicalEthernetId = get_physical_interface_id(logical_link);
 

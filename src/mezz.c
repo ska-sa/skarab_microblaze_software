@@ -74,7 +74,6 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
           mezz_hdl->m_allow_init = 1;
         }
         uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-        //ret = init_qsfp_mezz(&(mezz_hdl->QSFPContext));
         ret = uQSFPInit(&(mezz_hdl->m_obj.QSFPContext));
         /*Assert: could have a more lenient error check but no reason for init to fail here */
         Xil_AssertNonvoid(XST_SUCCESS == ret);    /* development time error */
@@ -96,28 +95,8 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
     case MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2:
       if (MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2 == ft){   /* firmware support? */
         mezz_hdl->m_firmw_support = FIRMW_SUPPORT_TRUE;
-        /* TODO globals... */
-#if 0
-        /* the mezz site must now be passed along with the adc state obj */
-        if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
-          uADC32RF45X2MezzanineLocation = mezz_site;
-        }
-        uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
-#endif
         mezz_hdl->m_allow_init = 1;
-        //ret = init_adc_mezz(&(mezz_hdl->AdcContext));
         ret = AdcInit(&(mezz_hdl->m_obj.AdcContext), mezz_site);
-
-#ifdef PERALEX_SPECIFIC
-        static u8 uFirstADC32RF45Mezzanine = TRUE;
-
-        if (uFirstADC32RF45Mezzanine == TRUE){
-          uFirstADC32RF45Mezzanine = FALSE;
-          // Configure the location of where to expect the GPS PPS
-          /* TODO - shadow reg write missing in Peralex code (?) */
-          WriteBoardRegister(C_WR_TIMESTAMP_CTL_ADDR, mezz_site << 8);
-        }
-#endif
 
         /*Assert: could have a more lenient error check but no reason for init to fail here */
         Xil_AssertNonvoid(XST_SUCCESS == ret);    /* development time error */
