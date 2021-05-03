@@ -35,14 +35,19 @@ static adc_app_state_func_ptr adc_app_state_table[] = {
 
 /********** API functions **********/
 
-u8 AdcInit(struct sAdcObject *pAdcObject){
+u8 AdcInit(struct sAdcObject *pAdcObject, unsigned int mezz_site){
   if (pAdcObject == NULL){
     return XST_FAILURE;
   }
 
+  Xil_AssertNonvoid((mezz_site >= 0) && (mezz_site < 4));  /* API usage error */
+
+  pAdcObject->AdcMagic = ADC_MAGIC;
+  pAdcObject->uMezzLocation = mezz_site;
   pAdcObject->uWaitCount = 0;
   pAdcObject->InitState = ADC_STATE_INIT_BOOTLOADER_VERSION_WRITE_MODE;
   pAdcObject->AppState = ADC_STATE_APP_DO_NOTHING;
+  pAdcObject->StateMachinePause = 0;
 
   return XST_SUCCESS;
 }
@@ -52,9 +57,39 @@ u8 AdcStateMachine(struct sAdcObject *pAdcObject){
     return XST_FAILURE;
   }
 
-  pAdcObject->InitState = adc_init_state_table[pAdcObject->InitState](pAdcObject);
+  if (0 == pAdcObject->StateMachinePause){
+    pAdcObject->InitState = adc_init_state_table[pAdcObject->InitState](pAdcObject);
+  }
 
   return XST_SUCCESS;
+}
+
+void uAdcStateMachineReset(struct sAdcObject *pAdcObject){
+  /* do not assert() - reachable via user commands */
+  if (pAdcObject == NULL){
+    return;
+  }
+
+  pAdcObject->InitState = ADC_STATE_INIT_BOOTLOADER_VERSION_WRITE_MODE;
+  pAdcObject->AppState = ADC_STATE_APP_DO_NOTHING;
+}
+
+void uAdcStateMachinePause(struct sAdcObject *pAdcObject){
+  /* do not assert() - reachable via user commands */
+  if (pAdcObject == NULL){
+    return;
+  }
+
+  pAdcObject->StateMachinePause = 1;
+}
+
+void uAdcStateMachineResume(struct sAdcObject *pAdcObject){
+  /* do not assert() - reachable via user commands */
+  if (pAdcObject == NULL){
+    return;
+  }
+
+  pAdcObject->StateMachinePause = 0;
 }
 
 
@@ -63,6 +98,9 @@ u8 AdcStateMachine(struct sAdcObject *pAdcObject){
 static typeAdcInitState adc_init_bootloader_version_wr_state(struct sAdcObject *pAdcObject){
   u16 uWriteBytes[7];
   int iStatus;
+  unsigned int adc_mezz_location;
+
+  adc_mezz_location = pAdcObject->uMezzLocation;
 
   // Need to read and store ADC32RF45X2 bootloader version before exit bootloader mode
   uWriteBytes[0] = ADC32RF45X2_BOOTLOADER_READ_OPCODE;
@@ -73,9 +111,9 @@ static typeAdcInitState adc_init_bootloader_version_wr_state(struct sAdcObject *
   uWriteBytes[5] = 0x00; // Reading 1 byte
   uWriteBytes[6] = 0x01; // Reading 1 byte
 
-  iStatus = WriteI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 7);
+  iStatus = WriteI2CBytes(adc_mezz_location + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 7);
   if (iStatus != XST_SUCCESS){
-    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", adc_mezz_location);
   }
 
   return ADC_STATE_INIT_BOOTLOADER_VERSION_READ_MODE;
@@ -85,16 +123,19 @@ static typeAdcInitState adc_init_bootloader_version_wr_state(struct sAdcObject *
 static typeAdcInitState adc_init_bootloader_version_rd_state(struct sAdcObject *pAdcObject){
   u16 uReadBytes[1] = {0xffff};
   int iStatus;
+  unsigned int adc_mezz_location;
 
-  iStatus = ReadI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uReadBytes, 1);
+  adc_mezz_location = pAdcObject->uMezzLocation;
+
+  iStatus = ReadI2CBytes(adc_mezz_location + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uReadBytes, 1);
   if (iStatus != XST_SUCCESS){
-    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C read [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C read [FAILED]\r\n", adc_mezz_location);
   }
 
   uADC32RF45X2BootloaderVersionMajor = (uReadBytes[0] >> 4) & 0xF;
   uADC32RF45X2BootloaderVersionMinor = uReadBytes[0] & 0xF;
 
-  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine bootloader version: %x.%x\r\n", uADC32RF45X2MezzanineLocation, uADC32RF45X2BootloaderVersionMajor, uADC32RF45X2BootloaderVersionMinor);
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine bootloader version: %x.%x\r\n", adc_mezz_location, uADC32RF45X2BootloaderVersionMajor, uADC32RF45X2BootloaderVersionMinor);
 
   return ADC_STATE_INIT_BOOTLOADER_MODE;
 }
@@ -103,13 +144,16 @@ static typeAdcInitState adc_init_bootloader_version_rd_state(struct sAdcObject *
 static typeAdcInitState adc_init_bootloader_state(struct sAdcObject *pAdcObject){
   u16 uWriteBytes[1];
   int iStatus;
+  unsigned int adc_mezz_location;
+
+  adc_mezz_location = pAdcObject->uMezzLocation;
 
   uWriteBytes[0] = ADC32RF45X2_LEAVE_BOOTLOADER_MODE;
-  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine leaving bootloader mode.\r\n", uADC32RF45X2MezzanineLocation);
+  log_printf(LOG_SELECT_HARDW, LOG_LEVEL_INFO, "ADC  [%02x] Mezzanine leaving bootloader mode.\r\n", adc_mezz_location);
 
-  iStatus = WriteI2CBytes(uADC32RF45X2MezzanineLocation + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 1);
+  iStatus = WriteI2CBytes(adc_mezz_location + 1, ADC32RF45X2_STM_I2C_BOOTLOADER_SLAVE_ADDRESS, uWriteBytes, 1);
   if (iStatus != XST_SUCCESS){
-    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", uADC32RF45X2MezzanineLocation);
+    log_printf(LOG_SELECT_HARDW, LOG_LEVEL_ERROR, "ADC  [%02x] Bootloader I2C write [FAILED]\r\n", adc_mezz_location);
   }
 
   return ADC_STATE_INIT_STARTING_APPLICATION_MODE;
@@ -139,5 +183,6 @@ static typeAdcInitState adc_init_application_state(struct sAdcObject *pAdcObject
 /********** Application state functions **********/
 
 static typeAdcAppState adc_app_do_nothing(struct sAdcObject *pAdcObject){
+  asm("nop");
   return ADC_STATE_APP_DO_NOTHING;
 }

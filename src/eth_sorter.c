@@ -45,6 +45,9 @@
 #include "time.h"
 #include "fanctrl.h"
 #include "error.h"
+#include "mezz.h"
+
+extern u8 uQSFPUpdateStatusEnable;
 
 //=================================================================================
 //  CalculateIPChecksum
@@ -3469,3 +3472,95 @@ static int GetFPGAFanControllerLUTHandler(u8 * pCommand, u32 uCommandLength, u8 
   Response->uError = 0;
   return XST_SUCCESS;
 }
+
+
+//=================================================================================
+//	MezzanineResetAndProgramCommandHandler
+//--------------------------------------------------------------------------------
+//	This method executes the MEZZANINE_RESET_AND_PROG command.
+//
+//	Parameter	Dir		Description
+//	---------	---		-----------
+//	pCommand				IN	Pointer to command header
+//	uCommandLength			IN	Length of command
+//	uResponsePacketPtr		IN	Pointer to where response packet must be constructed
+//	uResponseLength			OUT	Length of payload of response packet
+//
+//	Return
+//	------
+//	XST_SUCCESS if successful
+//=================================================================================
+int MezzanineResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+{
+  /* static array to hold the state of each mezz site between operations */
+  static u8 btldr_programming[4] = {0};   /* previously, ADC32RF45X2_STATE_BOOTLOADER_PROGRAMMING_MODE state
+                                           held state machine in "pause" state */
+
+	sMezzanineResetAndProgramReqT *Command = (sMezzanineResetAndProgramReqT *) pCommand;
+	sMezzanineResetAndProgramRespT *Response = (sMezzanineResetAndProgramRespT *) uResponsePacketPtr;
+	u8 uPaddingIndex;
+	u32 uReg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
+
+	if (uCommandLength < sizeof(sMezzanineResetAndProgramReqT)){
+		return XST_FAILURE;
+  }
+
+  /* TODO: should we not check for mezz type ADC here ?? This command seems to target ADCs specifically. Ported from
+   * Peralex code. QSFP and ADC logic have different state variables and state machines - this function addresses ADC
+   * state variables only. */
+
+	if (Command->uReset == 0x1){
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Resetting Mezzanine.\r\n", Command->uMezzanine);
+
+		uReg = uReg | (QSFP_MEZZANINE_RESET << Command->uMezzanine);
+		WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
+		Delay(100);
+		uReg = uReg & (~ (QSFP_MEZZANINE_RESET << Command->uMezzanine));
+		WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
+
+    adc_mezz_sm_control(Command->uMezzanine, ADC_MEZZ_SM_RESET_OP);
+
+    /* global variable "task" flag in main - will be set again on next timer
+     * interrupt */
+    uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+
+		if (Command->uProgram == 0x1){
+      log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Entering bootloader programming mode.\r\n", Command->uMezzanine);
+			btldr_programming[Command->uMezzanine] = 1;
+      /* previously had a "pause" state (ADC32RF45X2_STATE_BOOTLOADER_PROGRAMMING_MODE), now explicitly paused by function call */
+      adc_mezz_sm_control(Command->uMezzanine, ADC_MEZZ_SM_PAUSE_OP);
+		}
+	}
+
+  if ((Command->uProgram == 0x0)&&(btldr_programming[Command->uMezzanine] == 1)){
+#if 0
+		// If we were in programming mode and programming is now finished
+		// Start 5 second timer and put in bootloader mode
+		uADC32RF45X2StateCounter[Command->uMezzanine] = 0x0;
+		uADC32RF45X2State[Command->uMezzanine] = ADC32RF45X2_STATE_INITIAL_BOOTLOADER_MODE;
+#endif  /* state machine already reset above by uAdcResetInit() */
+
+    /* If we were in programming mode and notified via cmd that programming is
+     now finished */
+    uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+
+    adc_mezz_sm_control(Command->uMezzanine, ADC_MEZZ_SM_RESUME_OP);
+
+    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Mezzanine leaving bootloader programming mode.\r\n", Command->uMezzanine);
+    btldr_programming[Command->uMezzanine] = 0;
+	}
+
+	Response->Header.uCommandType = Command->Header.uCommandType + 1;
+	Response->Header.uSequenceNumber = Command->Header.uSequenceNumber;
+	Response->uReset = Command->uReset;
+	Response->uProgram = Command->uProgram;
+	Response->uMezzanine = Command->uMezzanine;
+
+	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++)
+		Response->uPadding[uPaddingIndex] = 0;
+
+	*uResponseLength = sizeof(sMezzanineResetAndProgramRespT);
+
+	return XST_SUCCESS;
+}
+

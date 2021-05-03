@@ -1,3 +1,5 @@
+/* SARAO, RvW */
+
 #include <xstatus.h>
 #include <xil_assert.h>
 #include <xil_types.h>
@@ -27,42 +29,55 @@ void __sanity_check_mezz_site(u8 mezz_site){
 
 
 struct sMezzObject *init_mezz_location(u8 mezz_site){
-  static struct sMezzObject MezzContext[4];  /* statically allocated memory - but could be dynamic in future */
+  //static struct sMezzObject MezzContext[4];  /* statically allocated memory - but could be dynamic in future */
+  struct sMezzObject *mezz_hdl;
   MezzHWType mt;
   MezzFirmwType ft;
+  u8 ret;
 
   SANE_MEZZ_SITE(mezz_site);
 
-  if (MEZZ_MAGIC == MezzContext[mezz_site].m_magic){
+  mezz_hdl = lookup_mezz_handle_by_site(mezz_site);
+
+  if (MEZZ_MAGIC == mezz_hdl->m_magic){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "MEZZ [%02x] Failed - attempted to overwrite previous state.", mezz_site);
-    return &(MezzContext[mezz_site]);
+    return mezz_hdl;
   }
 
-  MezzContext[mezz_site].m_magic = MEZZ_MAGIC;
-  MezzContext[mezz_site].m_site = mezz_site;
+  mezz_hdl->m_magic = MEZZ_MAGIC;
+  mezz_hdl->m_site = mezz_site;
 
-  MezzContext[mezz_site].m_allow_init = 0;
+  mezz_hdl->m_allow_init = 0;
 
   mt = read_mezz_type_id(mezz_site);    /* get the type id stored on the mezzanine card */
-  MezzContext[mezz_site].m_type = mt;
+  mezz_hdl->m_type = mt;
 
   ft = get_mezz_firmware_type(mezz_site);   /* get the firmware type compiled
                                                for this mezz */
 
   /* preset this value and set if firmware support present */
-  MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_FALSE;
+  mezz_hdl->m_firmw_support = FIRMW_SUPPORT_FALSE;
 
   switch(mt){
     case MEZ_BOARD_TYPE_QSFP:
     case MEZ_BOARD_TYPE_QSFP_PHY:
       if (MEZ_FIRMW_TYPE_QSFP == ft){   /* firmware support? */
-        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+        mezz_hdl->m_firmw_support = FIRMW_SUPPORT_TRUE;
+        /*
+         * only ONE qsfp mezz card provided for - conceptually one could have multiple qsfp cards
+         * but there may be broader implications to the code e.g. QSFPResetAndProgramCommandHandler() would
+         * need to be updated to accept the id of the qsfp card being addresses and pass this to reset function call.
+         * The uQSFPMezzaninePresent flag guards for this here i.e. if this is the first qsfp card found...
+         */
         if (uQSFPMezzaninePresent == QSFP_MEZZANINE_NOT_PRESENT){
           uQSFPMezzanineLocation = mezz_site;     /* TODO: need to get rid of global scope and place within local scope of obj */
+          mezz_hdl->m_allow_init = 1;
         }
         uQSFPMezzaninePresent = QSFP_MEZZANINE_PRESENT;
-        MezzContext[mezz_site].m_allow_init = 1;
-        //ret = init_qsfp_mezz(&(MezzContext[mezz_site].QSFPContext));
+        //ret = init_qsfp_mezz(&(mezz_hdl->QSFPContext));
+        ret = uQSFPInit(&(mezz_hdl->m_obj.QSFPContext));
+        /*Assert: could have a more lenient error check but no reason for init to fail here */
+        Xil_AssertNonvoid(XST_SUCCESS == ret);    /* development time error */
       } else {
         log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for QSFP!\r\n", mezz_site);
       }
@@ -70,8 +85,8 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
     case MEZ_BOARD_TYPE_HMC_R1000_0005:
       if (MEZ_FIRMW_TYPE_HMC_R1000_0005 == ft){   /* firmware support? */
-        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
-        MezzContext[mezz_site].m_allow_init = 1;
+        mezz_hdl->m_firmw_support = FIRMW_SUPPORT_TRUE;
+        mezz_hdl->m_allow_init = 1;
       } else {
         log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for HMC!\r\n", mezz_site);
       }
@@ -80,14 +95,32 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
     case MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2:
       if (MEZ_FIRMW_TYPE_SKARAB_ADC32RF45X2 == ft){   /* firmware support? */
-        MezzContext[mezz_site].m_firmw_support = FIRMW_SUPPORT_TRUE;
+        mezz_hdl->m_firmw_support = FIRMW_SUPPORT_TRUE;
         /* TODO globals... */
+#if 0
+        /* the mezz site must now be passed along with the adc state obj */
         if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_NOT_PRESENT){
           uADC32RF45X2MezzanineLocation = mezz_site;
         }
         uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_PRESENT;
-        MezzContext[mezz_site].m_allow_init = 1;
-        //ret = init_adc_mezz(&(MezzContext[mezz_site].AdcContext));
+#endif
+        mezz_hdl->m_allow_init = 1;
+        //ret = init_adc_mezz(&(mezz_hdl->AdcContext));
+        ret = AdcInit(&(mezz_hdl->m_obj.AdcContext), mezz_site);
+
+#ifdef PERALEX_SPECIFIC
+        static u8 uFirstADC32RF45Mezzanine = TRUE;
+
+        if (uFirstADC32RF45Mezzanine == TRUE){
+          uFirstADC32RF45Mezzanine = FALSE;
+          // Configure the location of where to expect the GPS PPS
+          /* TODO - shadow reg write missing in Peralex code (?) */
+          WriteBoardRegister(C_WR_TIMESTAMP_CTL_ADDR, mezz_site << 8);
+        }
+#endif
+
+        /*Assert: could have a more lenient error check but no reason for init to fail here */
+        Xil_AssertNonvoid(XST_SUCCESS == ret);    /* development time error */
       } else {
         log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_WARN, "MEZZ [%02x] WARNING: no firmware support for ADC!\r\n", mezz_site);
       }
@@ -100,7 +133,7 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
       break;
   }
 
-  return &(MezzContext[mezz_site]);   /* return a handle to this mezz data structure */
+  return mezz_hdl;   /* return a handle to this mezz data structure */
 }
 
 
@@ -155,10 +188,10 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
   } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE3)&&(read_bytes[0x6] == 0xFD)){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "QSFP+ PHY MEZZANINE\r\n");
     return MEZ_BOARD_TYPE_QSFP_PHY;
-    
- } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&((read_bytes[0x6] == 0xE5)||(read_bytes[0x6] == 0xE6)||(read_bytes[0x6] == 0xE7))){
+
+  } else if ((read_bytes[0x0] == 0x50)&&(read_bytes[0x4] == 0x01)&&(read_bytes[0x5] == 0xE7)&&((read_bytes[0x6] == 0xE5)||(read_bytes[0x6] == 0xE6)||(read_bytes[0x6] == 0xE7))){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "ADC32RF45X2 MEZZANINE\r\n");
-    return MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;    
+    return MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2;
 
   } else if ((read_bytes[0x0] == 0x53)&&(read_bytes[0x4] == 0xFF)&&(read_bytes[0x5] == 0x00)&&(read_bytes[0x6] == 0x01)){
     log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "HMC R1000-0005 MEZZANINE\r\n");
@@ -223,3 +256,161 @@ struct sMezzObject *init_mezz_location(u8 mezz_site){
 
   return firmw_type;
 }
+
+
+
+void run_qsfp_mezz_mgmt(void){
+  struct sMezzObject *m;
+  struct sQSFPObject *q;
+
+  /* the codebase only supports one qsfp card cached in uQSFPMezzanineLocation */
+  if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT){
+    m = lookup_mezz_handle_by_site(uQSFPMezzanineLocation);
+
+    /* we can assert here because if present flag is set, we should
+     * have set up the rest of the context state with valid parameters
+     */
+    Xil_AssertVoid(m != NULL);
+    Xil_AssertVoid(MEZZ_MAGIC == m->m_magic);
+
+    q = &(m->m_obj.QSFPContext);
+
+    Xil_AssertVoid(q != NULL);
+    Xil_AssertVoid(QSFP_MAGIC == q->QSFPMagic);
+
+    QSFPStateMachine(q);
+  }
+}
+
+void run_adc_mezz_mgmt(void){
+  struct sMezzObject *m;
+  struct sAdcObject *a;
+  int i;
+
+  /* the codebase must support multiple ADCs - therefore lookup required */
+
+  for (i = 0; i < 4; i++){
+    m = lookup_mezz_handle_by_site(i);
+
+    /* order of conditions below matter */
+    if (NULL == m){
+      return;
+    }
+
+    if (MEZZ_MAGIC != m->m_magic){
+      return;
+    }
+
+    if (MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2 != m->m_type){
+      return;
+    }
+
+    if (0 == m->m_allow_init){
+      return;
+    }
+
+    a = &(m->m_obj.AdcContext);
+
+    /* can assert here - if we have gotten this far, everything else should be set correctly */
+    Xil_AssertVoid(a != NULL);
+    Xil_AssertVoid(ADC_MAGIC == a->AdcMagic);
+
+    AdcStateMachine(a);
+  }
+
+}
+
+
+void adc_mezz_sm_control(u8 mezz_site, AdcMezzSMOperation op){
+  struct sMezzObject *m;
+  struct sAdcObject *a;
+
+  /* do not assert() in these functions since they are reachable via user commands */
+
+  /* mezzanine sites indexed 0 to 3 */
+  if (mezz_site > 3){
+    return;
+  }
+
+  m = lookup_mezz_handle_by_site(mezz_site);
+  if (NULL == m){
+    return;
+  }
+
+  if (MEZZ_MAGIC != m->m_magic){
+    return;
+  }
+
+  if (MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2 != m->m_type){
+    return;
+  }
+
+  if (0 == m->m_allow_init){
+    return;
+  }
+
+  a = &(m->m_obj.AdcContext);
+  if (NULL == a){
+    return;
+  }
+
+  if (ADC_MAGIC != a->AdcMagic){
+    return;
+  }
+
+  switch(op){
+    case ADC_MEZZ_SM_PAUSE_OP:
+      uAdcStateMachinePause(a);
+      break;
+
+    case ADC_MEZZ_SM_RESUME_OP:
+      uAdcStateMachineResume(a);
+      break;
+
+    case ADC_MEZZ_SM_RESET_OP:
+      uAdcStateMachineReset(a);
+      break;
+
+    default:
+      break;
+  }
+}
+
+u8 is_adc_mezz(u8 mezz_site){
+  /* do not assert() in these functions since they are reachable via user commands */
+  struct sMezzObject *m;
+
+  /* mezzanine sites indexed 0 to 3 */
+  if (mezz_site > 3){
+    return XST_FAILURE;
+  }
+
+  m = lookup_mezz_handle_by_site(mezz_site);
+  if (NULL == m){
+    return XST_FAILURE;
+  }
+
+  if (MEZZ_MAGIC != m->m_magic){
+    return XST_FAILURE;
+  }
+
+  if (MEZ_BOARD_TYPE_SKARAB_ADC32RF45X2 != m->m_type){
+    return XST_FAILURE;
+  }
+
+  return XST_SUCCESS;
+}
+
+
+/* hide the mezz state handles */
+struct sMezzObject *lookup_mezz_handle_by_site(u8 mezz_site){
+  /*
+   * statically initialise the pool of mezz state objects for each site
+   */
+  static struct sMezzObject MezzContext[4];  /* statically allocated memory - but could be dynamic in future */
+
+  SANE_MEZZ_SITE(mezz_site);
+
+  return &MezzContext[mezz_site];
+}
+

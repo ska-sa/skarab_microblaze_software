@@ -39,6 +39,13 @@ typedef enum {
   MEZ_FIRMW_TYPE_HMC_R1000_0005
 } MezzFirmwType;
 
+  typedef union {
+    //void none;
+    struct sQSFPObject QSFPContext;
+    struct sAdcObject AdcContext;
+    //struct sHmcObject HmcContext;
+  } mezz_obj;
+
 struct sMezzObject {
   u32 m_magic;
   u8 m_site;
@@ -48,14 +55,24 @@ struct sMezzObject {
   u8 m_firmw_support;  /* has support been compiled into firmware */
   u8 m_allow_init;     /* set if both hardware AND firmware suppported */
 
-  union {
-    struct sQSFPObject QSFPContext;
-    struct sAdcObject AdcContext;
-    //struct sHmcObject HmcContext;
-  } m_sel;
+  mezz_obj m_obj;
 };
 
+struct sMezzObject *lookup_mezz_handle_by_site(u8 mezz_site);
 struct sMezzObject *init_mezz_location(u8 mezz_site);
+void run_qsfp_mezz_mgmt(void);
+void run_adc_mezz_mgmt(void);
+
+typedef enum{
+  ADC_MEZZ_SM_PAUSE_OP,
+  ADC_MEZZ_SM_RESUME_OP,
+  ADC_MEZZ_SM_RESET_OP
+} AdcMezzSMOperation;
+
+void adc_mezz_sm_control(u8 mezz_site, AdcMezzSMOperation op);
+
+u8 is_adc_mezz(u8 mezz_site);
+
 MezzFirmwType get_mezz_firmware_type(u8 mezz_site);
 MezzHWType read_mezz_type_id(u8 mezz_site);
 
