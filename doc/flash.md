@@ -13,38 +13,51 @@ motherboard DS2433 EEPROM.
 The following parameters are stored in **PAGE15** of the DS2433 one wire eeprom
 on the SKARAB motherboard (one wire port 0x0):
 
-DHCP INIT
-  (16-bit value)
+DHCP INIT (16-bit value):<BR>
+                          Time delay at startup before first dhcp packet is sent. This allows for
+                          the links to initialise before the first dhcp packet is broadcast.
 ```
   pg15_byte[0] = LSB    {0x01e0}
   pg15_byte[1] = MSB    {0x01e1}
   init time (milliseconds) = ((byte[1] << 8) + byte[0]) * 100
 ```
 
-DHCP RETRY RATE
-  (16-bit value)
+DHCP RETRY RATE (16-bit value):<BR>
+                                Time between dhcp retries, until dhcp is configured.
 ```
   pg15_byte[2] = LSB    {0x01e2}
   pg15_byte[3] = MSB    {0x01e3}
   retry time (milliseconds) = ((byte[3] << 8) + byte[2]) * 100
 ```
 
-HMC RECONFIG TIMEOUT (per reset)
-  (16-bit value)
+HMC RECONFIG TIMEOUT (per reset) (16-bit value):<BR>
+                                                 Sets the timeout for the HMC reconfigure mechanism,
+                                                 i.e.  the time within which all HMCs should
+                                                 initialise otherwise the FPGA is reconfigured, in
+                                                 line with the HMC bringup strategy (See further
+                                                     details about the HMC reconfigure mechanism
+                                                     below).
 ```
   pg15_byte[4] = LSB    {0x01e4}
   pg15_byte[5] = MSB    {0x01e5}
   hmc timeout (milliseconds) = ((byte[5] << 8) + byte[4]) * 100
 ```
 
-HMC RECONFIG MAX RETRIES
-  (8-bit value)
+HMC RECONFIG MAX RETRIES (8-bit value):<BR>
+                                        Sets the maximum number of retries that the HMC reconfigure
+                                        mechanism will attempt to bring up the HMCs, after which,
+                                        the mechanism will give up. This prevents infinite
+                                        "reconfigure-loops" in the case of a persistent HMC hardware
+                                        issue or other initialisation issue.
 ```
   pg15_byte[6]          {0x01e6}
 ```
 
-LINK MON TIMEOUT
-  (16-bit value)
+LINK MON TIMEOUT (16-bit value):<BR>
+                                 The link monitor task attempts to recover the SKARAB from
+                                 (suspected) rx-link failures.  The value set by this parameter
+                                 determines the timeout (i.e. time to wait if the rx link does not
+                                     come up) before rebooting the SKARAB.
 ```
   pg15_byte[7] = LSB    {0x01e7}
   pg15_byte[8] = MSB    {0x01e8}
@@ -52,6 +65,8 @@ LINK MON TIMEOUT
 ```
 
 ### SKARAB SERIAL NUMBER
+This is the hardware serial number of the SKARAB unit<BR>
+(For example: SKARAB02030B => '02' = upper octet; '03' = middle octet; '0B' = lower octet)
 Stored in **PAGE0** of SKARAB motherboard FLASH.
 ```
   pg0_byte[1] = UPPER_OCTET
@@ -122,7 +137,7 @@ Out: ['0x50', '0x0', '0x0', '0x0', '0x1', '0xe3', '0x99']
 ### HMC RECONFIGURE ATTEMPTS STATS STORED IN HMC MEZZ FLASH:
 
 The Microblaze employs a monitoring mechanism to ensure the reliable bring-up of the
-HMC cards. This mechanism monitors the RESET and POST signals of the HMC cards
+HMC cards. This mechanism monitors the INIT OK and POST OK signals of the HMC cards
 populated on the SKARAB and a timeout invokes a reconfiguration of the FPGA in an
 attempt to recover failed HMC bootups. Usually, each SKARAB is populated with three HMC
 cards. The counters documented below are the statistics recorded for these HMC
@@ -132,7 +147,7 @@ retries value is incremented. In this way one can see how many times *this* card
 caused a reboot and how many times *this* card has been involved in a reboot, but not
 necessarily the cause of it.
 
-The reconfigure stats for each HMC is stored in **PAGE15** of the eeprom on the
+The reconfigure stats for each HMC is stored in **PAGE15** of the DS2433 eeprom on the
 respective hmc mezzanine card at the following bytes:
 
 HMC RETRIES (for current card)

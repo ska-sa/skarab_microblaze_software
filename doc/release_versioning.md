@@ -1,11 +1,11 @@
 The following howto note describes the generation of a *release version* for the
 Microblaze software:
 
-1) push your development branch to github
+1) push your development branch to github (ska-sa/skarab_microblaze_software)
 
 2) merge the branch into **master** on github with a *pull request*
 
-3) now, on your local computer, pull the updated master branch
+3) now, on your local computer, pull the updated master branch from github
 
 4) the revision number gets updated in constant_defs.h on the *master* branch with
 the following convention:
@@ -34,7 +34,9 @@ e.g. Release v3.21.36
 
 7) you can then note the changes in the body of the commit text
 
-8) after committing, tag the commit with release version number e.g.'git tag v3.21.36'
+8) after committing, tag the commit with release version number e.g.```% git tag -a v3.21.36 -m "" ```
+Please note that annotated tags are used for the software versioning. In the above command, the
+message argument (-m) is left blank, but this can be filled with an appropriate message.
 
 9) then push the commit: 'git push --tags origin master'
 

@@ -19,6 +19,8 @@ serial connection is the ```whoami``` command.
 Using a serial communication program, such as minicom, connect to the relevant
 ttyUSBx device with the following parameters:
 
+```% minicom -D /dev/ttyUSBx```
+
 ```115200, 8N1, no HW or SW flow control```
 
 ## Command Line Interpreter
@@ -162,6 +164,8 @@ can be used to clear this counter.
 
 ```fan-runtime [lf|lm|lb|rb|fpga]```
 Returns the total number of hours of fan runtime.
+Cmd arguments: lf = left front; lm = left middle; lb = left back; rb = right back;
 
 ```fan-pwm-avg [lf|lm|lb|rb|fpga]```
 Returns the total runtime average of the fan PWM duty cycle (%).
+Cmd arguments: lf = left front; lm = left middle; lb = left back; rb = right back;
