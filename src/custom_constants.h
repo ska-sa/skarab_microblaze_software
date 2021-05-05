@@ -57,6 +57,8 @@ extern "C" {
 #define VOUT_MODE_CMD      0x20
 #define READ_VOUT_CMD      0x8B
 #define READ_TEMPERATURE_1_CMD 0x8D
+#define MFR_FAN_RUN_TIME_CMD  0xF7u
+#define MFR_FAN_PWM_AVG_CMD  0xF8u
 
 // skarab motherboard fan pages
 #define LEFT_FRONT_FAN_PAGE   0

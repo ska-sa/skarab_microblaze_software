@@ -348,3 +348,95 @@ static int write_i2c_bytes_dryrun(u16 uId, u16 uSlaveAddress, u16 * uWriteBytes,
   return XST_SUCCESS;
 }
 #endif
+
+
+/*
+ * Returns the number of hours of fan lifetime in hours
+ * but returns zero for error (operating hours unlikely to be zero)
+ */
+u16 fanctrlr_get_run_time(unsigned int fan_page){
+  int ret;
+  u16 wr_buffer[2] = {0};
+  u16 rd_buffer[2] = {0};
+  u16 runtime = 0;
+
+  /* check that the fan_page is valid */
+  switch(fan_page){
+    case LEFT_FRONT_FAN_PAGE:
+    case LEFT_MIDDLE_FAN_PAGE:
+    case LEFT_BACK_FAN_PAGE:
+    case RIGHT_BACK_FAN_PAGE:
+    case FPGA_FAN:
+      wr_buffer[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
+      wr_buffer[1] = fan_page;
+      break;
+    default:
+      return 0;
+  }
+
+  ret = ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  ret = WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, wr_buffer, 2);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  ret = PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, MFR_FAN_RUN_TIME_CMD, rd_buffer, 2);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  runtime = (rd_buffer[1] & 0xff) << 8;
+  runtime |= (rd_buffer[0] & 0xff);
+
+  return runtime;
+}
+
+
+/*
+ * Returns the lifetime average of the fan PWM duty cycle in % duty cycle
+ * but returns zero for error (pwm avg unlikely to be zero)
+ */
+u16 fanctrlr_get_pwm_avg(unsigned int fan_page){
+  int ret;
+  u16 wr_buffer[2] = {0};
+  u16 rd_buffer[2] = {0};
+  u16 pwm_avg = 0;
+
+  /* check that the fan_page is valid */
+  switch(fan_page){
+    case LEFT_FRONT_FAN_PAGE:
+    case LEFT_MIDDLE_FAN_PAGE:
+    case LEFT_BACK_FAN_PAGE:
+    case RIGHT_BACK_FAN_PAGE:
+    case FPGA_FAN:
+      wr_buffer[0] = PAGE_CMD; // command code for MAX31785 to select page to be controlled/read
+      wr_buffer[1] = fan_page;
+      break;
+    default:
+      return 0;
+  }
+
+  ret = ConfigureSwitch(FAN_CONT_SWTICH_SELECT);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  ret = WriteI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, wr_buffer, 2);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  ret = PMBusReadI2CBytes(MB_I2C_BUS_ID, MAX31785_I2C_DEVICE_ADDRESS, MFR_FAN_PWM_AVG_CMD, rd_buffer, 2);
+  if (XST_FAILURE == ret){
+    return 0;
+  }
+
+  pwm_avg = (rd_buffer[1] & 0xff) << 8;
+  pwm_avg |= (rd_buffer[0] & 0xff);
+
+  return pwm_avg;
+}
