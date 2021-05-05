@@ -3475,9 +3475,9 @@ static int GetFPGAFanControllerLUTHandler(u8 * pCommand, u32 uCommandLength, u8 
 
 
 //=================================================================================
-//	MezzanineResetAndProgramCommandHandler
+//	ADCMezzanineResetAndProgramCommandHandler
 //--------------------------------------------------------------------------------
-//	This method executes the MEZZANINE_RESET_AND_PROG command.
+//	This method executes the ADC_MEZZANINE_RESET_AND_PROG command.
 //
 //	Parameter	Dir		Description
 //	---------	---		-----------
@@ -3490,27 +3490,29 @@ static int GetFPGAFanControllerLUTHandler(u8 * pCommand, u32 uCommandLength, u8 
 //	------
 //	XST_SUCCESS if successful
 //=================================================================================
-int MezzanineResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
+int ADCMezzanineResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8 * uResponsePacketPtr, u32 * uResponseLength)
 {
   /* static array to hold the state of each mezz site between operations */
   static u8 btldr_programming[4] = {0};   /* previously, ADC32RF45X2_STATE_BOOTLOADER_PROGRAMMING_MODE state
                                            held state machine in "pause" state */
 
-	sMezzanineResetAndProgramReqT *Command = (sMezzanineResetAndProgramReqT *) pCommand;
-	sMezzanineResetAndProgramRespT *Response = (sMezzanineResetAndProgramRespT *) uResponsePacketPtr;
+	sADCMezzanineResetAndProgramReqT *Command = (sADCMezzanineResetAndProgramReqT *) pCommand;
+	sADCMezzanineResetAndProgramRespT *Response = (sADCMezzanineResetAndProgramRespT *) uResponsePacketPtr;
 	u8 uPaddingIndex;
 	u32 uReg = uWriteBoardShadowRegs[C_WR_MEZZANINE_CTL_ADDR >> 2];
 
-	if (uCommandLength < sizeof(sMezzanineResetAndProgramReqT)){
+	if (uCommandLength < sizeof(sADCMezzanineResetAndProgramReqT)){
 		return XST_FAILURE;
   }
 
-  /* TODO: should we not check for mezz type ADC here ?? This command seems to target ADCs specifically. Ported from
-   * Peralex code. QSFP and ADC logic have different state variables and state machines - this function addresses ADC
-   * state variables only. */
+  /* this function targets ADC mezzanine cards */
+  if (is_adc_mezz(Command->uMezzanine) != XST_SUCCESS){
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_WARN, "MEZZ [%02x] Not an ADC Mezzanine.\r\n", Command->uMezzanine);
+    return XST_FAILURE;
+  }
 
 	if (Command->uReset == 0x1){
-    log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "MEZZ [%02x] Resetting Mezzanine.\r\n", Command->uMezzanine);
+    log_printf(LOG_SELECT_CTRL, LOG_LEVEL_INFO, "MEZZ [%02x] Resetting Mezzanine.\r\n", Command->uMezzanine);
 
 		uReg = uReg | (QSFP_MEZZANINE_RESET << Command->uMezzanine);
 		WriteBoardRegister(C_WR_MEZZANINE_CTL_ADDR, uReg);
@@ -3559,7 +3561,7 @@ int MezzanineResetAndProgramCommandHandler(u8 * pCommand, u32 uCommandLength, u8
 	for (uPaddingIndex = 0; uPaddingIndex < 6; uPaddingIndex++)
 		Response->uPadding[uPaddingIndex] = 0;
 
-	*uResponseLength = sizeof(sMezzanineResetAndProgramRespT);
+	*uResponseLength = sizeof(sADCMezzanineResetAndProgramRespT);
 
 	return XST_SUCCESS;
 }

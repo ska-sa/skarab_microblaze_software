@@ -268,7 +268,7 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define HMC_WRITE_I2C               0x0033
 //#define SPARE2                      0x0035
 //#define SPARE3                      0x0037
-#define MEZZANINE_RESET_AND_PROG	  0x0039
+#define ADC_MEZZANINE_RESET_AND_PROG	  0x0039
 //#define SPARE5                      0x0041
 
 /* the following opcodes (commented out) defined in custom_constants.h
@@ -1244,20 +1244,20 @@ typedef struct sGetFPGAFanControllerLUTResp {
   u16 uPadding[4];
 } sGetFPGAFanControllerLUTRespT;
 
-typedef struct sMezzanineResetAndProgramReq {
-	sCommandHeaderT Header;
-    u16  			uReset;
-    u16				uProgram;
-    u16				uMezzanine;
-} sMezzanineResetAndProgramReqT;
+typedef struct sADCMezzanineResetAndProgramReq {
+  sCommandHeaderT Header;
+  u16  			uReset;
+  u16				uProgram;
+  u16				uMezzanine;
+} sADCMezzanineResetAndProgramReqT;
 
-typedef struct sMezzanineResetAndProgramResp {
-	sCommandHeaderT Header;
-    u16  			uReset;
-    u16				uProgram;
-    u16				uMezzanine;
-	u16				uPadding[6];
-} sMezzanineResetAndProgramRespT;
+typedef struct sADCMezzanineResetAndProgramResp {
+  sCommandHeaderT Header;
+  u16  			uReset;
+  u16				uProgram;
+  u16				uMezzanine;
+  u16				uPadding[6];
+} sADCMezzanineResetAndProgramRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0
