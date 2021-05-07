@@ -84,6 +84,7 @@ u8 uQSFPInit(struct sQSFPObject *pQSFPObject){
     return XST_FAILURE;
   }
 
+  pQSFPObject->QSFPMagic = QSFP_MAGIC;
   pQSFPObject->uWaitCount = 0;
   pQSFPObject->InitState = QSFP_STATE_INIT_BOOTLOADER_VERSION_WRITE_MODE;
   pQSFPObject->AppState = QSFP_STATE_APP_UPDATING_TX_LEDS;

@@ -106,7 +106,7 @@ volatile u8 uDoReboot;
 volatile u8 uQSFPMezzanineLocation;
 volatile u8 uQSFPMezzaninePresent;
 volatile u32 uQSFPCtrlReg;
-volatile u8 uQSFPUpdateStatusEnable;
+//volatile u8 uQSFPUpdateStatusEnable;
 /* volatile u8 uQSFPUpdateState; */
 volatile u8 uQSFPI2CMicroblazeAccess;
 /* volatile u32 uQSFPStateCounter; */
@@ -120,8 +120,8 @@ volatile u16 uQSFPBootloaderVersionMinor;
 volatile u32 uPreviousAsyncSdramRead;
 volatile u16 uPreviousSequenceNumber;
 
-volatile u8 uADC32RF45X2MezzanineLocation;
-volatile u8 uADC32RF45X2MezzaninePresent;
+//volatile u8 uADC32RF45X2MezzanineLocation;
+//volatile u8 uADC32RF45X2MezzaninePresent;
 volatile u8 uADC32RF45X2UpdateStatusEnable;
 
 volatile u16 uADC32RF45X2BootloaderVersionMajor;
@@ -268,8 +268,16 @@ volatile u16 uADC32RF45X2BootloaderVersionMinor;
 #define HMC_WRITE_I2C               0x0033
 //#define SPARE2                      0x0035
 //#define SPARE3                      0x0037
-//#define SPARE4                      0x0039
+#define ADC_MEZZANINE_RESET_AND_PROG	  0x0039
 //#define SPARE5                      0x0041
+
+/* the following opcodes (commented out) defined in custom_constants.h
+ * #define GET_SENSOR_DATA       0x0043
+ * #define SET_FAN_SPEED         0x0045
+ * #define BIG_READ_WISHBONE     0x0047
+ * #define BIG_WRITE_WISHBONE    0x0049
+ */
+
 #define SDRAM_PROGRAM_OVER_WISHBONE 0x0051
 #define SET_DHCP_TUNING_DEBUG       0x0053
 #define GET_DHCP_TUNING_DEBUG       0x0055
@@ -1235,6 +1243,21 @@ typedef struct sGetFPGAFanControllerLUTResp {
   u16 uError;  /* status: send 0 for success, >= 1 for error */
   u16 uPadding[4];
 } sGetFPGAFanControllerLUTRespT;
+
+typedef struct sADCMezzanineResetAndProgramReq {
+  sCommandHeaderT Header;
+  u16  			uReset;
+  u16				uProgram;
+  u16				uMezzanine;
+} sADCMezzanineResetAndProgramReqT;
+
+typedef struct sADCMezzanineResetAndProgramResp {
+  sCommandHeaderT Header;
+  u16  			uReset;
+  u16				uProgram;
+  u16				uMezzanine;
+  u16				uPadding[6];
+} sADCMezzanineResetAndProgramRespT;
 
 // I2C BUS DEFINES
 #define MB_I2C_BUS_ID       0x0

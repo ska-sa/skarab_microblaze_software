@@ -98,6 +98,8 @@ static volatile u8 uFlagRunTask_Diagnostics = 0;
 static volatile u8 uFlagRunTask_ARP_Requests[NUM_ETHERNET_INTERFACES] = {ARP_REQUEST_DONT_UPDATE};
 static volatile u8 uFlagRunTask_WriteLEDStatus = 0;
 
+volatile u8 uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+
 static volatile u8 uFlagRunTask_Aux = 0;
 
 static volatile u16 uTimeoutCounter = 255;
@@ -118,8 +120,10 @@ extern u32 _location_checksum_;
 //static struct sDHCPObject DHCPContextState[NUM_ETHERNET_INTERFACES];  /* TODO can we narrow down the scope of this data? */
 //static struct sICMPObject ICMPContextState[NUM_ETHERNET_INTERFACES];
 //static struct sIFObject IFContext[NUM_ETHERNET_INTERFACES];
-static struct sQSFPObject QSFPContext;
-static struct sAdcObject AdcContext;
+//static struct sQSFPObject QSFPContext;
+//static struct sAdcObject AdcContext;
+//static struct sQSFPObject *QSFPContext_hdl;
+//static struct sAdcObject *AdcContext_hdl;
 
 static struct sMezzObject *MezzHandle[4];   /* holds the handle to the state of each mezzanine card*/
 
@@ -185,7 +189,6 @@ void TimerHandler(void * CallBackRef, u8 uTimerCounterNumber)
 #endif
 
     uQSFPUpdateStatusEnable = UPDATE_QSFP_STATUS;
-
     uADC32RF45X2UpdateStatusEnable = UPDATE_ADC32RF45X2_STATUS;
 
     uFlagRunTask_WriteLEDStatus = 1;
@@ -506,8 +509,8 @@ int main()
   uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
   uQSFPI2CMicroblazeAccess = QSFP_I2C_MICROBLAZE_ENABLE;
 
-  uADC32RF45X2MezzanineLocation = 0x0;
-  uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
+  //uADC32RF45X2MezzanineLocation = 0x0;
+  //uADC32RF45X2MezzaninePresent = ADC32RF45X2_MEZZANINE_NOT_PRESENT;
   uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
 
   struct sIFObject *pIFObjectPtr[NUM_ETHERNET_INTERFACES]; /* store i/f state handles */
@@ -527,6 +530,7 @@ int main()
 
   //u32 uIGMPGroupAddress;
   u8 uOKToReboot;
+
 #ifdef LINK_MONITOR
   u8 uDHCPReconfigCount = DHCP_MAX_RECONFIG_COUNT;
   u16 uDHCPTimeoutMax = DHCP_MON_COUNTER_DEFAULT_VALUE;
@@ -721,16 +725,17 @@ int main()
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_ERROR, "INIT [..] Mezzanine locations\r\n");
   InitialiseMezzanineLocations();
 
-  AdcInit(&AdcContext);
-  uQSFPInit(&QSFPContext);
+  //AdcInit(&AdcContext);       /* now handled within mezz obj context */
+  //uQSFPInit(QSFPContext_hdl);    /* now handled within mezz obj context */
 
   /*
-   * call the qsfp+ state machine 4 times - this will set up the mezzanine cards
-   * early in the init process - before hmc
+   * call the qsfp+ state machine 4 times - this will set up the qsfp mezzanine cards
+   * early in the init process - before hmc. This should reduce the boot up time slightly
    */
 
   for (uIndex = 0; uIndex < 4; uIndex++){
-        QSFPStateMachine(&QSFPContext);
+        /* QSFPStateMachine(QSFPContext_hdl); */
+        run_qsfp_mezz_mgmt();
         Delay(100000);  /* 100ms */
   }
 
@@ -1178,22 +1183,21 @@ int main()
   //WriteBoardRegister(C_WR_FRONT_PANEL_STAT_LED_ADDR, 255);
   while(1)
   {
-    if (uQSFPMezzaninePresent == QSFP_MEZZANINE_PRESENT){
-      //UpdateQSFPStatus();
-      if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
-        uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
-        QSFPStateMachine(&QSFPContext);
-      }
+
+    /* these mezz mgmt functions are split since the flags guarding them are set
+     * by other functions and cmds independently e.g. uQSFPUpdateStatusEnable is set in
+     * QSFPResetAndProgramCommandHandler()
+     */
+    if (uQSFPUpdateStatusEnable == UPDATE_QSFP_STATUS){
+      uQSFPUpdateStatusEnable = DO_NOT_UPDATE_QSFP_STATUS;
+      run_qsfp_mezz_mgmt();
     }
 
-    if (uADC32RF45X2MezzaninePresent == ADC32RF45X2_MEZZANINE_PRESENT){
-      if (uADC32RF45X2UpdateStatusEnable == UPDATE_ADC32RF45X2_STATUS){
-        uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
-        AdcStateMachine(&AdcContext);
-      }
+    if (uADC32RF45X2UpdateStatusEnable == UPDATE_ADC32RF45X2_STATUS){
+      uADC32RF45X2UpdateStatusEnable = DO_NOT_UPDATE_ADC32RF45X2_STATUS;
+      run_adc_mezz_mgmt();
     }
 
-    //for (uPhysicalEthernetId = 0; uPhysicalEthernetId < NUM_ETHERNET_INTERFACES; uPhysicalEthernetId++){
 
     for (logical_link = 0; logical_link < num_links; logical_link++){
       uPhysicalEthernetId = get_physical_interface_id(logical_link);
