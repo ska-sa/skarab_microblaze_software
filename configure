@@ -15,7 +15,7 @@ function fail_exit() {
 }
 
 function print_usage_exit() {
-  echo "usage: ./configure [--force] [--gui <none|zenity|dialog>]"
+  echo "usage: ./configure [--help] [--force] [--gui <none|zenity|dialog>]"
   exit
 }
 
@@ -153,7 +153,7 @@ case "$OPTION" in
   ;;
 
 *)
-  echo "dialog or zenity not installed - running interactive text mode."
+  echo "dialog or zenity not installed - running interactive text mode (tab completion enabled)."
   echo "${ASK_SDK_LOC}"
   read -e -p"$>" SELECTDIR
   #force expansions - example '~'

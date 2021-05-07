@@ -19,6 +19,7 @@
 #include "error.h"
 #include "memtest.h"
 #include "mezz.h"
+#include "fanctrl.h"
 
 #define LINE_BYTES_MAX 20
 
@@ -68,6 +69,8 @@ typedef enum {
   CMD_INDEX_ARP_PROC,
   CMD_INDEX_MEMTEST,
   CMD_INDEX_CLR_LINK_MON,
+  CMD_INDEX_FAN_RUNTIME,
+  CMD_INDEX_FAN_PWM_AVG,
   CMD_INDEX_HELP,
   CMD_INDEX_END
 } CMD_INDEX;
@@ -98,6 +101,8 @@ static const char * const cli_cmd_map[] = {
   [CMD_INDEX_ARP_PROC]    = "arp-proc",
   [CMD_INDEX_MEMTEST]     = "memtest",
   [CMD_INDEX_CLR_LINK_MON]= "clr-link-mon-count",
+  [CMD_INDEX_FAN_RUNTIME] = "fan-runtime",
+  [CMD_INDEX_FAN_PWM_AVG] = "fan-pwm-avg",
   [CMD_INDEX_HELP]        = "help",
   [CMD_INDEX_END]         = NULL
 };
@@ -127,6 +132,8 @@ static const char * const cli_cmd_options[][12] = {
  [CMD_INDEX_ARP_PROC]     = {"off",     "on",     "stat"},    /* order of "off" (index 0) and "on" (index 1) are important */
  [CMD_INDEX_MEMTEST]      = { NULL },
  [CMD_INDEX_CLR_LINK_MON] = { NULL },
+ [CMD_INDEX_FAN_RUNTIME]  = {"lf",      "lm",     "lb",   "rb",   "fpga",   NULL },  /* order is important - corresponds to fan page number */
+ [CMD_INDEX_FAN_PWM_AVG]  = {"lf",      "lm",     "lb",   "rb",   "fpga",   NULL },  /* order is important - corresponds to fan page number */
  [CMD_INDEX_HELP]         = { NULL },
  [CMD_INDEX_END]          = { NULL }
 };
@@ -154,6 +161,8 @@ static int cli_arp_req_exe(struct cli *_cli);
 static int cli_arp_proc_exe(struct cli *_cli);
 static int cli_memtest_exe(struct cli *_cli);
 static int cli_clr_link_mon_exe(struct cli *_cli);
+static int cli_fan_runtime_exe(struct cli *_cli);
+static int cli_fan_pwm_avg_exe(struct cli *_cli);
 static int cli_help_exe(struct cli *_cli);
 
 static const cmd_callback cli_cmd_callback[] = {
@@ -180,6 +189,8 @@ static const cmd_callback cli_cmd_callback[] = {
  [CMD_INDEX_ARP_PROC]     = cli_arp_proc_exe,
  [CMD_INDEX_MEMTEST]      = cli_memtest_exe,
  [CMD_INDEX_CLR_LINK_MON] = cli_clr_link_mon_exe,
+ [CMD_INDEX_FAN_RUNTIME]  = cli_fan_runtime_exe,
+ [CMD_INDEX_FAN_PWM_AVG]  = cli_fan_pwm_avg_exe,
  [CMD_INDEX_HELP]         = cli_help_exe,
  [CMD_INDEX_END]          = NULL
 };
@@ -794,20 +805,12 @@ static int cli_get_config_exe(struct cli *_cli){
 #endif
   log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "multi-link arch: %s\r\n", str_multi);
 
-#ifdef LINK_MON_RX_40GBE
-  const char *str_lmon = "yes";
-#else
-  const char *str_lmon = "no";
-#endif
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "40gbe link 1 mon: %s\r\n", str_lmon);
-
-
-#ifdef RECONFIG_UPON_NO_DHCP
+#ifdef LINK_MONITOR
   const char *str_dmon = "yes";
 #else
   const char *str_dmon = "no";
 #endif
-  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "dhcp mon: %s\r\n", str_dmon);
+  log_printf(LOG_SELECT_GENERAL, LOG_LEVEL_INFO, "link mon: %s\r\n", str_dmon);
 
 #ifdef HMC_RECONFIG_RETRY
   const char *str_hmc = "yes";
@@ -1191,4 +1194,45 @@ static int cli_clr_link_mon_exe(struct cli *_cli){
   } else {
     return -1;
   }
+}
+
+const char * const fan_text_lut[] = {"left-front", "left-mid", "left-back", "right-back", "fpga"};
+
+static int cli_fan_runtime_exe(struct cli *_cli){
+  u16 runtime;
+
+  /* no need to check the option parsed in - cli s/m logic does this already, we should
+   * thus be able to pass it directly to the fan control runtime function.
+   */
+  runtime = fanctrlr_get_run_time(_cli->opt_id);
+  if (0 == runtime){
+    return -1;
+  }
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  xil_printf("%s ", fan_text_lut[_cli->opt_id]);
+#endif
+  xil_printf("%u hrs\r\n", runtime);
+
+  return 0;
+}
+
+
+static int cli_fan_pwm_avg_exe(struct cli *_cli){
+  u16 pwm_avg;
+
+  /* no need to check the option parsed in - cli s/m logic does this already, we should
+   * thus be able to pass it directly to the fan control pwm avg function.
+   */
+  pwm_avg = fanctrlr_get_pwm_avg(_cli->opt_id);
+  if (0 == pwm_avg){
+    return -1;
+  }
+
+#ifndef PRUNE_CODEBASE_DIAGNOSTICS
+  xil_printf("%s ", fan_text_lut[_cli->opt_id]);
+#endif
+  xil_printf("%u.%u %%\r\n", (pwm_avg/100), (pwm_avg%100));
+
+  return 0;
 }

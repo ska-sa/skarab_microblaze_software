@@ -18,6 +18,8 @@ int fanctrlr_setup_registers();
 int fanctrlr_set_lut_points(u16 *setpoints);
 int fanctrlr_store_defaults_to_flash();
 u16 *fanctrlr_get_lut_points();
+u16 fanctrlr_get_run_time(unsigned int fan_page);
+u16 fanctrlr_get_pwm_avg(unsigned int fan_page);
 
 #ifdef __cplusplus
 }
